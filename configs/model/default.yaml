@@ -1,0 +1,24 @@
+defaults:
+  - scheduler: cosine
+  - optimizer: adam_w
+
+smc_sampler:
+  _target_: src.models.samplers.continuous_time_smc_sampler.ContinuousTimeSMCSampler
+  _partial_: true
+  batch_size: ${data.batch_size}
+  langevin_eps: 0.1
+  num_timesteps: 10
+  enabled: false
+  ess_threshold: 0.0
+  input_energy_cutoff: null
+
+sampling_config:
+  num_proposal_samples: 10_000
+  num_test_proposal_samples: 10_000
+  num_smc_samples: 10_000
+  batch_size: 10_000
+  clip_reweighting_logits: null
+
+ema_decay: 0.999
+# compile model for faster training with pytorch 2.0
+compile: false

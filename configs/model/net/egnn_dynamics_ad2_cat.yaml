@@ -1,0 +1,4 @@
+_target_: src.models.neural_networks.egnn.egnn_dynamics_ad2_cat.EGNN_dynamics_AD2_cat
+num_atoms: ${data.num_atoms}
+num_dimensions: ${data.num_dimensions}
+data_dir: ${data.data_dir}

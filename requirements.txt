@@ -1,0 +1,54 @@
+# --------- pytorch --------- #
+torch>=2.0.0
+torchvision>=0.15.0
+lightning>=2.0.0
+torchmetrics>=0.11.4
+
+# --------- hydra --------- #
+hydra-core==1.3.2
+hydra-colorlog==1.2.0
+hydra-optuna-sweeper==1.2.0
+hydra-submitit_launcher
+
+# --------- loggers --------- #
+# wandb
+# neptune-client
+# mlflow
+# comet-ml
+# aim>=3.16.2  # no lower than 3.16.2, see https://github.com/aimhubio/aim/issues/2550
+
+# --------- others --------- #
+rootutils       # standardizing the project root setup
+pre-commit      # hooks for applying linters on commit
+rich            # beautiful text formatting in terminal
+pytest          # tests
+# sh            # for running bash commands in some tests (linux/macos only)
+
+# --------- project-specific --------- #
+einops
+matplotlib
+mdtraj
+networkx
+numpy
+nglview
+openmm[cuda12]
+pot
+scikit-learn
+scipy
+tables
+tensorboard
+torchdiffeq
+torchsde
+torchdyn
+tqdm
+jupyterlab
+bgflow @ git+https://github.com/atong01/bgflow.git
+bgmol @ git+https://github.com/atong01/bgmol.git
+zuko
+wandb
+huggingface-hub
+webdataset
+wget
+
+# flash-attn no build isolation
+# pip install flash-attn --no-build-isolation

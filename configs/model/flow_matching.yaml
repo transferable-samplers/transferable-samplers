@@ -1,0 +1,22 @@
+defaults:
+  - default
+  - net: egnn_dynamics_transferable_md
+
+_target_: src.models.flow_matching_module.FlowMatchLitModule
+mean_free_prior: True
+atol: 1e-4
+rtol: 1e-4
+div_estimator: "exact"
+logp_tol_scale: 1.0
+n_eps: 1
+
+optimizer:
+  _partial_: true
+  lr: 5e-4
+  betas:
+    - 0.9
+    - 0.999
+  weight_decay: 1e-4
+
+sampling_config:
+  use_com_adjustment: False

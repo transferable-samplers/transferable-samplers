@@ -1,0 +1,11 @@
+_target_: src.data.single_peptide_datamodule.SinglePeptideDataModule
+repo_id: many-peptides/sequential-boltzmann-generators-data
+data_dir: ${paths.data_dir}
+sequence: AAAAAA
+temperature: 310
+batch_size: 512 # Needs to be divisible by the number of devices (e.g., if in a distributed setup)
+num_workers: 1
+pin_memory: False
+num_dimensions: 3
+num_atoms: 63
+dim: 189

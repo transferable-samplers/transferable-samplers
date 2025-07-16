@@ -1,0 +1,9 @@
+_target_: src.models.neural_networks.tarflow.tarflow.TarFlow
+img_size: ${data.dim}
+in_channels: ${data.num_dimensions}
+channels: 256
+num_blocks: 4
+layers_per_block: 4
+use_adapt_ln: False
+use_attn_pair_bias: False
+use_qkln: True
