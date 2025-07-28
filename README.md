@@ -1,6 +1,6 @@
 # Transferable Samplers!
 
-Welcome to the official codebase for "Scalable Equilibrium Sampling with Sequential Boltzmann Generators" (ICML 2025)[https://icml.cc/virtual/2025/poster/45137]
+Welcome to the official codebase for "Scalable Equilibrium Sampling with Sequential Boltzmann Generators" [ICML 2025](https://icml.cc/virtual/2025/poster/45137)
 
 ## Install
 
