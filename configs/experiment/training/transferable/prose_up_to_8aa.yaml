@@ -1,0 +1,24 @@
+# @package _global_
+
+defaults:
+  - override /model: normalizing_flow
+  - override /model/net: prose
+  - override /data: transferable/up_to_8aa
+  - override /trainer: gpu
+
+model:
+  sampling_config:
+    num_proposal_samples: 5_000
+
+data:
+  batch_size: 512
+  num_eval_samples: 5_000
+  com_augmentation: True
+
+trainer:
+  check_val_every_n_epoch: 50
+  limit_train_batches: 1000
+  limit_val_batches: 0.5 # it's quite slow otherwise - only affects val/loss
+  limit_test_batches: null
+  max_epochs: 500
+  num_sanity_val_steps: 0

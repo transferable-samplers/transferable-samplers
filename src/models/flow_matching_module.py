@@ -42,7 +42,7 @@ class FlowMatchLitModule(TransferableBoltzmannGeneratorLitModule):
         """
         return self.net(t, x, encodings=encodings, node_mask=mask)
 
-    def get_xt(self, x0, x1, t):
+    def get_xt(self, x0, x1, t, mask=None):
         mu_t = (1.0 - t) * x0 + t * x1
 
         if not self.hparams.sigma == 0.0:
@@ -50,6 +50,9 @@ class FlowMatchLitModule(TransferableBoltzmannGeneratorLitModule):
             num_tokens = x1.shape[1] // self.datamodule.hparams.num_dimensions
             noise = self.prior.sample(num_samples, num_tokens, mask=None, device=x1.device).flatten(start_dim=1)
             xt = mu_t + self.hparams.sigma * noise
+            if mask is not None:
+                xt = xt.view(num_samples, num_tokens, -1) * mask[..., None]
+                xt = xt.view(num_samples, -1)
         else:
             xt = mu_t
 
@@ -76,8 +79,7 @@ class FlowMatchLitModule(TransferableBoltzmannGeneratorLitModule):
         num_tokens = x1.shape[1]
 
         encodings = batch.get("encodings", None)
-        permutations = batch.get("permutations", None)
-        mask = permutations.get("mask", None) if permutations else None
+        mask = batch.get("mask", None)
 
         t = torch.rand(num_samples, 1, device=x1.device)
         prior_samples = self.prior.sample(num_samples, num_tokens, mask, device=x1.device)
@@ -85,11 +87,18 @@ class FlowMatchLitModule(TransferableBoltzmannGeneratorLitModule):
         x1 = x1.flatten(start_dim=1)
         prior_samples = prior_samples.flatten(start_dim=1)
 
-        xt = self.get_xt(prior_samples, x1, t)
+        xt = self.get_xt(prior_samples, x1, t, mask)
         vt_flow = self.get_flow_targets(prior_samples, x1)
 
         vt_pred = self.forward(t, xt, encodings=encodings, mask=mask)
-        loss = self.criterion(vt_pred, vt_flow)
+
+        assert len(vt_pred.shape) == 2
+        assert len(vt_flow.shape) == 2
+
+        loss = torch.sum((vt_pred - vt_flow) ** 2, dim=-1)
+        if mask is not None:
+            loss = loss / mask.int().sum(-1)
+        loss = loss.mean()
 
         return loss
 
@@ -130,6 +139,11 @@ class FlowMatchLitModule(TransferableBoltzmannGeneratorLitModule):
 
     @torch.no_grad()
     def flow(self, x: torch.Tensor, encodings, reverse=False, dummy_ll=False) -> torch.Tensor:
+        batch_size = x.shape[0]
+        num_atoms = x.shape[1]
+
+        x = x.reshape(batch_size, -1)  # Ensure x is 2D
+
         dlog_p = torch.zeros((x.shape[0], 1), device=x.device)
         t_span = torch.linspace(1, 0, 2) if reverse else torch.linspace(0, 1, 2)
 
@@ -174,6 +188,7 @@ class FlowMatchLitModule(TransferableBoltzmannGeneratorLitModule):
             dlog_p = x[..., -1] * self.hparams.logp_tol_scale
             x = x[..., :-1]
         # logp = (-self.prior.energy(x).view(-1) - dlog_p.view(-1))
+        x = x.reshape(batch_size, num_atoms, -1)
 
         return x, dlog_p
 
@@ -240,13 +255,32 @@ class FlowMatchLitModule(TransferableBoltzmannGeneratorLitModule):
         return -(-self.prior.energy(x).view(-1) - dlogp.view(-1))
 
     def evaluate(
-        self, sequence, true_samples, permutations, encodings, energy_fn, prefix: str = "val", proposal_generator=None,
+        self,
+        sequence,
+        true_samples,
+        permutations,
+        encodings,
+        energy_fn,
+        tica_model,
+        prefix: str = "val",
+        proposal_generator=None,
+        output_dir=None,
     ):
         logger.info(f"has test_integrators {hasattr(self.hparams, 'test_integrators')}")
         if True and hasattr(self.hparams, "test_integrators"):
             self.test_integrators()
             return {}
-        results = super().evaluate(sequence, true_samples, permutations, encodings, energy_fn, prefix)
+        results = super().evaluate(
+            sequence,
+            true_samples,
+            permutations,
+            encodings,
+            energy_fn,
+            tica_model,
+            prefix,
+            proposal_generator,
+            output_dir,
+        )
 
         self.log(f"{prefix}/nfe", self.nfe / (max(self.num_integrations, 1e-4)))
         self.nfe = 0
@@ -257,7 +291,7 @@ class FlowMatchLitModule(TransferableBoltzmannGeneratorLitModule):
     def generate_samples(
         self,
         batch_size: int,
-        permutations: dict[str, torch.Tensor],
+        permutations: Optional[dict[str, torch.Tensor]] = None,
         encodings: Optional[dict[str, torch.Tensor]] = None,
         dummy_ll: bool = False,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -283,23 +317,20 @@ class FlowMatchLitModule(TransferableBoltzmannGeneratorLitModule):
         # need to rescale to the "sum" of the log p (the prior returns the position-wise mean)
         prior_log_p = -self.prior.energy(prior_samples) * data_dim
 
-        prior_samples = prior_samples.flatten(start_dim=1)
-
         if encodings is not None:
             encodings = {
-                key: tensor.unsqueeze(0).repeat(local_batch_size, 1).to(self.device) for key, tensor in encodings.items()
+                key: tensor.unsqueeze(0).repeat(local_batch_size, 1).to(self.device)
+                for key, tensor in encodings.items()
             }
 
         with torch.no_grad():
             samples, dlog_p = self.flow(prior_samples, encodings=encodings, reverse=False, dummy_ll=dummy_ll)
-            samples = self.all_gather(samples).reshape(batch_size, -1)
+            samples = self.all_gather(samples).reshape(batch_size, *samples.shape[1:])
             dlog_p = self.all_gather(dlog_p).reshape(-1, *dlog_p.shape[1:])
             prior_log_p = self.all_gather(prior_log_p).reshape(-1, *prior_log_p.shape[1:])
             prior_samples = self.all_gather(prior_samples).reshape(-1, *prior_samples.shape[1:])
 
         log_p = prior_log_p.flatten() + dlog_p.flatten()
-
-        samples = samples.view(batch_size, -1, self.datamodule.hparams.num_dimensions)
 
         return samples, log_p, prior_samples
 

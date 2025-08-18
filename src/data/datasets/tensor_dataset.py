@@ -1,5 +1,6 @@
-import numpy as np
 import torch
+
+# TODO this should be factored together with peptides_dataset.py
 
 
 class TensorDataset(torch.utils.data.Dataset):

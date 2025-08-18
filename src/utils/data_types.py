@@ -3,7 +3,6 @@ from dataclasses import dataclass
 import torch
 
 
-
 @dataclass
 class SamplesData:
     samples: torch.Tensor

@@ -1,10 +1,10 @@
+import inspect
 import logging
 import os
 import statistics as stats
 import time
 from collections import defaultdict
 from typing import Any, Optional
-import inspect
 
 import hydra
 import matplotlib.pyplot as plt
@@ -12,16 +12,14 @@ import torch
 import torchmetrics
 from lightning import LightningDataModule, LightningModule
 from lightning.pytorch.loggers import WandbLogger
-from omegaconf import OmegaConf
 from torchmetrics import MeanMetric
-from tqdm import tqdm
+from tqdm import tqdm, trange
 
-from src.utils.data_types import SamplesData
-from src.models.utils import get_symmetry_change
 from src.models.neural_networks.ema import EMA
 from src.models.priors import NormalDistribution
 from src.models.samplers.base_sampler import SMCSampler
-from src.models.utils import resample
+from src.models.utils import get_symmetry_change, resample
+from src.utils.data_types import SamplesData
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +48,6 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         :param scheduler: The learning rate scheduler to use for training.
         """
         super().__init__()
-
         # this line allows to access init params with 'self.hparams' attribute
         # also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=False, ignore=("datamodule"))
@@ -164,6 +161,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         encodings: Optional[dict[str, torch.Tensor]] = None,
         batch_size: Optional[int] = None,
         dummy_ll: bool = False,
+        log_invert_error: bool = True,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         if batch_size is None:
             batch_size = self.hparams.sampling_config.batch_size
@@ -171,13 +169,15 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         log_ps = []
         prior_samples = []
         for _ in tqdm(range(total_size // batch_size)):
-            s, lp, ps = self.generate_samples(batch_size, permutations, encodings=encodings, dummy_ll=dummy_ll)
+            s, lp, ps = self.generate_samples(
+                batch_size, permutations=permutations, encodings=encodings, dummy_ll=dummy_ll
+            )
             samples.append(s)
             log_ps.append(lp)
             prior_samples.append(ps)
         if total_size % batch_size > 0:
             s, lp, ps = self.generate_samples(
-                total_size % batch_size, permutations, encodings=encodings, dummy_ll=dummy_ll
+                total_size % batch_size, permutations=permutations, encodings=encodings, dummy_ll=dummy_ll
             )
             samples.append(s)
             log_ps.append(lp)
@@ -299,19 +299,25 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
 
     def evaluate_all(self, prefix):
         metrics = {}
-        sequence = self.datamodule.hparams.sequence
-        true_samples, permutations, encodings, energy_fn = self.datamodule.prepare_eval(prefix)
-        metrics.update(
-            self.evaluate(
-                sequence,
-                true_samples,
-                permutations,
-                encodings,
-                energy_fn,
-                prefix=f"{prefix}/{sequence}",
-                proposal_generator=self.batched_generate_samples,
+        eval_sequences = self.datamodule.val_sequences if prefix.startswith("val") else self.datamodule.test_sequences
+        for sequence in eval_sequences:
+            # TODO: single peptides expects prefix as input while transferable expects sequence as input
+            true_samples, permutations, encodings, energy_fn, tica_model = self.datamodule.prepare_eval(
+                prefix=prefix, sequence=sequence
             )
-        )
+            logging.info(f"Evaluating {sequence} samples")
+            metrics.update(
+                self.evaluate(
+                    sequence,
+                    true_samples,
+                    permutations,
+                    encodings,
+                    energy_fn,
+                    tica_model,
+                    prefix=f"{prefix}/{sequence}",
+                    proposal_generator=self.batched_generate_samples,
+                )
+            )
 
         # Aggregate metrics across all sequences
         if self.local_rank == 0:
@@ -332,6 +338,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         permutations,
         encodings,
         energy_fn,
+        tica_model=None,
         prefix: str = "val",
         proposal_generator=None,
         output_dir=None,
@@ -358,43 +365,55 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         else:
             num_proposal_samples = self.hparams.sampling_config.num_proposal_samples
 
-        # Generate samples and record time
-        torch.cuda.synchronize()
-        start_time = time.time()
-        proposal_samples, proposal_log_q, prior_samples = proposal_generator(num_proposal_samples, permutations, encodings)
-        torch.cuda.synchronize()
-        time_duration = time.time() - start_time
+        if self.hparams.sampling_config.get("load_samples_path", None) is None:
+            # Generate samples and record time
+            torch.cuda.synchronize()
+            start_time = time.time()
+            proposal_samples, proposal_log_q, prior_samples = proposal_generator(
+                num_proposal_samples, permutations, encodings
+            )
+            torch.cuda.synchronize()
+            time_duration = time.time() - start_time
 
-        metrics.update(
-            {
-                f"{prefix}/samples_walltime": time_duration,
-                f"{prefix}/samples_per_second": len(proposal_samples) / time_duration,
-                f"{prefix}/seconds_per_sample": time_duration / len(proposal_samples),
+            metrics.update(
+                {
+                    f"{prefix}/samples_walltime": time_duration,
+                    f"{prefix}/samples_per_second": len(proposal_samples) / time_duration,
+                    f"{prefix}/seconds_per_sample": time_duration / len(proposal_samples),
+                }
+            )
+
+            # Save samples to disk
+            samples_dict = {
+                "prior_samples": prior_samples,
+                "proposal_samples": proposal_samples,
+                "proposal_log_q": proposal_log_q,
             }
-        )
-
-        # Save samples to disk
-        samples_dict = {
-            "prior_samples": prior_samples,
-            "proposal_samples": proposal_samples,
-            "proposal_log_q": proposal_log_q,
-        }
-        if output_dir is None:
-            output_dir = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
-        if self.local_rank == 0:
-            os.makedirs(f"{output_dir}/{prefix}", exist_ok=True)
-            if self.hparams.sampling_config.get("subset_idx") is not None:
-                torch.save(
-                    samples_dict, f"{output_dir}/{prefix}/samples_{self.hparams.sampling_config.subset_idx}.pt"
-                )
-                logging.info(
-                    f"Saving {len(proposal_samples)} samples to {output_dir} "
-                    "/{prefix}/samples_{self.hparams.sampling_config.subset_idx}.pt"
-                )
-                return {}  # early return if subset_idx is set - need to post-process these samples in notebook
-            else:
-                torch.save(samples_dict, f"{output_dir}/{prefix}/samples.pt")
-                logging.info(f"Saving {len(proposal_samples)} samples to {output_dir}/{prefix}/samples.pt")
+            if output_dir is None:
+                output_dir = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
+            if self.local_rank == 0:
+                os.makedirs(f"{output_dir}/{prefix}", exist_ok=True)
+                if self.hparams.sampling_config.get("subset_idx") is not None:
+                    torch.save(
+                        samples_dict, f"{output_dir}/{prefix}/samples_{self.hparams.sampling_config.subset_idx}.pt"
+                    )
+                    logging.info(
+                        f"Saving {len(proposal_samples)} samples to {output_dir} "
+                        "/{prefix}/samples_{self.hparams.sampling_config.subset_idx}.pt"
+                    )
+                    return {}  # early return if subset_idx is set - need to post-process these samples in notebook
+                else:
+                    torch.save(samples_dict, f"{output_dir}/{prefix}/samples.pt")
+                    logging.info(f"Saving {len(proposal_samples)} samples to {output_dir}/{prefix}/samples.pt")
+        else:
+            # Load samples from disk
+            samples_path = self.hparams.sampling_config.load_samples_path
+            logging.info(f"Loading proposal samples from {samples_path}")
+            samples_dict = torch.load(samples_path, map_location=self.device)
+            proposal_samples = samples_dict["proposal_samples"]
+            proposal_log_q = samples_dict["proposal_log_q"]
+            prior_samples = samples_dict["prior_samples"]
+            logging.info(f"Loaded {len(proposal_samples)} samples")
 
         # Compute energy
         proposal_samples_energy = energy_fn(proposal_samples)
@@ -406,7 +425,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         )
 
         # Compute proposal center of mass std
-        coms = self.datamodule.center_of_mass(proposal_samples)
+        coms = proposal_samples.mean(dim=1, keepdim=False)
         proposal_com_std = coms.std()
         # TODO little scary relying on this class attribute! - gets used in self.proposal_energy
         # when use_com_adjustment=True
@@ -417,9 +436,9 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         temp_proposal_samples = proposal_samples.clone()
 
         first_symmetry_change = get_symmetry_change(
-            self.datamodule.as_pointcloud(self.datamodule.unnormalize(true_samples)),
-            self.datamodule.as_pointcloud(self.datamodule.unnormalize(temp_proposal_samples)),
-            self.datamodule.topology,
+            self.datamodule.unnormalize(true_samples),
+            self.datamodule.unnormalize(temp_proposal_samples),
+            self.datamodule.topology_dict[sequence],
         )
 
         correct_symmetry_rate = 1 - first_symmetry_change.float().mean().item()
@@ -427,9 +446,9 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         temp_proposal_samples[first_symmetry_change] *= -1
 
         second_symmetry_change = get_symmetry_change(
-            self.datamodule.as_pointcloud(self.datamodule.unnormalize(true_samples)),
-            self.datamodule.as_pointcloud(self.datamodule.unnormalize(temp_proposal_samples)),
-            self.datamodule.topology,
+            self.datamodule.unnormalize(true_samples),
+            self.datamodule.unnormalize(temp_proposal_samples),
+            self.datamodule.topology_dict[sequence],
         )
 
         uncorrectable_symmetry_rate = second_symmetry_change.float().mean().item()
@@ -451,7 +470,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
 
         # Datatype for easier metrics and plotting
         proposal_data = SamplesData(
-            self.datamodule.as_pointcloud(self.datamodule.unnormalize(proposal_samples)),
+            self.datamodule.unnormalize(proposal_samples),
             proposal_samples_energy,
         )
 
@@ -483,7 +502,22 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
             logits=resampling_logits,
         )
 
-        if self.smc_sampler.enabled:
+        if self.hparams.sampling_config.get("load_samples_path", None) is not None:
+            load_samples_path_jarz = self.hparams.sampling_config.load_samples_path.replace("samples", "smc_samples")
+        else:
+            load_samples_path_jarz = None
+
+        if load_samples_path_jarz and os.path.exists(load_samples_path_jarz):
+            logging.info(f"Loading Jarzynski samples from {load_samples_path_jarz}")
+            smc_samples_dict = torch.load(load_samples_path_jarz, map_location=self.device)
+            smc_samples = smc_samples_dict["samples"]
+            smc_logits = smc_samples_dict["logits"]
+            smc_data = SamplesData(
+                self.datamodule.unnormalize(smc_samples),
+                energy_fn(smc_samples),
+                logits=smc_logits,
+            )
+        elif self.smc_sampler is not None and self.smc_sampler.enabled:
             logging.info("SMC sampling enabled")
 
             num_smc_samples = min(self.hparams.sampling_config.num_smc_samples, len(proposal_samples))
@@ -493,7 +527,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
             start_time = time.time()
 
             # TODO: Make conditional proposal energy
-            cond_proposal_energy = lambda _x: self.proposal_energy(_x, encodings=encodings)
+            cond_proposal_energy = lambda _x: self.proposal_energy(_x, permutations, encodings=encodings)
             smc_samples, smc_logits = self.smc_sampler.sample(
                 proposal_samples[:num_smc_samples], cond_proposal_energy, energy_fn
             )  # already returned resampled
@@ -508,6 +542,10 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
                 "smc_logits": smc_logits,
             }
             if self.local_rank == 0:
+                if output_dir is None:
+                    output_dir = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
+                    os.makedirs(f"{output_dir}/{prefix}", exist_ok=True)
+
                 torch.save(smc_samples_dict, f"{output_dir}/{prefix}/smc_samples.pt")
                 logging.info(f"Saving {len(smc_samples)} samples to {output_dir}/{prefix}_smc_samples.pt")
 
@@ -530,6 +568,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
                     proposal_data,
                     reweighted_data,
                     smc_data,
+                    tica_model,
                     prefix=prefix,
                 )
             )
@@ -537,8 +576,130 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
             metrics = {}
         return metrics
 
+    def generate_and_resample(self, num_proposal_samples: int = None):
+        assert self.datamodule.test_sequences is not None, "Eval sequence name should be set"
+        assert len(self.datamodule.test_sequences) == 1, "Can only self-refine on 1 test sequence at a time."
+        assert self.datamodule.buffer is not None, "Need to have buffer instantiated in datamodule for self-consumption"
+
+        if num_proposal_samples is None:
+            num_proposal_samples = self.hparams.sampling_config.num_proposal_samples
+
+        # on first step, we need to prepare the eval encoding
+        _, permutations, eval_encoding, energy_fn, _ = self.datamodule.prepare_eval(self.datamodule.test_sequences[0])
+
+        proposal_samples, proposal_log_p, _ = self.batched_generate_samples(
+            num_proposal_samples, permutations=permutations, encodings=eval_encoding, log_invert_error=False
+        )
+
+        # Compute energy
+        proposal_samples_energy = energy_fn(proposal_samples)
+
+        # Compute proposal center of mass std
+        coms = proposal_samples.mean(dim=1, keepdim=False)
+        proposal_com_std = coms.std()
+        # TODO little scary relying on this class attribute! - gets used in self.proposal_energy
+        # when use_com_adjustment=True
+        self.proposal_com_std = proposal_com_std
+
+        # Apply CoM adjustment to energy, this must be done here for compatibility with CNFs
+        if self.hparams.sampling_config.get("use_com_adjustment", False):
+            proposal_log_p = proposal_log_p + self.com_energy_adjustment(proposal_samples)
+
+        # Compute resampling index
+        resampling_logits = -proposal_samples_energy - proposal_log_p
+
+        # Filter samples based on logit clipping - this affects both IS and SMC
+        if self.hparams.sampling_config.clip_reweighting_logits:
+            clipped_logits_mask = resampling_logits > torch.quantile(
+                resampling_logits,
+                1 - float(self.hparams.sampling_config.clip_reweighting_logits),
+            )
+            proposal_samples = proposal_samples[~clipped_logits_mask]
+            proposal_samples_energy = proposal_samples_energy[~clipped_logits_mask]
+            resampling_logits = resampling_logits[~clipped_logits_mask]
+            logging.info("Clipped logits for resampling")
+
+        _, resampling_index = resample(proposal_samples, resampling_logits, return_index=True)
+        reweighted_samples = self.datamodule.unnormalize(proposal_samples[resampling_index])
+        return reweighted_samples
+
+    def on_fit_start(self) -> None:
+        """
+        Called at the very beginning of the fit loop, after setup() has been called.
+        Here we add a one-epoch fine-tuning step on the dataset before the main training starts.
+        """
+
+        # Check if the pre-training hyperparameter is set to True
+        if self.hparams.sampling_config.get("finetune_on_data", False):
+            logger.info("Starting fine-tuning on the dataset...")
+
+            # Ensure model is in training mode and gradients are enabled
+            self.train()
+            torch.set_grad_enabled(True)
+
+            # Get the optimizer and the training dataloader from the trainer
+            optimizer = self.trainer.optimizers[0]
+            dataloader = self.trainer.train_dataloader
+
+            # Manual training loop for one epoch
+            total_loss = 0.0
+            num_iter = (
+                self.hparams.sampling_config.num_finetune_epochs * dataloader.dataset.data_length
+            ) // self.datamodule.hparams.batch_size
+
+            pbar = trange(num_iter)
+            data_iterator = iter(dataloader)
+            for step in pbar:
+                batch = next(data_iterator)
+                optimizer.zero_grad()
+
+                _batch = {}
+                _batch["x"] = batch["x"].to(self.device)
+                _batch["sequence"] = batch["sequence"]
+                _batch["encodings"] = {k: v.to(self.device) for k, v in batch["encodings"].items()}
+                _batch["permutations"] = {k: v.to(self.device) for k, v in batch["permutations"].items()}
+                _batch["mask"] = batch["mask"].to(self.device)
+
+                # The model_step method should contain the forward pass and loss calculation
+                # It is already used by your training_step, so we reuse it here.
+                loss = self.model_step(_batch, log=False)
+
+                loss.backward()
+                optimizer.step()
+                total_loss += loss.item()
+
+                pbar.set_description(f"Fine-tuning step: {step} | Loss: {loss:.4f}")
+
+            # Log the average loss for the fine-tuning epoch
+            avg_loss = total_loss / num_iter
+            logger.info(f"Finished fine-tuning epoch with average loss: {avg_loss:.4f}")
+
     def on_train_epoch_start(self) -> None:
         logging.info("Train epoch start")
+
+        # if doing self-refinement: generate and reweight samples
+        # at start of every epoch to finetune the model
+        if self.hparams.get("self_refinement", False):
+            logging.info(
+                f"Generating {self.hparams.sampling_config.num_self_refinement_proposal_samples} Samples"
+                " for self-consumption"
+            )
+            torch.set_grad_enabled(False)
+            self.net.eval()
+
+            samples = self.generate_and_resample(
+                num_proposal_samples=self.hparams.sampling_config.num_self_refinement_proposal_samples,
+            )
+
+            # add the IS samples into the buffer
+            self.datamodule.data_train.buffer.add(samples, self.datamodule.test_sequences[0])
+
+            # save the buffer into memory
+            self.datamodule.save_buffer()
+
+            torch.set_grad_enabled(True)
+            self.net.train()
+
         self.train_metrics.reset()
 
     def on_validation_epoch_start(self) -> None:

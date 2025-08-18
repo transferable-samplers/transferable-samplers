@@ -1,20 +1,18 @@
 import logging
 from typing import Any, Callable, Optional
 
-import torch
-from lightning import LightningDataModule
-from torch.utils.data import DataLoader
-from torch.utils.data import IterableDataset
-
 import webdataset as wds
+from lightning import LightningDataModule
+from torch.utils.data import DataLoader, IterableDataset
 
-from src.utils.data_types import SamplesData
+from src.data.preprocessing.tica import TicaModel
 from src.evaluation.metrics.evaluate_peptide_data import evaluate_peptide_data
 from src.evaluation.plots.plot_atom_distances import plot_atom_distances
 from src.evaluation.plots.plot_com_norms import plot_com_norms
 from src.evaluation.plots.plot_energies import plot_energies
 from src.evaluation.plots.plot_ramachandran import plot_ramachandran
 from src.evaluation.plots.plot_tica import plot_tica
+from src.utils.data_types import SamplesData
 
 
 class BaseDataModule(LightningDataModule):
@@ -68,26 +66,30 @@ class BaseDataModule(LightningDataModule):
         is_iterable = isinstance(self.data_train, IterableDataset)
 
         if is_iterable:
-
             data_loader = wds.WebLoader(
-                self.data_train,
-                batch_size=self.batch_size_per_device,
-                num_workers=self.hparams.num_workers
+                self.data_train, batch_size=self.batch_size_per_device, num_workers=self.hparams.num_workers
             )
 
-            # Define epoch length (can be overridden by Lightning's `limit_train_batches`) 
+            # Define epoch length (can be overridden by Lightning's `limit_train_batches`)
             data_loader = data_loader.with_epoch(10_000)
 
             return data_loader
 
         else:
+            persistent_workers_flag = True if self.hparams.num_workers > 0 else False
+            num_workers = self.hparams.num_workers
+            if hasattr(self.data_train, "buffer"):
+                if isinstance(self.data_train.buffer, list):
+                    persistent_workers_flag = False
+                    num_workers = 0
+
             return DataLoader(
                 dataset=self.data_train,
                 batch_size=self.batch_size_per_device,
-                num_workers=self.hparams.num_workers,
+                num_workers=num_workers,
                 pin_memory=self.hparams.pin_memory,
                 shuffle=True,
-                persistent_workers=True if self.hparams.num_workers > 0 else False,
+                persistent_workers=persistent_workers_flag,
             )
 
     def val_dataloader(self) -> DataLoader[Any]:
@@ -118,43 +120,43 @@ class BaseDataModule(LightningDataModule):
             persistent_workers=True if self.hparams.num_workers > 0 else False,
         )
 
-    def zero_center_of_mass(self, x):
-        num_samples = x.shape[0]
-        x = x.view(num_samples, -1, self.hparams.num_dimensions)
-        x = x - x.mean(axis=1, keepdims=True)
-        x = x.view(num_samples, -1)
-        return x
-
-    def center_of_mass(self, x: torch.Tensor) -> torch.Tensor:
-        num_samples = x.shape[0]
-        x = x.view(num_samples, -1, self.hparams.num_dimensions)
-        com = x.mean(axis=1)
-        return com
-
     def normalize(self, x):
+        """
+        Normalize trajectory samples using stored standard deviation.
+
+        Subtracts the center of mass for each sample and divides by the scalar
+        standard deviation computed previously.
+
+        Args:
+            x (torch.Tensor): Tensor of shape (num_samples, num_atoms, num_dimensions).
+
+        Returns:
+            torch.Tensor: Normalized tensor of the same shape.
+        """
         assert self.std is not None, "Standard deviation should be computed first"
         assert self.std.numel() == 1, "Standard deviation should be scalar"
         assert len(x.shape) == 3, "Input should be 3D tensor"
-
-        x = x - x.mean(axis=1, keepdims=True)
+        x = x - x.mean(dim=1, keepdim=True)
         x = x / self.std
         return x
 
     def unnormalize(self, x):
+        """
+        Undo normalization of trajectory samples using stored standard deviation.
+
+        Multiplies normalized samples by the scalar standard deviation.
+
+        Args:
+            x (torch.Tensor): Normalized tensor of shape (num_samples, num_atoms, num_dimensions).
+
+        Returns:
+            torch.Tensor: Unnormalized tensor of the same shape.
+        """
         assert self.std is not None, "Standard deviation should be computed first"
         assert self.std.numel() == 1, "Standard deviation should be scalar"
         assert len(x.shape) == 3, "Input should be 3D tensor"
         x = x * self.std.to(x)
         return x
-
-    def as_pointcloud(self, x: torch.Tensor) -> torch.Tensor:
-        num_samples = x.shape[0]
-        return x.view(num_samples, -1, self.hparams.num_dimensions)
-
-    def energy(self, x):
-        x = self.unnormalize(x)
-        energy = self.potential.energy(x).flatten()
-        return energy
 
     def metrics_and_plots(
         self,
@@ -164,28 +166,49 @@ class BaseDataModule(LightningDataModule):
         proposal_data: SamplesData,
         resampled_data: SamplesData,
         smc_data: Optional[SamplesData] = None,
+        tica_model: Optional[TicaModel] = None,
         prefix: str = "",
     ) -> None:
-        """Log metrics and plots at the end of an epoch."""
+        """
+        Compute evaluation metrics and log diagnostic plots for model outputs.
 
+        Logs Ramachandran plots, TICA projections, energy distributions, atom
+        distance distributions, and center-of-mass norms for provided datasets.
+        Also computes quantitative evaluation metrics by comparing generated
+        samples against true reference data.
+
+        Args:
+            log_image_fn (Callable): Function used to log or save generated plots.
+            sequence (str): Peptide sequence identifier.
+            true_data (SamplesData): Reference trajectory samples and energies.
+            proposal_data (SamplesData): Samples generated by the proposal distribution.
+            resampled_data (SamplesData): Samples after resampling.
+            smc_data (Optional[SamplesData], optional): Samples from SMC if available.
+            tica_model (Optional[TicaModel], optional): TICA model used for projections.
+            prefix (str, optional): String prefix to prepend to log keys.
+
+        Returns:
+            dict: Dictionary mapping metric names to computed values.
+        """
         if len(prefix) > 0 and prefix[-1] != "/":
             prefix += "/"
 
         metrics = {}
-
-        plot_ramachandran(
-            log_image_fn,
-            true_data.samples,
-            self.topology,
-            prefix=prefix + "true",
-        )
-        plot_tica(
-            log_image_fn,
-            true_data.samples,
-            self.topology,
-            self.tica_model,
-            prefix=prefix + "true",
-        )
+        do_plots = self.hparams.get("do_plots", True)
+        if do_plots:
+            plot_ramachandran(
+                log_image_fn,
+                true_data.samples,
+                self.topology_dict[sequence],
+                prefix=prefix + "true",
+            )
+            plot_tica(
+                log_image_fn,
+                true_data.samples,
+                self.topology_dict[sequence],
+                tica_model,
+                prefix=prefix + "true",
+            )
 
         for data, name in [
             [proposal_data, "proposal"],
@@ -207,21 +230,22 @@ class BaseDataModule(LightningDataModule):
                 evaluate_peptide_data(
                     true_data,
                     data,
-                    topology=self.topology,
-                    tica_model=self.tica_model,
+                    topology=self.topology_dict[sequence],
+                    tica_model=tica_model,
                     num_eval_samples=self.hparams.num_eval_samples,
                     prefix=prefix + name,
                     compute_distribution_distances=False,
                 )
             )
-            plot_ramachandran(log_image_fn, data.samples, self.topology, prefix=prefix + name)
-            plot_tica(
-                log_image_fn,
-                data.samples,
-                self.topology,
-                self.tica_model,
-                prefix=prefix + name,
-            )
+            if do_plots:
+                plot_ramachandran(log_image_fn, data.samples, self.topology_dict[sequence], prefix=prefix + name)
+                plot_tica(
+                    log_image_fn,
+                    data.samples,
+                    self.topology_dict[sequence],
+                    tica_model=tica_model,
+                    prefix=prefix + name,
+                )
 
         # reduce size so plotting doesn't crash with many samples
         true_data = true_data[: self.hparams.num_eval_samples]
@@ -229,29 +253,30 @@ class BaseDataModule(LightningDataModule):
         resampled_data = resampled_data[: self.hparams.num_eval_samples]
         smc_data = smc_data[: self.hparams.num_eval_samples] if smc_data is not None else None
 
-        plot_energies(
-            log_image_fn,
-            true_data.energy,
-            proposal_data.energy if len(proposal_data) > 0 else None,
-            resampled_data.energy if len(resampled_data) > 0 else None,
-            smc_data.energy if (smc_data is not None and len(smc_data) > 0) else None,
-            prefix=prefix,
-        )
-        plot_atom_distances(
-            log_image_fn,
-            true_data.samples,
-            proposal_data.samples if len(proposal_data) > 0 else None,
-            resampled_data.samples if len(resampled_data) > 0 else None,
-            smc_data.samples if (smc_data is not None and len(smc_data) > 0) else None,
-            prefix=prefix,
-        )
-        plot_com_norms(
-            log_image_fn,
-            proposal_data.samples if len(proposal_data) > 0 else None,
-            resampled_data.samples if len(resampled_data) > 0 else None,
-            smc_data.samples if (smc_data is not None and len(smc_data) > 0) else None,
-            prefix=prefix,
-        )
+        if do_plots:
+            plot_energies(
+                log_image_fn,
+                true_data.energy,
+                proposal_data.energy if len(proposal_data) > 0 else None,
+                resampled_data.energy if len(resampled_data) > 0 else None,
+                smc_data.energy if (smc_data is not None and len(smc_data) > 0) else None,
+                prefix=prefix,
+            )
+            plot_atom_distances(
+                log_image_fn,
+                true_data.samples,
+                proposal_data.samples if len(proposal_data) > 0 else None,
+                resampled_data.samples if len(resampled_data) > 0 else None,
+                smc_data.samples if (smc_data is not None and len(smc_data) > 0) else None,
+                prefix=prefix,
+            )
+            plot_com_norms(
+                log_image_fn,
+                proposal_data.samples if len(proposal_data) > 0 else None,
+                resampled_data.samples if len(resampled_data) > 0 else None,
+                smc_data.samples if (smc_data is not None and len(smc_data) > 0) else None,
+                prefix=prefix,
+            )
 
         return metrics
 

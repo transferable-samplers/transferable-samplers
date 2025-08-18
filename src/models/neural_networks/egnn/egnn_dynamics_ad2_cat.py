@@ -1,4 +1,3 @@
-import mdtraj as md
 import numpy as np
 import torch
 import torch.nn as nn
@@ -83,7 +82,6 @@ class EGNN_dynamics_AD2_cat(nn.Module):
         return h_initial
 
     def get_hidden(self):
-        n_encodings = 78
         amino_dict = {
             "ALA": 0,
             "ARG": 1,

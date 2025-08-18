@@ -1,8 +1,9 @@
-# ruff: noqa: E402, I001
+# ruff: noqa: E402, I001, S311
 import os
 import random
 import time
 from typing import Any, Optional
+import logging
 
 import hydra
 import lightning as L
@@ -12,6 +13,7 @@ from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
 
 import rootutils
+
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 
 # ------------------------------------------------------------------------------------ #
@@ -37,12 +39,16 @@ from src.utils.pylogger import RankedLogger
 from src.utils.utils import extras, get_metric_value, task_wrapper
 
 # We had issues with invertbility of TarFlow without the following settings.
-# Didn't notice any walltime difference for TarFlow or ECNF, but is worth # TODO
+# Didn't notice any walltime difference for TarFlow or ECNF, but is worth
 # benchmarking for any further implemented models.
-torch.set_float32_matmul_precision("highest")
+torch.set_float32_matmul_precision("highest")  # must be at least high
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
-
+logging.info(
+    "Some numerical settings applied for TarFlow invertibility. No slowdown was "
+    "observed for ECNF but other neural networks may be slower than expected."
+)
+# TODO consolidate codebase logging into single library.
 log = RankedLogger(__name__, rank_zero_only=True)
 
 
@@ -89,49 +95,20 @@ def train(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
         log.info("Logging hyperparameters!")
         log_hyperparameters(object_dict)
 
-    if cfg.get("train"):
-        log.info("Starting training!")
-        ckpt_path = cfg.get("ckpt_path")
-        if ckpt_path:
-            if os.path.exists(ckpt_path):
-                log.info(f"Resuming training from checkpoint: {ckpt_path}")
-            else:
-                log.warning(f"Checkpoint path {ckpt_path} not found! Ignoring...")
-                ckpt_path = None
-        trainer.fit(model=model, datamodule=datamodule, ckpt_path=ckpt_path)
+    log.info("Starting training!")
+    ckpt_path = cfg.get("ckpt_path")
+    if ckpt_path:
+        if os.path.exists(ckpt_path):
+            log.info(f"Resuming training from checkpoint: {ckpt_path}")
+        else:
+            log.warning(f"Checkpoint path {ckpt_path} not found! Ignoring...")
+            ckpt_path = None
+
+    trainer.fit(model=model, datamodule=datamodule, ckpt_path=ckpt_path)
 
     train_metrics = trainer.callback_metrics
 
-    if cfg.get("val"):
-        log.info("Starting validation!")
-        ckpt_path = cfg.get("ckpt_path")
-        if ckpt_path is None:
-            ckpt_path = trainer.checkpoint_callback.best_model_path
-            if ckpt_path == "":
-                log.warning("Best ckpt not found! Using current weights for testing...")
-                ckpt_path = None
-        trainer.validate(model=model, datamodule=datamodule, ckpt_path=ckpt_path)
-        log.info(f"Best ckpt path: {ckpt_path}")
-
-    val_metrics = trainer.callback_metrics
-
-    if cfg.get("test"):
-        log.info("Starting testing!")
-        ckpt_path = cfg.get("ckpt_path")
-        if ckpt_path is None:
-            ckpt_path = trainer.checkpoint_callback.best_model_path
-            if ckpt_path == "":
-                log.warning("Best ckpt not found! Using current weights for testing...")
-                ckpt_path = None
-        trainer.test(model=model, datamodule=datamodule, ckpt_path=ckpt_path)
-        log.info(f"Best ckpt path: {ckpt_path}")
-
-    test_metrics = trainer.callback_metrics
-
-    # merge train and test metrics
-    metric_dict = {**train_metrics, **val_metrics, **test_metrics}
-
-    return metric_dict, object_dict
+    return train_metrics, object_dict
 
 
 @hydra.main(version_base="1.3", config_path="../configs", config_name="train.yaml")
@@ -150,7 +127,7 @@ def main(cfg: DictConfig) -> Optional[float]:
         # causing rate limiting issues with wandb. To avoid this, we add a random sleep time
         # before starting the training. This is a workaround to avoid hitting the rate limits.
         # It seems to be fine having many concurrent jobs, but not starting simultaneously.
-        sleep_time = random.uniform(0, 120)
+        sleep_time = random.uniform(0, 60) # noqa:S311
         log.info(f"Sleeping for {sleep_time:.2f} seconds to avoid wandb rate limitations.")
         time.sleep(sleep_time)
 

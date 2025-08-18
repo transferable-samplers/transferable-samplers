@@ -13,11 +13,7 @@ class EMA(torch.nn.Module):
         self.register_buffer("num_updates", torch.tensor(0))
 
         self.shadow_params = torch.nn.ParameterList(
-            [
-                torch.nn.Parameter(p.clone().detach(), requires_grad=False)
-                for p in model.parameters()
-                if p.requires_grad
-            ]
+            [torch.nn.Parameter(p.clone().detach(), requires_grad=False) for p in model.parameters() if p.requires_grad]
         )
         self.backup_params = []
 

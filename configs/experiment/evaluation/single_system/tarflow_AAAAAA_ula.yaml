@@ -1,0 +1,45 @@
+# @package _global_
+
+defaults:
+  - override /model: normalizing_flow
+  - override /model/net: tarflow_single_system
+  - override /data: single_system/AAAAAA
+  - override /trainer: gpu
+
+model:
+  net:
+    channels: 384
+    img_size: 189
+    num_blocks: 6
+    layers_per_block: 6
+
+  sampling_config:
+    batch_size: 10_000
+    num_test_proposal_samples: 10_000
+    num_smc_samples: 10_000 
+    clip_reweighting_logits: 0.002
+
+  smc_sampler:
+    _target_: src.models.samplers.ula_sampler.SMCSamplerULA
+    enabled: True
+    langevin_eps: 1e-8
+    num_timesteps: 100
+    ess_threshold: 0.5
+    systematic_resampling: False
+    warmup: 0.0
+    batch_size: 128
+    input_energy_cutoff: -20.0
+    do_energy_plots: True
+    log_freq: 1
+    
+  ema_decay: 0.0
+
+data:
+  batch_size: 10_000
+  num_eval_samples: 10_000
+
+trainer:
+  limit_test_batches: 1
+  limit_val_batches: 1
+
+state_dict_hf_path: single_system/tarflow_AAAAAA_0.pth

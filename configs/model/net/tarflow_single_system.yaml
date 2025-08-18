@@ -1,0 +1,4 @@
+_target_: src.models.neural_networks.tarflow.tarflow_single_system.TarFlow
+in_channels: 3
+channels: 256
+patch_size: 1

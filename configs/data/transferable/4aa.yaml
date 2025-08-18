@@ -1,0 +1,52 @@
+_target_: src.data.transferable_peptide_datamodule.TransferablePeptideDataModule
+data_dir: ${paths.data_dir}
+num_dimensions: 3
+num_atoms: 97        # Max number of particles
+num_aa_min: 4
+num_aa_max: 4
+precomputed_std: 0.28 # Standardization factor for normalization
+batch_size: 512 # Needs to be divisible by the number of devices (e.g., if in a distributed setup)
+num_workers: 2
+pin_memory: False
+val_sequences:
+- CAVQ
+- CVNR
+- EDWY
+- GNFL
+- ISDT
+- KHAP
+- KHGM
+- LFTE
+- PMWS
+- YRIQ
+test_sequences:
+- ARIP
+- CCVH
+- CIPQ
+- DEMT
+- DMTL
+- EHQW
+- FESD
+- FYYY
+- GCDE
+- GDTI
+- GGRS
+- HEAV
+- HQVS
+- HYGW
+- ITYL
+- KKAP
+- KLLR
+- KRWN
+- NCFG
+- NEVI
+- PQIF
+- QAKR
+- QWNL
+- RLMM
+- SHKS
+- SVND
+- TAPF
+- TMWC
+- VPFY
+- WNMA

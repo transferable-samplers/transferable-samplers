@@ -1,0 +1,27 @@
+# @package _global_
+
+defaults:
+  - override /model: normalizing_flow
+  - override /model/net: tarflow_single_system
+  - override /data: single_system/Ace-AAA-Nme
+  - override /trainer: gpu
+
+model:
+  net:
+    img_size: 126
+    num_blocks: 6
+    layers_per_block: 6
+
+  sampling_config:
+    num_proposal_samples: 10_000
+    num_test_proposal_samples: 10_000
+
+data:
+  batch_size: 512
+  com_augmentation: True
+  num_eval_samples: 10_000
+
+trainer:
+  check_val_every_n_epoch: 50
+  max_epochs: 1000
+  num_sanity_val_steps: 0

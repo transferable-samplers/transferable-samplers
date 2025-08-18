@@ -149,9 +149,7 @@ def create_adjacency_list(distance_matrix, atom_types):
 # check if chirality is the same
 # if not --> mirror
 # if still not --> discard
-def find_chirality_centers(
-    adj_list: torch.Tensor, atom_types: torch.Tensor, num_h_atoms: int = 2
-) -> torch.Tensor:
+def find_chirality_centers(adj_list: torch.Tensor, atom_types: torch.Tensor, num_h_atoms: int = 2) -> torch.Tensor:
     """
     Return the chirality centers for a peptide, e.g. carbon alpha atoms and their bonds.
 
@@ -165,9 +163,7 @@ def find_chirality_centers(
         chirality_centers
     """
     chirality_centers = []
-    candidate_chirality_centers = torch.where(torch.unique(adj_list, return_counts=True)[1] == 4)[
-        0
-    ]
+    candidate_chirality_centers = torch.where(torch.unique(adj_list, return_counts=True)[1] == 4)[0]
     for center in candidate_chirality_centers:
         bond_idx, bond_pos = torch.where(adj_list == center)
         bonded_idxs = adj_list[bond_idx, (bond_pos + 1) % 2].long()
@@ -191,9 +187,7 @@ def compute_chirality_sign(coords: torch.Tensor, chirality_centers: torch.Tensor
     """
     assert coords.dim() == 3
     # print(coords.shape, chirality_centers.shape, chirality_centers)
-    direction_vectors = (
-        coords[:, chirality_centers[:, 1:], :] - coords[:, chirality_centers[:, [0]], :]
-    )
+    direction_vectors = coords[:, chirality_centers[:, 1:], :] - coords[:, chirality_centers[:, [0]], :]
     perm_sign = torch.einsum(
         "ijk, ijk->ij",
         direction_vectors[:, :, 0],

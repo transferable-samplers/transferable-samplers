@@ -1,0 +1,574 @@
+backbone:
+  n2c:
+    before_sidechain:
+      - N 
+      - H # not on Proline
+      - H2 # only on N-terminal
+      - H3 # only on N-terminal
+      - CA
+      - HA # not on Glycine
+      - HA2 # only on Glycine
+      - HA3 # only on Glycine
+    after_sidechain:
+      - C
+      - O
+      - OXT # only on C-terminal
+  c2n:
+    before_sidechain:
+      - OXT # only on C-terminal
+      - C
+      - O
+      - CA
+      - HA # not on Glycine
+      - HA2 # only on Glycine
+      - HA3 # only on Glycine
+    after_sidechain:
+      - N
+      - H # not on Proline
+      - H2 # only on N-terminal
+      - H3 # only on N-terminal
+
+sidechain:
+  ALA:
+    standard:
+      # β-carbon group (methyl)
+      - CB
+      - HB1
+      - HB2
+      - HB3
+
+  ARG:
+    standard:
+      # β-carbon group (methylene)
+      - CB
+      - HB2
+      - HB3
+
+      # γ-carbon group (methylene)
+      - CG
+      - HG2
+      - HG3
+
+      # δ-carbon group (methylene)
+      - CD
+      - HD2
+      - HD3
+
+      # ε-nitrogen group (secondary amine)
+      - NE
+      - HE
+
+      # ζ-carbon group (guanidinium)
+      - CZ
+      - NH1
+      - HH11
+      - HH12
+      - NH2
+      - HH21
+      - HH22
+
+  ASN:
+    standard:
+      # β-carbon group (methylene)
+      - CB
+      - HB2
+      - HB3
+
+      # γ-carbon group (carboxamide)
+      - CG
+      - OD1
+
+      # amide nitrogen group (amide)
+      - ND2
+      - HD21
+      - HD22
+
+  ASP:
+    standard:
+      # β-carbon group (methylene)
+      - CB
+      - HB2
+      - HB3
+
+      # γ-carbon group (carboxylate)
+      - CG
+      - OD1
+      - OD2
+
+  CYS:
+    standard:
+      # β-carbon group (methylene)
+      - CB
+      - HB2
+      - HB3
+
+      # thiol group
+      - SG
+      - HG
+
+  GLN:
+    standard:
+      # β-carbon group (methylene)
+      - CB
+      - HB2
+      - HB3
+
+      # γ-carbon group (methylene)
+      - CG
+      - HG2
+      - HG3
+
+      # δ-carbon group (carboxamide)
+      - CD
+      - OE1
+
+      # amide nitrogen group (amide)
+      - NE2
+      - HE21
+      - HE22
+
+  GLU:
+    standard:
+      # β-carbon group (methylene)
+      - CB
+      - HB2
+      - HB3
+
+      # γ-carbon group (methylene)
+      - CG
+      - HG2
+      - HG3
+
+      # δ-carbon group (carboxylate)
+      - CD
+      - OE1
+      - OE2
+
+  GLY:
+    standard: []  # HA3 is considered part of the backbone, no side chain
+
+  HIE:
+    standard:
+      # β-carbon group
+      - CB
+      - HB2
+      - HB3
+
+      # γ-carbon group (bridge to ring)
+      - CG
+
+      # imidazole ring atoms
+      - ND1
+      - CE1
+      - HE1
+      - NE2
+      - HE2
+      - CD2
+      - HD2
+
+    ring_reverse:
+      # β-carbon group
+      - CB
+      - HB2
+      - HB3
+
+      # γ-carbon group (bridge to ring)
+      - CG
+
+      # imidazole ring atoms (reversed traversal)
+      - CD2
+      - HD2
+      - NE2
+      - HE2
+      - CE1
+      - HE1
+      - ND1
+    
+  ILE:
+    standard:
+      # β-carbon group (methyl branch)
+      - CB
+      - HB
+
+      # γ2-carbon group (methyl branch)
+      - CG2
+      - HG21
+      - HG22
+      - HG23
+
+      # γ1-carbon group (methylene branch)
+      - CG1
+      - HG12
+      - HG13
+
+      # δ1-carbon group (methyl)
+      - CD1
+      - HD11
+      - HD12
+      - HD13
+
+    branch_order_reverse:
+      # β-carbon group
+      - CB
+      - HB
+
+      # γ1-carbon group (methylene)
+      - CG1
+      - HG12
+      - HG13
+
+      # δ1-carbon group (methyl)
+      - CD1
+      - HD11
+      - HD12
+      - HD13
+
+      # γ2-carbon group (methyl branch)
+      - CG2
+      - HG21
+      - HG22
+      - HG23
+
+  LEU:
+    standard:
+      # β-carbon group (methylene)
+      - CB
+      - HB2
+      - HB3
+
+      # γ-carbon group (methine)
+      - CG
+      - HG
+
+      # δ1-carbon group (methyl)
+      - CD1
+      - HD11
+      - HD12
+      - HD13
+
+      # δ2-carbon group (methyl)
+      - CD2
+      - HD21
+      - HD22
+      - HD23
+
+    branch_order_reverse:
+      # β-carbon group (methylene)
+      - CB
+      - HB2
+      - HB3
+
+      # γ-carbon group (methine)
+      - CG
+      - HG
+
+      # δ2-carbon group (methyl)
+      - CD2
+      - HD21
+      - HD22
+      - HD23
+
+      # δ1-carbon group (methyl)
+      - CD1
+      - HD11
+      - HD12
+      - HD13
+
+  LYS:
+    standard:
+      # β-carbon group (methylene)
+      - CB
+      - HB2
+      - HB3
+
+      # γ-carbon group (methylene)
+      - CG
+      - HG2
+      - HG3
+
+      # δ-carbon group (methylene)
+      - CD
+      - HD2
+      - HD3
+
+      # ε-carbon group (methylene)
+      - CE
+      - HE2
+      - HE3
+
+      # ζ-nitrogen group (amino)
+      - NZ
+      - HZ1
+      - HZ2
+      - HZ3
+
+  MET:
+    standard:
+      # β-carbon group (methylene)
+      - CB
+      - HB2
+      - HB3
+
+      # γ-carbon group (methylene)
+      - CG
+      - HG2
+      - HG3
+
+      # thioether sulfur
+      - SD
+
+      # ε-carbon group (methyl)
+      - CE
+      - HE1
+      - HE2
+      - HE3
+
+  PHE:
+    standard:
+      # β-carbon group (methylene)
+      - CB
+      - HB2
+      - HB3
+
+      # γ-carbon group (bridge to aromatic)
+      - CG
+
+      # aromatic ring (phenyl)
+      - CD1
+      - HD1
+      - CE1
+      - HE1
+      - CZ
+      - HZ
+      - CE2
+      - HE2
+      - CD2
+      - HD2
+
+    ring_reverse:
+      # β-carbon group (methylene)
+      - CB
+      - HB2
+      - HB3
+
+      # γ-carbon group (bridge to aromatic)
+      - CG
+
+      # aromatic ring (reversed traversal)
+      - CD2
+      - HD2
+      - CE2
+      - HE2
+      - CZ
+      - HZ
+      - CE1
+      - HE1
+      - CD1
+      - HD1
+
+
+  PRO:
+    standard:
+      # β-carbon group (methylene)
+      - CB
+      - HB2
+      - HB3
+
+      # γ-carbon group (methylene)
+      - CG
+      - HG2
+      - HG3
+
+      # δ-carbon group (ring closure)
+      - CD
+      - HD2
+      - HD3
+
+    ring_reverse:
+      # δ-carbon group (ring closure)
+      - CD
+      - HD2
+      - HD3
+
+      # γ-carbon group (methylene)
+      - CG
+      - HG2
+      - HG3
+
+      # β-carbon group (methylene)
+      - CB
+      - HB2
+      - HB3
+
+  SER:
+    standard:
+      # β-carbon group (methylene)
+      - CB
+      - HB2
+      - HB3
+
+      # hydroxyl group
+      - OG
+      - HG
+
+  THR:
+    standard:
+      # β-carbon group (methine)
+      - CB
+      - HB
+
+      # hydroxyl group
+      - OG1
+      - HG1
+
+      # γ2-carbon group (methyl)
+      - CG2
+      - HG21
+      - HG22
+      - HG23
+
+    branch_order_reverse:
+      # β-carbon group (methine)
+      - CB
+      - HB
+
+      # γ2-carbon group (methyl)
+      - CG2
+      - HG21
+      - HG22
+      - HG23
+
+      # hydroxyl group
+      - OG1
+      - HG1
+
+  TRP:
+    standard:
+      # β-carbon group (methylene)
+      - CB
+      - HB2
+      - HB3
+
+      # γ-carbon group (bridge to ring)
+      - CG
+
+      # indole ring system
+      - CD1
+      - HD1
+      - NE1
+      - HE1
+      - CE2
+      - CZ2
+      - HZ2
+      - CH2
+      - HH2
+      - CZ3
+      - HZ3
+      - CE3
+      - HE3
+      - CD2
+
+    ring_reverse:
+      # β-carbon group (methylene)
+      - CB
+      - HB2
+      - HB3
+
+      # γ-carbon group (bridge to ring)
+      - CG
+
+      # indole ring system (reversed traversal)
+      - CD2
+      - CE3
+      - HE3
+      - CZ3
+      - HZ3
+      - CH2
+      - HH2
+      - CZ2
+      - HZ2
+      - CE2
+      - NE1
+      - HE1
+      - CD1
+      - HD1
+
+  TYR:
+    standard:
+      # β-carbon group (methylene)
+      - CB
+      - HB2
+      - HB3
+
+      # γ-carbon group (bridge to aromatic)
+      - CG
+
+      # aromatic ring with hydroxyl
+      - CD1
+      - HD1
+      - CE1
+      - HE1
+      - CZ
+      - OH
+      - HH
+      - CE2
+      - HE2
+      - CD2
+      - HD2
+
+    ring_reverse:
+      # β-carbon group (methylene)
+      - CB
+      - HB2
+      - HB3
+
+      # γ-carbon group (bridge to aromatic)
+      - CG
+
+      # aromatic ring (reversed traversal)
+      - CD2
+      - HD2
+      - CE2
+      - HE2
+      - CZ
+      - OH
+      - HH
+      - CE1
+      - HE1
+      - CD1
+      - HD1
+
+  VAL:
+    standard:
+      # β-carbon group (methine)
+      - CB
+      - HB
+
+      # γ1-methyl group
+      - CG1
+      - HG11
+      - HG12
+      - HG13
+
+      # γ2-methyl group
+      - CG2
+      - HG21
+      - HG22
+      - HG23
+
+    branch_order_reverse:
+      # β-carbon group (methine)
+      - CB
+      - HB
+
+      # γ2-methyl group
+      - CG2
+      - HG21
+      - HG22
+      - HG23
+
+      # γ1-methyl group
+      - CG1
+      - HG11
+      - HG12
+      - HG13

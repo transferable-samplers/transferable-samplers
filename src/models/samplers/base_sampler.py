@@ -81,6 +81,7 @@ class SMCSampler(torch.nn.Module):
             # this is a bit hacky but is fine as long as
             # the energy function is defined properly and
             # doesn't mix batch items
+
             x_grad = torch.autograd.grad(et.sum(), x)[0]
 
             assert x_grad.shape == x.shape, "x_grad should have the same shape as x"
@@ -239,7 +240,7 @@ class SMCSampler(torch.nn.Module):
         timesteps = self.init_timesteps()
 
         X = proposal_samples
-        A = torch.ones(X.shape[0], device=X.device)  # the smc weights
+        A = torch.zeros(X.shape[0], device=X.device)  # the smc weights
 
         A_list = [A]
         ESS_list = [1.0]
@@ -343,7 +344,7 @@ class SMCSampler(torch.nn.Module):
                 # cum_prob = torch.cumsum(torch.softmax(A, dim=-1), dim=0)
                 # indexes = np.searchsorted(cum_prob, qmc_rand, side="left").flatten()
                 X, indexes = self.resample(x=X, logw=A)
-                A = torch.ones_like(A)
+                A = torch.zeros_like(A)
                 logging.info(f"resampling @ step {j}")
 
                 particle_ids = particle_ids[indexes.cpu()]

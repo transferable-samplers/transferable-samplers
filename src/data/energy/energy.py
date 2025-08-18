@@ -133,6 +133,7 @@ class Energy(torch.nn.Module):
         assert len(xs) == len(self.event_shapes), (
             f"Expected {len(self.event_shapes)} arguments but only received {len(xs)}"
         )
+
         batch_shape = xs[0].shape[: -len(self.event_shapes[0])]
         for i, (x, s) in enumerate(zip(xs, self.event_shapes)):
             assert x.shape[: -len(s)] == batch_shape, (
@@ -232,6 +233,8 @@ class _BridgeEnergyWrapper(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output):
         (neg_force,) = ctx.saved_tensors
+        if neg_force.ndim == 3:
+            grad_output = grad_output[..., None]
         grad_input = grad_output * neg_force
         return grad_input, None
 

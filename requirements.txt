@@ -11,7 +11,7 @@ hydra-optuna-sweeper==1.2.0
 hydra-submitit_launcher
 
 # --------- loggers --------- #
-# wandb
+wandb
 # neptune-client
 # mlflow
 # comet-ml
@@ -42,10 +42,7 @@ torchsde
 torchdyn
 tqdm
 jupyterlab
-bgflow @ git+https://github.com/atong01/bgflow.git
-bgmol @ git+https://github.com/atong01/bgmol.git
 zuko
-wandb
 huggingface-hub
 webdataset
 wget

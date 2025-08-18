@@ -1,3 +1,13 @@
 _target_: torch.optim.lr_scheduler.StepLR
 _partial_: true
-step_size: 500
+step_size: 125 # corresponds to approx 5 epochs in Leon's TBG code (assuming 1000 batches per epoch)
+gamma: 0.25 # approximate the schedule Leon gave me (see below, it's slightly awkward to implement using hydra)
+
+# if epoch == 5:
+#     for g in optim.param_groups: g["lr"] = 2e-4
+# if epoch == 10:
+#     for g in optim.param_groups: g["lr"] = 5e-5
+# if epoch == 15:
+#     for g in optim.param_groups: g["lr"] = 2e-5
+# if epoch == 20:
+#     for g in optim.param_groups: g["lr"] = 5e-6

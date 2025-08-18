@@ -153,7 +153,6 @@ configs/local/default.yaml
 # Aim logging
 .aim
 
-# Custom
 *.npz
 *.npy
 *.out
@@ -164,7 +163,12 @@ configs/local/default.yaml
 *.png
 .DS_Store
 *.pt
+AImplicitUnconstrained*
+/models/
+/scratch/
+/wandb/
 
 ___*.py
 *.pkl
 *.pdb
+src/data/data_old/*

@@ -1,5 +1,5 @@
 model_checkpoint_time:
-  _target_: lightning.pytorch.callbacks.ModelCheckpoint
+  _target_: src.utils.model_checkpoint_callback.FullAndWeightsModelCheckpoint
   dirpath: ${paths.output_dir}/checkpoints
   filename: "epoch_{epoch:03d}_time"
   monitor: null # name of the logged metric which determines when model is improving

@@ -1,0 +1,33 @@
+# @package _global_
+
+defaults:
+  - override /model: flow_matching
+  - override /data: transferable/up_to_4aa
+  - override /trainer: gpu
+
+state_dict_hf_path: transferable/ecnf++_up_to_4aa.pth
+train: False
+val: False
+test: True
+
+model:
+  eval_seq_name: null
+  sampling_config:
+    use_com_adjustment: False
+    batch_size: 4
+    num_test_proposal_samples: 10_000
+    clip_reweighting_logits: 0.002
+    subset_idx: ${seed}
+  net:
+    channels: 256
+    num_layers: 9
+    num_aa_max: ${data.num_aa_max}
+    num_aa_min: ${data.num_aa_min}
+
+data:
+  batch_size: 128
+  num_eval_samples: 10_000
+
+trainer:
+  limit_test_batches: 1
+  limit_val_batches: 1

@@ -1,9 +1,18 @@
 _target_: src.models.neural_networks.tarflow.tarflow.TarFlow
-img_size: ${data.dim}
-in_channels: ${data.num_dimensions}
-channels: 256
-num_blocks: 4
-layers_per_block: 4
+input_dimension: 3 # 3D coordinates
+channels: 384
+max_num_tokens: ${data.num_atoms}
+num_blocks: 8
+layers_per_block: 8
+permutation_keys:
+- "n2c_residue-by-residue_standard"
+- "n2c_residue-by-residue_standard_flip"
+cond_embed:
+  _target_: src.models.neural_networks.embedder.ConditionalEmbedder
+  hidden_dim: ${model.net.channels}
+  output_dim: ${model.net.channels}
+  sinusoid_div_value: 1000 # for sinusoidal positional embedding
 use_adapt_ln: False
-use_attn_pair_bias: False
+use_transition: False
 use_qkln: True
+pos_embed_type: "sinusoidal"

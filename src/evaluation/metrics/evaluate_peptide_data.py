@@ -5,6 +5,7 @@ from src.evaluation.metrics.distribution_distances import (
     energy_distances,
 )
 from src.evaluation.metrics.ess import sampling_efficiency
+from src.evaluation.metrics.jsd_metric import jsd_metric
 from src.evaluation.metrics.ramachandran import ramachandran_metrics
 from src.evaluation.metrics.tica_metric import tica_metric
 
@@ -62,5 +63,9 @@ def evaluate_peptide_data(
     # TICA metric
     metrics.update(tica_metric(true_data.samples, pred_data.samples, topology, tica_model, prefix=prefix))
     logging.info("TICA metrics computed")
+
+    # JSD metric
+    metrics.update(jsd_metric(true_data.samples, pred_data.samples, topology, tica_model=tica_model, prefix=prefix))
+    logging.info("JSD metrics computed")
 
     return metrics

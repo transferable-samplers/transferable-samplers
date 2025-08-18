@@ -1,0 +1,45 @@
+# @package _global_
+
+defaults:
+  - override /model: normalizing_flow
+  - override /model/net: tarflow_single_system
+  - override /data: single_system/Ace-A-Nme
+  - override /trainer: gpu
+
+model:
+  net:
+    in_channels: 1
+    img_size: 66
+    num_blocks: 4
+    layers_per_block: 4
+
+  sampling_config:
+    batch_size: 10_000
+    num_test_proposal_samples: 10_000
+    num_smc_samples: 10_000 
+    clip_reweighting_logits: 0.002
+
+  smc_sampler:
+    _target_: src.models.samplers.ula_sampler.SMCSamplerULA
+    enabled: True
+    langevin_eps: 1e-7
+    num_timesteps: 100
+    ess_threshold: 0.5
+    systematic_resampling: False
+    warmup: 0.0
+    batch_size: 128
+    input_energy_cutoff: 10.0
+    do_energy_plots: True
+    log_freq: 1
+    
+  ema_decay: 0.0
+
+data:
+  batch_size: 10_000
+  num_eval_samples: 10_000
+
+trainer:
+  limit_test_batches: 1
+  limit_val_batches: 1
+
+state_dict_hf_path: single_system/tarflow_Ace-A-Nme_0.pth

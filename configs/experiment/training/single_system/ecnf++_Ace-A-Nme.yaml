@@ -1,0 +1,26 @@
+# @package _global_
+
+defaults:
+  - override /model: flow_matching++
+  - override /model/net: egnn_dynamics_ad2_cat
+  - override /data: single_system/Ace-A-Nme
+  - override /trainer: gpu
+
+model:
+  net:
+    channels: 256
+    num_layers: 5
+  sampling_config:
+    batch_size: 64
+    num_proposal_samples: 0
+    num_test_proposal_samples: 10_000
+
+data:
+  batch_size: 512
+  com_augmentation: False
+  num_eval_samples: 10_000
+
+trainer:
+  check_val_every_n_epoch: 50
+  max_epochs: 1000
+  num_sanity_val_steps: 0

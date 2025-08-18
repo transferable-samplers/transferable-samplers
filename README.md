@@ -14,8 +14,6 @@ conda activate transferable-samplers
 pip install -r requirements.txt
 ```
 
-You must also populate the `.env.example` file with a suitable scratch directory, and save as `.env`
-
 ## Usage
 
 ### Datasets
@@ -34,10 +32,10 @@ The pretrained model weights used in our works are provided [here](https://huggi
 
 The codebase builds on the [Lightning-Hydra-Template](https://github.com/ashleve/lightning-hydra-template). Accordingly, the experiments are organized into experiment configuration files.
 
-To train a TarFlow on the single system AL2 dataset run:
+To train a TarFlow on the single system Ace-A-Nme dataset run:
 
 ```
-python src/train.py experiment=training/single_system/tarflow_al2
+python src/train.py experiment=training/single_system/tarflow_Ace-A-Nme
 ```
 
 To train Prose on the ManyPeptidesMD dataset

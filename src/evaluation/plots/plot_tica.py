@@ -4,6 +4,7 @@ import pickle
 import matplotlib
 import matplotlib.pyplot as plt
 import mdtraj as md
+import torch
 from matplotlib.colors import LogNorm
 
 from src.data.preprocessing.tica import tica_features, tica_features_ca
@@ -23,7 +24,13 @@ def plot_tic01(ax, tics, tics_lims, cmap="viridis"):
     return ax
 
 
-def plot_tica(log_image_fn, samples, topology, tica_model, prefix=""):
+def plot_tica(log_image_fn, samples, topology, tica_model=None, tica_model_path=None, prefix=""):
+    assert (tica_model is not None) ^ (tica_model_path is not None), "Provide either tica_model or tica_model_path."
+    logging.info(f"Plotting TICA for {prefix}")
+    if not tica_model:
+        with open(tica_model_path, "rb") as f:
+            tica_model = pickle.load(f)  # noqa: S301
+
     pred_traj_samples = md.Trajectory(samples.cpu().numpy(), topology=topology)
 
     if topology.n_residues > 4:
@@ -33,6 +40,9 @@ def plot_tica(log_image_fn, samples, topology, tica_model, prefix=""):
         features = tica_features(pred_traj_samples)
 
     tics = tica_model.transform(features)
+    if isinstance(tics, torch.Tensor):
+        tics = tics.cpu().numpy()
+
     fig, ax = plt.subplots()
     ax = plot_tic01(ax, tics, tics_lims=tics)
     log_image_fn(fig, f"{prefix}/tica/plot")

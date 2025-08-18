@@ -127,10 +127,12 @@ class OpenMMBridge(_Bridge):
         batch_array = assert_numpy(batch, arr_type=self._FLOATING_TYPE)
 
         # assert correct number of positions
-        assert batch_array.shape[1] == self._openmm_system.getNumParticles() * self._SPATIAL_DIM
+        if batch_array.ndim == 2:
+            assert batch_array.shape[1] == self._openmm_system.getNumParticles() * self._SPATIAL_DIM
 
-        # reshape to (B, N, D)
-        batch_array = batch_array.reshape(batch.shape[0], -1, self._SPATIAL_DIM)
+            # reshape to (B, N, D)
+            batch_array = batch_array.reshape(batch.shape[0], -1, self._SPATIAL_DIM)
+
         energies, forces, new_positions, log_path_probability_ratio = self.context_wrapper.evaluate(
             batch_array,
             evaluate_energy=evaluate_energy,
@@ -145,22 +147,17 @@ class OpenMMBridge(_Bridge):
         energies = self._reduce_units(energies)
         forces = self._reduce_units(forces)
 
+        if batch.ndim == 3:
+            force_shape = (batch.shape[0], self._openmm_system.getNumParticles(), self._SPATIAL_DIM)
+        elif batch.ndim == 2:
+            force_shape = (batch.shape[0], self._openmm_system.getNumParticles() * self._SPATIAL_DIM)
+
+        assert force_shape == batch.shape
+
         # to PyTorch tensors
         energies = torch.tensor(energies).to(batch).reshape(-1, 1) if evaluate_energy else None
-        forces = (
-            torch.tensor(forces)
-            .to(batch)
-            .reshape(batch.shape[0], self._openmm_system.getNumParticles() * self._SPATIAL_DIM)
-            if evaluate_force
-            else None
-        )
-        new_positions = (
-            torch.tensor(new_positions)
-            .to(batch)
-            .reshape(batch.shape[0], self._openmm_system.getNumParticles() * self._SPATIAL_DIM)
-            if evaluate_positions
-            else None
-        )
+        forces = torch.tensor(forces).to(batch).reshape(force_shape) if evaluate_force else None
+        new_positions = torch.tensor(new_positions).to(batch).reshape(force_shape) if evaluate_positions else None
         log_path_probability_ratio = (
             torch.tensor(log_path_probability_ratio).to(batch).reshape(-1, 1)
             if evaluate_path_probability_ratio
@@ -544,7 +541,7 @@ class SingleContext:
 
 
 class OpenMMEnergy(_BridgeEnergy):
-    def __init__(self, dimension=None, bridge=None, two_event_dims=False):
+    def __init__(self, dimension=None, bridge=None, two_event_dims=True):
         if dimension is not None:
             warnings.warn(
                 "dimension argument in OpenMMEnergy is deprecated and will be ignored. "

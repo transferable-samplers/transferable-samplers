@@ -1,5 +1,5 @@
 import logging
-import math
+import os
 from typing import Optional
 
 import mdtraj as md
@@ -8,18 +8,15 @@ import openmm
 import openmm.app
 import torch
 import torchvision
+from huggingface_hub import snapshot_download
 
 from src.data.base_datamodule import BaseDataModule
-from src.data.energy.openmm import OpenMMBridge, OpenMMEnergy
-# from src.data.preprocessing.preprocessing import prepare_tica_models
 from src.data.datasets.tensor_dataset import TensorDataset
+from src.data.energy.openmm import OpenMMBridge, OpenMMEnergy
+from src.data.preprocessing.tica import get_tica_model
 from src.data.transforms.center_of_mass import CenterOfMassTransform
 from src.data.transforms.rotation import Random3DRotationTransform
 from src.data.transforms.standardize import StandardizeTransform
-from src.data.preprocessing.tica import get_tica_model
-
-from huggingface_hub import snapshot_download
-import os
 
 
 class SinglePeptideDataModule(BaseDataModule):
@@ -31,7 +28,6 @@ class SinglePeptideDataModule(BaseDataModule):
         temperature: float,
         num_dimensions: int,
         num_atoms: int,
-        dim: int,
         com_augmentation: bool = False,
         num_eval_samples: int = 10_000,
         batch_size: int = 64,
@@ -43,7 +39,7 @@ class SinglePeptideDataModule(BaseDataModule):
         self.repo_name = self.hparams.repo_id.split("/")[-1]
         self.trajectory_name = f"{self.hparams.sequence}_{self.hparams.temperature}K"
 
-        # Setup paths
+        # Setup paths
         self.trajectory_data_dir = f"{data_dir}/{self.repo_name}/{self.trajectory_name}"
         self.train_data_path = f"{self.trajectory_data_dir}/{self.trajectory_name}_train.npy"
         self.val_data_path = f"{self.trajectory_data_dir}/{self.trajectory_name}_val.npy"
@@ -55,21 +51,34 @@ class SinglePeptideDataModule(BaseDataModule):
         self.test_sequences = [self.hparams.sequence]
 
     def prepare_data(self):
+        """Download + preprocessing data. Lightning ensures that `self.prepare_data()` is called only
+        within a single process on CPU, so you can safely add your downloading logic within. In
+        case of multi-node training, the execution of this hook depends upon
+        `self.prepare_data_per_node()`.
 
-        os.makedirs(f"{self.hparams.repo_id}/{self.repo_name}", exist_ok=True)
+        Do not use it to assign state (self.x = y).
+        """
+        os.makedirs(f"{self.hparams.data_dir}/{self.repo_name}", exist_ok=True)
 
         local_dir = snapshot_download(
             repo_id=self.hparams.repo_id,
             repo_type="dataset",
             local_dir=f"{self.hparams.data_dir}/{self.repo_name}",
             allow_patterns=[f"{self.trajectory_name}/*"],
-            use_auth_token=True
+            use_auth_token=True,
         )
         logging.info(f"Downloaded dataset to {local_dir}")
 
-        # TODO - cache TICA model?
-
     def setup(self, stage: Optional[str] = None) -> None:
+        """Load data. Set variables: `self.data_train`, `self.data_val`, `self.data_test`.
+
+        This method is called by Lightning before `trainer.fit()`, `trainer.validate()`, `trainer.test()`, and
+        `trainer.predict()`, so be careful not to execute things like random split twice! Also, it is called after
+        `self.prepare_data()` and there is a barrier in between which ensures that all the processes proceed to
+        `self.setup()` once the data is prepared and available for use.
+
+        :param stage: The stage to setup. Either `"fit"`, `"validate"`, `"test"`, or `"predict"`. Defaults to ``None``.
+        """
         # Divide batch size by the number of devices.
         if self.trainer is not None:
             if self.hparams.batch_size % self.trainer.world_size != 0:
@@ -78,13 +87,15 @@ class SinglePeptideDataModule(BaseDataModule):
                     "of devices ({self.trainer.world_size})."
                 )
             self.batch_size_per_device = self.hparams.batch_size // self.trainer.world_size
+        else:
+            self.batch_size_per_device = self.hparams.batch_size
 
         # Load the data
-        data_train = np.load(self.train_data_path, allow_pickle=True)
-        data_val = np.load(self.val_data_path, allow_pickle=True)
-        data_test = np.load(self.test_data_path, allow_pickle=True)
+        data_train = np.load(self.train_data_path)
+        data_val = np.load(self.val_data_path)
+        data_test = np.load(self.test_data_path)
 
-        # Reshape and tensorize the data
+        # Tensorize the data
         data_train = torch.from_numpy(data_train)
         data_val = torch.from_numpy(data_val)
         data_test = torch.from_numpy(data_test)
@@ -95,23 +106,18 @@ class SinglePeptideDataModule(BaseDataModule):
         # Load the topology from the PDB file
         self.topology = md.load_topology(self.pdb_path)
 
-        # Prepare the TICA model
-        self.tica_model = get_tica_model(
-            data_test,
-            self.topology,
-        )
+        # For compatibility to transferable BG
+        self.topology_dict = {self.hparams.sequence: self.topology}
 
-        # Compute std on standardied data
-        self.std = self.zero_center_of_mass(data_train).std()
+        # Compute std on standardized data
+        self.std = (data_train - data_train.mean(dim=1, keepdim=True)).std()
 
         transform_list = [
             StandardizeTransform(self.std),
             Random3DRotationTransform(),
         ]
         if self.hparams.com_augmentation:
-            transform_list.append(
-                CenterOfMassTransform()
-            )
+            transform_list.append(CenterOfMassTransform())
         train_transforms = torchvision.transforms.Compose(transform_list)
         self.data_train = TensorDataset(
             data=data_train,
@@ -133,6 +139,12 @@ class SinglePeptideDataModule(BaseDataModule):
         logging.info(f"Test dataset size: {len(self.data_test)}")
 
     def setup_potential(self):
+        """
+        Set up the OpenMM potential energy function.
+
+        Returns:
+            OpenMMEnergy: An energy function wrapper around the OpenMM system and integrator.
+        """
         if self.hparams.sequence in ["Ace-A-Nme", "Ace-AAA-Nme"]:
             forcefield = openmm.app.ForceField("amber99sbildn.xml", "tip3p.xml", "amber99_obc.xml")
 
@@ -152,7 +164,6 @@ class SinglePeptideDataModule(BaseDataModule):
             )
             potential = OpenMMEnergy(bridge=OpenMMBridge(system, integrator, platform_name="CUDA"))
         else:
-
             forcefield = openmm.app.ForceField("amber14-all.xml", "implicit/obc1.xml")
             temperature = 310
 
@@ -173,15 +184,35 @@ class SinglePeptideDataModule(BaseDataModule):
 
         return potential
 
-    def prepare_eval(self, prefix: str):
-        """sequence for compatibility with transferable case"""
+    def prepare_eval(self, sequence: str, prefix: str):
+        """
+        Prepare evaluation data and energy function for validation or test trajectories.
 
+        Selects trajectory data based on the provided prefix, constructs a TICA model,
+        subsamples the trajectory, applies normalization, and sets up a potential energy
+        function. Returns all components required for evaluation.
+
+        Args:
+            sequence (str): Unused compatibility argument for integration with
+                TransferablePeptideDatamodule.
+            prefix (str): Dataset split to evaluate on. Must be either "val" or "test".
+
+        Returns:
+            tuple: A 5-tuple containing:
+                - true_samples (torch.Tensor): Normalized and subsampled trajectory samples.
+                - permutations (None): Placeholder for compatibility, not used here.
+                - encodings (None): Placeholder for compatibility, not used here.
+                - energy_fn (Callable): Function mapping positions → energy values.
+                - tica_model: Model with TICA projection parameters computed from the trajectory.
+        """
         if prefix == "test":
             true_samples = self.data_test.data
         elif prefix == "val":
             true_samples = self.data_val.data
         else:
             raise ValueError(f"Unknown prefix: {prefix}. Use 'val' or 'test'.")
+
+        tica_model = get_tica_model(true_samples, self.topology)
 
         # Subsample the true trajectory
         true_samples = true_samples[:: len(true_samples) // self.hparams.num_eval_samples]
@@ -190,6 +221,6 @@ class SinglePeptideDataModule(BaseDataModule):
         permutations = None
         encodings = None
         potential = self.setup_potential()
-        energy_fn = lambda x: potential.energy(self.unnormalize(x).flatten(start_dim=1)).flatten()
+        energy_fn = lambda x: potential.energy(self.unnormalize(x)).flatten()
 
-        return true_samples, permutations, encodings, energy_fn
+        return true_samples, permutations, encodings, energy_fn, tica_model

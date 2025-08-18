@@ -1,11 +1,8 @@
-import pickle
+import logging
 
 import deeptime as dt
 import mdtraj as md
 import numpy as np
-import torch
-
-from src.evaluation.metrics.distribution_distances import distribution_distances
 
 SELECTION = "symbol == C or symbol == N or symbol == S"
 
@@ -72,16 +69,36 @@ def run_tica_ca(trajectory, topology, lagtime=500, dim=2):
     tica_model = tica.fit(ca_features, reweighting_model).fetch_model()
     return tica_model
 
-def get_tica_model(data, topology):
 
+def get_tica_model(data, topology):
     sequence_length = topology.n_residues
     traj_samples = md.Trajectory(data, topology=topology)
 
-    if sequence_length > 6:
+    if sequence_length > 4:
         tica_model = run_tica_ca(traj_samples, topology, lagtime=100, dim=2)
-        print("doing CA only!")
+        logging.info("Using CA only for TICA")
     else:
         tica_model = run_tica_heavy(traj_samples, lagtime=100, dim=2)
-        print("doing all atoms!")
+        logging.info("Using all heavy atoms for TICA")
 
     return tica_model
+
+
+class TicaModel:
+    def __init__(
+        self,
+        projection,
+        mean,
+        dim=2,
+    ):
+        self.projection = projection
+        self.mean = mean
+        self.dim = dim
+
+    def forward(self, x):
+        X_centered = x - self.mean
+        return X_centered @ self.projection[:, : self.dim]
+
+    def transform(self, x):
+        """Compatibility with original tica code from deeptime"""
+        return self.forward(x)

@@ -1,0 +1,7 @@
+_target_: src.models.neural_networks.egnn.egnn_dynamics_transferable_md.EGNNDynamicsTransferableMD
+num_atoms: ${data.num_atoms}
+num_dimensions: ${data.num_dimensions}
+channels: 256
+num_layers: 9
+num_aa_max: ${data.num_aa_max}
+num_aa_min: ${data.num_aa_min}
