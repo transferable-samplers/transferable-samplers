@@ -14,6 +14,8 @@ conda activate transferable-samplers
 pip install -r requirements.txt
 ```
 
+You must also populate the `.env.example` file with a suitable scratch directory, and save as `.env`.
+
 ## Usage
 
 ### Datasets
