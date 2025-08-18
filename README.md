@@ -14,6 +14,8 @@ conda activate transferable-samplers
 pip install -r requirements.txt
 ```
 
+You must also populate `.env.example` and save as `.env`
+
 ## Usage
 
 ### Datasets
