@@ -3,7 +3,7 @@
 defaults:
   - override /model: normalizing_flow
   - override /model/net: prose
-  - override /data: transferable/transferable/up_to_8aa
+  - override /data: transferable/up_to_8aa
   - override /trainer: gpu
 
 train: False
