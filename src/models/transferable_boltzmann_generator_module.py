@@ -14,7 +14,7 @@ import torchmetrics
 from lightning import LightningDataModule, LightningModule
 from lightning.pytorch.loggers import WandbLogger
 from torchmetrics import MeanMetric
-from tqdm import tqdm, trange
+from tqdm import tqdm
 
 from src.models.neural_networks.ema import EMA
 from src.models.priors import NormalDistribution
@@ -68,7 +68,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
             self.smc_sampler = smc_sampler(
                 log_image_fn=self.log_image,
             )
-        
+
         # loss function
         self.criterion = torch.nn.MSELoss(reduction="mean")
 
@@ -631,7 +631,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
     def on_fit_start(self) -> None:
         """
         Called at the very beginning of the fit loop, after setup() has been called.
-        Here we make a copy of the model to serve as a teacher during self-refinement. 
+        Here we make a copy of the model to serve as a teacher during self-refinement.
         This ensures the "student" model does not drift to far from the initial model (teacher).
         """
 
@@ -662,7 +662,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
             if self.hparams.ema_decay > 0:
                 self.net.backup()
                 self.net.copy_to_model()
-                
+
                 with torch.no_grad():
                     samples = self.generate_and_resample(
                         num_proposal_samples=self.hparams.sampling_config.num_self_refinement_proposal_samples,
@@ -671,7 +671,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
                 self.net.restore_to_model()
 
             else:
-                 with torch.no_grad():
+                with torch.no_grad():
                     samples = self.generate_and_resample(
                         num_proposal_samples=self.hparams.sampling_config.num_self_refinement_proposal_samples,
                     )
@@ -683,7 +683,6 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
 
             # save the buffer into memory
             self.datamodule.save_buffer()
-
 
         self.train_metrics.reset()
 

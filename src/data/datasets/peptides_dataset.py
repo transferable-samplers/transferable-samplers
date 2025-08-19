@@ -51,7 +51,7 @@ class PeptidesDatasetWithBuffer(torch.utils.data.Dataset):
 
         sample = self.sample_buffer(idx)
         assert "sequence" in sample
-    
+
         if self.transform is not None:
             sample = self.transform(sample)
 

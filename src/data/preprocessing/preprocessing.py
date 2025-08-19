@@ -16,7 +16,7 @@ def prepare_and_cache_pdb_dict(
     if os.path.isfile(cache_path):
         logging.info(f"Loading cached PDB dict from {cache_path}")
         with open(cache_path, "rb") as f:
-            pdb_dict = pickle.load(f)
+            pdb_dict = pickle.load(f)  # noqa:S301
     else:
         pdb_dict = {}
         logging.info(f"Creating pdb dict and caching to {cache_path}")
@@ -36,7 +36,7 @@ def prepare_and_cache_topology_dict(pdb_dict: dict[str, openmm.app.PDBFile], cac
     if os.path.isfile(cache_path):
         logging.info(f"Loading cached topology dict from {cache_path}")
         with open(cache_path, "rb") as f:
-            topology_dict = pickle.load(f)
+            topology_dict = pickle.load(f)  # noqa:S301
     else:
         logging.info(f"Creating topology dict and caching to {cache_path}")
         topology_dict = {}
@@ -54,7 +54,7 @@ def prepare_and_cache_encodings_dict(topology_dict: dict[str, md.Topology], cach
     if os.path.isfile(cache_path):
         logging.info(f"Loading cached encodings dict from {cache_path}")
         with open(cache_path, "rb") as f:
-            encodings_dict = pickle.load(f)
+            encodings_dict = pickle.load(f)  # noqa:S301
     else:
         logging.info(f"Creating encodings dict and caching to {cache_path}")
         encodings_dict = get_encodings_dict(topology_dict)
@@ -68,7 +68,7 @@ def prepare_and_cache_permutations_dict(topology_dict: dict[str, md.Topology], c
     if os.path.isfile(cache_path):
         logging.info(f"Loading cached permutations dict from {cache_path}")
         with open(cache_path, "rb") as f:
-            permutations_dict = pickle.load(f)
+            permutations_dict = pickle.load(f)  # noqa:S301
     else:
         logging.info(f"Creating permutations dict and caching to {cache_path}")
         permutations_dict = get_permutations_dict(topology_dict)

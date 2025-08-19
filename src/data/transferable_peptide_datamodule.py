@@ -256,7 +256,7 @@ class TransferablePeptideDataModule(BaseDataModule):
 
         return potential
 
-    def prepare_eval(self, sequence: str, prefix: str=None):
+    def prepare_eval(self, sequence: str, prefix: str = None):
         """
         Prepare evaluation data and energy function for a given peptide sequence.
 

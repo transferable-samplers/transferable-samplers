@@ -3,7 +3,6 @@
 import pickle
 from typing import Any, Optional
 
-import os
 import hydra
 import lightning as L
 import rootutils
@@ -33,7 +32,6 @@ load_dotenv(override=True)
 # more info: https://github.com/ashleve/rootutils
 # ------------------------------------------------------------------------------------ #
 
-from src.utils.huggingface import download_weights
 from src.utils.instantiators import instantiate_callbacks, instantiate_loggers
 from src.utils.logging_utils import log_hyperparameters
 from src.utils.pylogger import RankedLogger
@@ -102,7 +100,6 @@ def train(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
         model.load_state_dict(state_dict)
     except pickle.UnpicklingError:
         log.info(f"Ensure checkpoint path {initial_ckpt_path} contains weights only.")
-
 
     log.info("Starting initial evaluation!")
     # validate to get results of the initial model
