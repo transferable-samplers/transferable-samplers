@@ -44,11 +44,11 @@ class NormalizingFlowLitModule(TransferableBoltzmannGeneratorLitModule):
             with torch.no_grad():
                 x0_teacher, dlogp_teacher = self.teacher(x1, permutations=permutations, encodings=encodings, mask=mask)
 
-            prior_log_p = - self.prior.energy(x0_teacher, mask=mask)
-            logq_teacher =  prior_log_p + dlogp_teacher
+            prior_log_p = -self.prior.energy(x0_teacher, mask=mask)
+            logq_teacher = prior_log_p + dlogp_teacher
 
-            logq = - self.prior.energy(x0, mask=mask) + dlogp
-            distill_loss =  (logq - logq_teacher).pow(2).mean()
+            logq = -self.prior.energy(x0, mask=mask) + dlogp
+            distill_loss = (logq - logq_teacher).pow(2).mean()
             loss = loss + self.hparams.distill_weight * distill_loss
             if log:
                 self.log("finetune/distill_loss", distill_loss.item(), prog_bar=True, sync_dist=True)
