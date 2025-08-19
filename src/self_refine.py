@@ -106,7 +106,7 @@ def train(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
 
     log.info("Starting initial evaluation!")
     # validate to get results of the initial model
-    # trainer.test(model=model, datamodule=datamodule)
+    trainer.test(model=model, datamodule=datamodule)
 
     log.info("Starting self-refinement training!")
     trainer.fit(model=model, datamodule=datamodule, ckpt_path=ckpt_path)
