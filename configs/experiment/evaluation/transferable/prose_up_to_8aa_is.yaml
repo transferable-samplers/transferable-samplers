@@ -14,7 +14,7 @@ model:
   sampling_config:
     use_com_adjustment: True
     batch_size: 5_000
-    num_test_proposal_samples: 10_000
+    num_test_proposal_samples: 1_000_000
     num_smc_samples: 10_000
     clip_reweighting_logits: 0.002 # it was working well on AC without - lets try avoid
   net:
