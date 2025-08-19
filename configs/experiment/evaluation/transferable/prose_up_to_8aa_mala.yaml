@@ -2,6 +2,7 @@
 
 defaults:
   - override /model: normalizing_flow
+  - override /model/net: prose
   - override /data: transferable/transferable/up_to_8aa
   - override /trainer: gpu
 
@@ -17,32 +18,6 @@ model:
     num_test_proposal_samples: 10_000
     num_smc_samples: 10_000
     clip_reweighting_logits: 0.002 # it was working well on AC without - lets try avoid
-  net:
-    _target_: src.models.neural_networks.tarflow.tarflow.TarFlow
-    input_dimension: 3 # 3D coordinates
-    channels: 384
-    max_num_tokens: ${data.num_atoms}
-    num_blocks: 8
-    layers_per_block: 8
-    permutation_keys:
-    - "n2c_backbone-first_standard"
-    - "n2c_residue-by-residue_standard_flip"
-    - "n2c_backbone-first_standard_flip"
-    - "n2c_residue-by-residue_standard"
-    - "n2c_backbone-first_variant"
-    - "n2c_residue-by-residue_variant_flip"
-    - "n2c_backbone-first_variant_flip"
-    - "n2c_residue-by-residue_variant"
-    cond_embed:
-      _target_: src.models.neural_networks.embedder.ConditionalEmbedder
-      hidden_dim: ${model.net.channels}
-      output_dim: ${model.net.channels}
-      sinusoid_div_value: 1000 # for sinusoidal positional embedding
-    use_adapt_ln: True
-    use_transition: True
-    use_qkln: True
-    pos_embed_type: "sinusoidal"
-    lookahead_conditioning: True
     
   smc_sampler:
     _target_: src.models.samplers.mala_sampler.SMCSamplerMALA
