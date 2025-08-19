@@ -1,0 +1,76 @@
+# @package _global_
+
+defaults:
+  - override /model: normalizing_flow
+  - override /data: transferable/up_to_8aa
+  - override /trainer: gpu
+
+initial_ckpt_path: null
+
+train: False
+val: False
+test: True
+task_name: self-refine
+
+model:
+  self_refinement: True
+  use_distill_loss: True
+  distill_weight: 0.5
+  sampling_config:
+    finetune_on_data: False
+    num_finetune_epochs: null
+    use_com_adjustment: True
+    batch_size: 2_500
+    num_self_refinement_proposal_samples: 200_000
+    num_proposal_samples: 10_000
+    num_test_proposal_samples: 200_000
+    clip_reweighting_logits: 0.002
+  net:
+    _target_: src.models.neural_networks.tarflow.tarflow.TarFlow
+    input_dimension: 3 # 3D coordinates
+    channels: 384
+    max_num_tokens: ${data.num_atoms}
+    num_blocks: 8
+    layers_per_block: 8
+    permutation_keys:
+    - "n2c_backbone-first_standard"
+    - "n2c_residue-by-residue_standard_flip"
+    - "n2c_backbone-first_standard_flip"
+    - "n2c_residue-by-residue_standard"
+    - "n2c_backbone-first_variant"
+    - "n2c_residue-by-residue_variant_flip"
+    - "n2c_backbone-first_variant_flip"
+    - "n2c_residue-by-residue_variant"
+    cond_embed:
+      _target_: src.models.neural_networks.embedder.ConditionalEmbedder
+      hidden_dim: ${model.net.channels}
+      output_dim: ${model.net.channels}
+      sinusoid_div_value: 1000 # for sinusoidal positional embedding
+    use_adapt_ln: True
+    use_transition: True
+    use_qkln: True
+    pos_embed_type: "sinusoidal"
+    lookahead_conditioning: True
+  optimizer:
+    lr: 5.e-6
+  smc_sampler:
+    enabled: False
+    
+data:
+  batch_size: 32
+  num_eval_samples: 10_000
+  buffer_ckpt_path: null
+  buffer:
+    _target_: src.data.datasets.buffer.ReplayBuffer
+    max_length: 200_000
+    sample_with_replacement: False
+
+trainer:
+  limit_train_batches: 1000
+  accumulate_grad_batches: 8
+  max_epochs: 4
+  limit_test_batches: 1
+  limit_val_batches: 1
+  num_sanity_val_steps: 0
+  check_val_every_n_epoch: 0
+  reload_dataloaders_every_n_epochs: 1

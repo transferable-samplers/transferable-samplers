@@ -13,8 +13,10 @@ from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
 
 import rootutils
+from dotenv import load_dotenv
 
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
+load_dotenv(override=True)
 
 # ------------------------------------------------------------------------------------ #
 # the setup_root above is equivalent to:

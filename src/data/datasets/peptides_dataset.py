@@ -33,46 +33,25 @@ class PeptidesDatasetWithBuffer(torch.utils.data.Dataset):
         self,
         buffer,
         transform=None,
-        file_path=None,
-        pdb_path=None,
     ):
-        self.pdb_path = pdb_path
-        self.file_path = file_path
         self.buffer = buffer
         self.transform = transform
-
-        self.data_from_file = None
-        self.sequence = None
-        self.data_length = 0
-
-        if self.file_path is not None:
-            assert self.pdb_path is not None
-
-            print(f"Loading samples from file: {self.file_path}")
-            self.data_from_file = torch.from_numpy(np.load(self.file_path))
-            if self.pdb_path:
-                self.sequence = os.path.splitext(os.path.basename(self.pdb_path))[0]
-
-            self.data_length = len(self.data_from_file)
 
     def __len__(self):
         # fake max number of samples in buffer
         # to estimate number of training steps
         if len(self.buffer) == 0:
-            return self.buffer.max_length + self.data_length
+            return self.buffer.max_length
 
-        return self.data_length + len(self.buffer)
+        return len(self.buffer)
 
     def __getitem__(self, idx):
-        if idx > self.data_length and len(self.buffer) > 0:
-            buffer_idx = idx % len(self.buffer)
-            sample = self.sample_buffer(buffer_idx)
-            assert "sequence" in sample
-        else:
-            idx = idx % self.data_length
-            coords = self.data_from_file[idx]
-            sample = {"x": coords, "sequence": self.sequence}
+        if len(self.buffer) == 0:
+            raise IndexError("Attempting to get an item from a completely empty dataset.")
 
+        sample = self.sample_buffer(idx)
+        assert "sequence" in sample
+    
         if self.transform is not None:
             sample = self.transform(sample)
 
