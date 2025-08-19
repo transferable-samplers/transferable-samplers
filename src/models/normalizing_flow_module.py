@@ -40,6 +40,19 @@ class NormalizingFlowLitModule(TransferableBoltzmannGeneratorLitModule):
         if log:
             self.log("train/mle_loss", loss.item(), prog_bar=True, sync_dist=True)
 
+        if self.hparams.use_distill_loss and self.hparams.self_refinement and self.training:
+            with torch.no_grad():
+                x0_teacher, dlogp_teacher = self.teacher(x1, permutations=permutations, encodings=encodings, mask=mask)
+
+            prior_log_p = -self.prior.energy(x0_teacher, mask=mask)
+            logq_teacher = prior_log_p + dlogp_teacher
+
+            logq = -self.prior.energy(x0, mask=mask) + dlogp
+            distill_loss = (logq - logq_teacher).pow(2).mean()
+            loss = loss + self.hparams.distill_weight * distill_loss
+            if log:
+                self.log("finetune/distill_loss", distill_loss.item(), prog_bar=True, sync_dist=True)
+
         if self.hparams.energy_kl_weight:
             assert self.hparams.eval_sequence is not None, "Eval sequence name should be set"
 
@@ -93,7 +106,7 @@ class NormalizingFlowLitModule(TransferableBoltzmannGeneratorLitModule):
             for k, v in encodings.items():
                 # ensure encodings is broadcasted to batch if we pass
                 # in a single peptide
-                if v.shape[0] != x.shape[0]:
+                if v.ndim == 1 and x.ndim > 2:
                     v = v[None, ...].repeat(x.shape[0], *([1] * v.ndim))
 
                 _encodings[k] = v.to(x.device)

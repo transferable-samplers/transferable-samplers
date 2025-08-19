@@ -10,17 +10,10 @@ import torch
 from lightning import Callback, LightningDataModule, LightningModule, Trainer
 from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
+from dotenv import load_dotenv
 
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
-
-from src.utils.instantiators import instantiate_callbacks, instantiate_loggers
-from src.utils.logging_utils import log_hyperparameters
-from src.utils.pylogger import RankedLogger
-from src.utils.utils import extras, get_metric_value, task_wrapper
-
-torch.set_float32_matmul_precision("highest")  # high at minimum!
-torch.backends.cuda.matmul.allow_tf32 = False
-torch.backends.cudnn.allow_tf32 = False
+load_dotenv(override=True)
 
 # ------------------------------------------------------------------------------------ #
 # the setup_root above is equivalent to:
@@ -39,6 +32,14 @@ torch.backends.cudnn.allow_tf32 = False
 # more info: https://github.com/ashleve/rootutils
 # ------------------------------------------------------------------------------------ #
 
+from src.utils.instantiators import instantiate_callbacks, instantiate_loggers
+from src.utils.logging_utils import log_hyperparameters
+from src.utils.pylogger import RankedLogger
+from src.utils.utils import extras, get_metric_value, task_wrapper
+
+torch.set_float32_matmul_precision("highest")  # high at minimum!
+torch.backends.cuda.matmul.allow_tf32 = False
+torch.backends.cudnn.allow_tf32 = False
 
 log = RankedLogger(__name__, rank_zero_only=True)
 
@@ -88,17 +89,17 @@ def train(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
 
     assert not cfg.trainer.num_sanity_val_steps, "num_sanity_val_steps should be 0 for finetuning!"
 
-    initial_ckpt_path = cfg.get("initial_ckpt_path")
-    assert initial_ckpt_path is not None, "Need pre-trained ckpt to give initial proposal"
     ckpt_path = cfg.get("ckpt_path")
+    initial_ckpt_path = cfg.get("initial_ckpt_path")
+
+    assert initial_ckpt_path is not None, "Need pre-trained ckpt to give initial proposal"
+    log.info(f"Loading weights from {initial_ckpt_path}")
 
     try:
-        state_dict = torch.load(initial_ckpt_path, weights_only=True)
+        state_dict = torch.load(initial_ckpt_path, map_location="cpu", weights_only=True)
+        model.load_state_dict(state_dict)
     except pickle.UnpicklingError:
         log.info(f"Ensure checkpoint path {initial_ckpt_path} contains weights only.")
-
-    log.info(f"Loading weights from {initial_ckpt_path}")
-    model.load_state_dict(state_dict)
 
     log.info("Starting initial evaluation!")
     # validate to get results of the initial model

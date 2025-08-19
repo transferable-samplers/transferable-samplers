@@ -1,0 +1,30 @@
+# @package _global_
+
+defaults:
+  - override /model: normalizing_flow
+  - override /model/net: prose
+  - override /data: transferable/up_to_8aa
+  - override /trainer: gpu
+
+train: False
+val: False
+test: True
+task_name: eval
+
+model:
+  sampling_config:
+    use_com_adjustment: True
+    batch_size: 5_000
+    num_test_proposal_samples: 1_000_000
+    num_smc_samples: 10_000
+    clip_reweighting_logits: 0.002 # it was working well on AC without - lets try avoid
+
+  smc_sampler: null
+
+data:
+  batch_size: 128
+  num_eval_samples: 10_000
+
+trainer:
+  limit_test_batches: 1
+  limit_val_batches: 1

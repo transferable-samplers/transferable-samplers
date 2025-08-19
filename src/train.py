@@ -13,8 +13,10 @@ from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
 
 import rootutils
+from dotenv import load_dotenv
 
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
+load_dotenv(override=True)
 
 # ------------------------------------------------------------------------------------ #
 # the setup_root above is equivalent to:
@@ -127,7 +129,7 @@ def main(cfg: DictConfig) -> Optional[float]:
         # causing rate limiting issues with wandb. To avoid this, we add a random sleep time
         # before starting the training. This is a workaround to avoid hitting the rate limits.
         # It seems to be fine having many concurrent jobs, but not starting simultaneously.
-        sleep_time = random.uniform(0, 60) # noqa:S311
+        sleep_time = random.uniform(0, 60)  # noqa:S311
         log.info(f"Sleeping for {sleep_time:.2f} seconds to avoid wandb rate limitations.")
         time.sleep(sleep_time)
 

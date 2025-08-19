@@ -1,15 +1,7 @@
 defaults:
   - optimizer: adam_w
 
-smc_sampler:
-  _target_: src.models.samplers.ula_sampler.SMCSamplerULA
-  _partial_: true
-  batch_size: ${data.batch_size}
-  langevin_eps: 0.1
-  num_timesteps: 10
-  enabled: false
-  ess_threshold: 0.0
-  input_energy_cutoff: null
+smc_sampler: null
 
 sampling_config:
   num_proposal_samples: 10_000

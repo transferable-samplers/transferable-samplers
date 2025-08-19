@@ -4,6 +4,7 @@ import os
 import statistics as stats
 import time
 from collections import defaultdict
+from copy import deepcopy
 from typing import Any, Optional
 
 import hydra
@@ -13,7 +14,7 @@ import torchmetrics
 from lightning import LightningDataModule, LightningModule
 from lightning.pytorch.loggers import WandbLogger
 from torchmetrics import MeanMetric
-from tqdm import tqdm, trange
+from tqdm import tqdm
 
 from src.models.neural_networks.ema import EMA
 from src.models.priors import NormalDistribution
@@ -38,6 +39,8 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         use_com_adjustment: bool = False,
         fix_symmetry: bool = True,
         drop_unfixable_symmetry: bool = False,
+        use_distill_loss: bool = False,
+        distill_weight: float = 0.5,
         *args,
         **kwargs,
     ) -> None:
@@ -60,9 +63,11 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
 
         self.datamodule = datamodule
 
-        self.smc_sampler = smc_sampler(
-            log_image_fn=self.log_image,
-        )
+        self.smc_sampler = None
+        if smc_sampler is not None:
+            self.smc_sampler = smc_sampler(
+                log_image_fn=self.log_image,
+            )
 
         # loss function
         self.criterion = torch.nn.MSELoss(reduction="mean")
@@ -503,13 +508,13 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         )
 
         if self.hparams.sampling_config.get("load_samples_path", None) is not None:
-            load_samples_path_jarz = self.hparams.sampling_config.load_samples_path.replace("samples", "smc_samples")
+            load_samples_path_smc = self.hparams.sampling_config.load_samples_path.replace("samples", "smc_samples")
         else:
-            load_samples_path_jarz = None
+            load_samples_path_smc = None
 
-        if load_samples_path_jarz and os.path.exists(load_samples_path_jarz):
-            logging.info(f"Loading Jarzynski samples from {load_samples_path_jarz}")
-            smc_samples_dict = torch.load(load_samples_path_jarz, map_location=self.device)
+        if load_samples_path_smc and os.path.exists(load_samples_path_smc):
+            logging.info(f"Loading SMC samples from {load_samples_path_smc}")
+            smc_samples_dict = torch.load(load_samples_path_smc, map_location=self.device)
             smc_samples = smc_samples_dict["samples"]
             smc_logits = smc_samples_dict["logits"]
             smc_data = SamplesData(
@@ -527,7 +532,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
             start_time = time.time()
 
             # TODO: Make conditional proposal energy
-            cond_proposal_energy = lambda _x: self.proposal_energy(_x, permutations, encodings=encodings)
+            cond_proposal_energy = lambda _x: self.proposal_energy(_x, permutations=permutations, encodings=encodings)
             smc_samples, smc_logits = self.smc_sampler.sample(
                 proposal_samples[:num_smc_samples], cond_proposal_energy, energy_fn
             )  # already returned resampled
@@ -626,53 +631,21 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
     def on_fit_start(self) -> None:
         """
         Called at the very beginning of the fit loop, after setup() has been called.
-        Here we add a one-epoch fine-tuning step on the dataset before the main training starts.
+        Here we make a copy of the model to serve as a teacher during self-refinement.
+        This ensures the "student" model does not drift to far from the initial model (teacher).
         """
 
-        # Check if the pre-training hyperparameter is set to True
-        if self.hparams.sampling_config.get("finetune_on_data", False):
-            logger.info("Starting fine-tuning on the dataset...")
+        if self.hparams.use_distill_loss and self.hparams.self_refinement:
+            self.teacher = deepcopy(self.net)
 
-            # Ensure model is in training mode and gradients are enabled
-            self.train()
-            torch.set_grad_enabled(True)
+            # ema params as teacher model if available
+            if self.hparams.ema_decay > 0:
+                self.teacher.backup()
+                self.teacher.copy_to_model()
 
-            # Get the optimizer and the training dataloader from the trainer
-            optimizer = self.trainer.optimizers[0]
-            dataloader = self.trainer.train_dataloader
-
-            # Manual training loop for one epoch
-            total_loss = 0.0
-            num_iter = (
-                self.hparams.sampling_config.num_finetune_epochs * dataloader.dataset.data_length
-            ) // self.datamodule.hparams.batch_size
-
-            pbar = trange(num_iter)
-            data_iterator = iter(dataloader)
-            for step in pbar:
-                batch = next(data_iterator)
-                optimizer.zero_grad()
-
-                _batch = {}
-                _batch["x"] = batch["x"].to(self.device)
-                _batch["sequence"] = batch["sequence"]
-                _batch["encodings"] = {k: v.to(self.device) for k, v in batch["encodings"].items()}
-                _batch["permutations"] = {k: v.to(self.device) for k, v in batch["permutations"].items()}
-                _batch["mask"] = batch["mask"].to(self.device)
-
-                # The model_step method should contain the forward pass and loss calculation
-                # It is already used by your training_step, so we reuse it here.
-                loss = self.model_step(_batch, log=False)
-
-                loss.backward()
-                optimizer.step()
-                total_loss += loss.item()
-
-                pbar.set_description(f"Fine-tuning step: {step} | Loss: {loss:.4f}")
-
-            # Log the average loss for the fine-tuning epoch
-            avg_loss = total_loss / num_iter
-            logger.info(f"Finished fine-tuning epoch with average loss: {avg_loss:.4f}")
+            # Freeze the teacher network's parameters
+            for param in self.teacher.parameters():
+                param.requires_grad = False
 
     def on_train_epoch_start(self) -> None:
         logging.info("Train epoch start")
@@ -684,21 +657,32 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
                 f"Generating {self.hparams.sampling_config.num_self_refinement_proposal_samples} Samples"
                 " for self-consumption"
             )
-            torch.set_grad_enabled(False)
             self.net.eval()
 
-            samples = self.generate_and_resample(
-                num_proposal_samples=self.hparams.sampling_config.num_self_refinement_proposal_samples,
-            )
+            if self.hparams.ema_decay > 0:
+                self.net.backup()
+                self.net.copy_to_model()
+
+                with torch.no_grad():
+                    samples = self.generate_and_resample(
+                        num_proposal_samples=self.hparams.sampling_config.num_self_refinement_proposal_samples,
+                    )
+
+                self.net.restore_to_model()
+
+            else:
+                with torch.no_grad():
+                    samples = self.generate_and_resample(
+                        num_proposal_samples=self.hparams.sampling_config.num_self_refinement_proposal_samples,
+                    )
+
+            self.net.train()
 
             # add the IS samples into the buffer
             self.datamodule.data_train.buffer.add(samples, self.datamodule.test_sequences[0])
 
             # save the buffer into memory
             self.datamodule.save_buffer()
-
-            torch.set_grad_enabled(True)
-            self.net.train()
 
         self.train_metrics.reset()
 
@@ -757,6 +741,10 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
     def proposal_energy(self, x: torch.Tensor) -> torch.Tensor:
         # x is considered to be a sample from the proposal distribution
         raise NotImplementedError
+
+    def state_dict(self, *args, **kwargs):
+        sd = super().state_dict(*args, **kwargs)
+        return {k: v for k, v in sd.items() if not k.startswith("teacher.")}
 
 
 if __name__ == "__main__":

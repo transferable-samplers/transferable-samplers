@@ -48,10 +48,7 @@ class TransferablePeptideDataModule(BaseDataModule):
         val_sequences: Union[str, list[str]] = None,
         test_sequences: Union[str, list[str]] = None,
         buffer: ReplayBuffer = None,
-        buffer_ratio: float = 0.5,
         buffer_ckpt_path: str = None,
-        initial_data_path: str = None,
-        initial_pdb_path: str = None,
         batch_size: int = 64,
         num_workers: int = 0,
         pin_memory: bool = False,
@@ -73,10 +70,7 @@ class TransferablePeptideDataModule(BaseDataModule):
         self.permutations_dict_pkl_path = os.path.join(self.preproc_cache_dir, "permutations_dict.pkl")
 
         self.buffer = buffer
-        self.buffer_ratio = buffer_ratio
         self.buffer_ckpt_path = buffer_ckpt_path
-        self.initial_data_path = initial_data_path
-        self.initial_pdb_path = initial_pdb_path
 
         # Parse evaluation sequence hparam (which sequences to use for val / testing)
         if isinstance(self.hparams.val_sequences, str):
@@ -201,8 +195,6 @@ class TransferablePeptideDataModule(BaseDataModule):
             self.data_train = PeptidesDatasetWithBuffer(
                 buffer=self.buffer,
                 transform=train_transforms,
-                file_path=self.initial_data_path,
-                pdb_path=self.initial_pdb_path,
             )
 
         self.data_val = build_peptides_dataset(
@@ -264,7 +256,7 @@ class TransferablePeptideDataModule(BaseDataModule):
 
         return potential
 
-    def prepare_eval(self, sequence: str, prefix: str):
+    def prepare_eval(self, sequence: str, prefix: str = None):
         """
         Prepare evaluation data and energy function for a given peptide sequence.
 

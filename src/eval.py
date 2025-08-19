@@ -113,7 +113,9 @@ def eval(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
         state_dict_path = download_weights(hf_filepath=state_dict_hf_path, destination_dir=dst_dir)
 
         # Directly load the state dict into model
-        assert not cfg.model.ema_decay, "Setting ema decay will cause silent errors in evaluation"
+        assert not cfg.model.ema_decay, (
+            "Setting ema decay will cause silent errors in evaluation when using huggingface weights"
+        )
         state_dict = torch.load(state_dict_path, map_location="cpu")
         model.load_state_dict(state_dict)
 

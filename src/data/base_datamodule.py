@@ -79,9 +79,8 @@ class BaseDataModule(LightningDataModule):
             persistent_workers_flag = True if self.hparams.num_workers > 0 else False
             num_workers = self.hparams.num_workers
             if hasattr(self.data_train, "buffer"):
-                if isinstance(self.data_train.buffer, list):
-                    persistent_workers_flag = False
-                    num_workers = 0
+                persistent_workers_flag = False
+                num_workers = 0
 
             return DataLoader(
                 dataset=self.data_train,
