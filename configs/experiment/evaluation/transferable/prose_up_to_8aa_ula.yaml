@@ -21,6 +21,7 @@ model:
 
   smc_sampler:
     _target_: src.models.samplers.ula_sampler.SMCSamplerULA
+    _partial_: true
     enabled: True
     langevin_eps: 1e-7
     num_timesteps: 100
