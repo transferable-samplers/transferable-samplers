@@ -63,10 +63,12 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
 
         self.datamodule = datamodule
 
-        self.smc_sampler = smc_sampler(
-            log_image_fn=self.log_image,
-        )
-
+        self.smc_sampler = None
+        if smc_sampler is not None:
+            self.smc_sampler = smc_sampler(
+                log_image_fn=self.log_image,
+            )
+        
         # loss function
         self.criterion = torch.nn.MSELoss(reduction="mean")
 
@@ -506,13 +508,13 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         )
 
         if self.hparams.sampling_config.get("load_samples_path", None) is not None:
-            load_samples_path_jarz = self.hparams.sampling_config.load_samples_path.replace("samples", "smc_samples")
+            load_samples_path_smc = self.hparams.sampling_config.load_samples_path.replace("samples", "smc_samples")
         else:
-            load_samples_path_jarz = None
+            load_samples_path_smc = None
 
-        if load_samples_path_jarz and os.path.exists(load_samples_path_jarz):
-            logging.info(f"Loading Jarzynski samples from {load_samples_path_jarz}")
-            smc_samples_dict = torch.load(load_samples_path_jarz, map_location=self.device)
+        if load_samples_path_smc and os.path.exists(load_samples_path_smc):
+            logging.info(f"Loading SMC samples from {load_samples_path_smc}")
+            smc_samples_dict = torch.load(load_samples_path_smc, map_location=self.device)
             smc_samples = smc_samples_dict["samples"]
             smc_logits = smc_samples_dict["logits"]
             smc_data = SamplesData(
