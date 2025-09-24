@@ -1,0 +1,35 @@
+This project contains adaptations of third-party code under licenses other than MIT.  
+The affected files are listed below with references to their sources and licenses.
+
+- src/data/preprocessing/tica.py
+  src/models/neural_networks/egnn/egnn.py
+  src/models/neural_networks/egnn/egnn_dynamics_ad2_cat.py
+  src/models/neural_networks/egnn/egnn_dynamics_transferable_md.py
+  src/models/neural_networks/egnn/gcl.py
+  src/models/neural_networks/egnn/gnn.py
+  src/models/neural_networks/egnn/utils.py
+  Adapted from https://osf.io/n8vz3/
+  Licensed under CC BY 4.0 https://creativecommons.org/licenses/by/4.0/
+  Copyright (c) 2024 Leon Klein, Frank Noé
+
+- src/models/neural_networks/tarflow/attention.py
+  src/models/neural_networks/tarflow/tarflow.py
+  src/models/neural_networks/tarflow/tarflow_single_system.py
+  Adapted from https://github.com/apple/ml-tarflow
+  Licensed under Apple Software License
+  Copyright (c) 2024 Apple Inc.
+
+- src/models/neural_networks/ema.py
+  Adapted from https://github.com/facebookresearch/riemannian-fm
+  Licensed under CC BY-NC 4.0 https://creativecommons.org/licenses/by-nc/4.0/
+  Copyright (c) Meta Platforms, Inc. and affiliates
+
+- src/models/neural_networks/tarflow/adaptive_blocks.py
+  Adapted from https://github.com/NVIDIA-Digital-Bio/proteina
+  Licensed under NVIDIA License
+  Copyright (c) 2025 NVIDIA Corporation & Affiliates
+
+All modifications to these files are Copyright (c) 2025 transferable-samplers contributors
+and licensed under the MIT License (see LICENSE in the repository root).
+
+The rest of this repository is licensed under the MIT License.
