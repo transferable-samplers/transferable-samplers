@@ -59,3 +59,10 @@ To use a locally generated checkpoint you may pass in the argument `ckpt_path` t
 ### Acknowledgements
 
 We greatly thank Hugging Face for hosting our large ManyPeptidesMD dataset!
+
+### License
+
+The core of this repository is licensed under the MIT License (see [LICENSE](./LICENSE)).  
+Some files include adaptation of third-party code under other licenses (Apple, Meta, NVIDIA, Klein & Noé).  
+In some cases these thrid-party licenses are **non-commerical**.
+See [NOTICE](./NOTICE) for details.

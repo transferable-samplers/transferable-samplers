@@ -1,3 +1,15 @@
+# -------------------------------------------------------------------------
+# Adapted from
+# https://osf.io/n8vz3/
+# Licensed under Creative Commons Attribution 4.0 International
+# -------------------------------------------------------------------------
+# Copyright (c) 2024 Leon Klein, Frank Noé.
+# https://creativecommons.org/licenses/by/4.0/
+# -------------------------------------------------------------------------
+# Modifications Copyright (c) 2025 transferable-samplers contributors
+# Licensed under the MIT License (see LICENSE in the repository root).
+# -------------------------------------------------------------------------
+
 import torch
 from torch import nn
 
