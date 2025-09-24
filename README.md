@@ -56,11 +56,11 @@ python src/eval_only.py experiment=evaluation/transferable/prose_up_to_8aa
 
 To use a locally generated checkpoint you may pass in the argument `ckpt_path` to override the remote weights usage.
 
-### Acknowledgements
+## Acknowledgements
 
 We greatly thank Hugging Face for hosting our large ManyPeptidesMD dataset!
 
-### License
+## License
 
 The core of this repository is licensed under the MIT License (see [LICENSE](./LICENSE)).  
 Some files include adaptation of third-party code under other licenses (Apple, Meta, NVIDIA, Klein & Noé).  
