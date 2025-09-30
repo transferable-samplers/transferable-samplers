@@ -6,6 +6,7 @@ defaults:
   - override /data: transferable/up_to_8aa
   - override /trainer: gpu
 
+state_dict_hf_path: transferable/prose_up_to_8aa.pth
 train: False
 val: False
 test: True
@@ -33,6 +34,8 @@ model:
     input_energy_cutoff: 100 # this might need tuning if you get NaNs!
     do_energy_plots: True
     log_freq: 1
+
+  ema_decay: 0.0
 
 data:
   batch_size: 128
