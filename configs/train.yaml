@@ -39,5 +39,8 @@ tags: ["dev"]
 # simply provide checkpoint path to resume training
 ckpt_path: null
 
+# globally set torch.set_num_threads a good default is 2
+torch_num_threads: 2
+
 # seed for random number generators in pytorch, numpy and python.random
 seed: null
