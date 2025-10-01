@@ -1,6 +1,6 @@
 # -------------------------------------------------------------------------
 # Adapted from
-# https://osf.io/n8vz3/
+# https://osf.io/n8vz3/
 # Licensed under Creative Commons Attribution 4.0 International
 # -------------------------------------------------------------------------
 # Copyright (c) 2024 Leon Klein, Frank Noé.
