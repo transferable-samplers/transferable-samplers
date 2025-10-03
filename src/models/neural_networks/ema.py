@@ -1,10 +1,10 @@
 # -------------------------------------------------------------------------
 # Adapted from
-# https://github.com/facebookresearch/riemannian-fm/blob/main/manifm/ema.py
-# Licensed under Creative Commons Attribution–NonCommercial 4.0 International
+# https://github.com/facebookresearch/riemannian-fm/blob/main/manifm/ema.py
+# Licensed under Creative Commons Attribution–NonCommercial 4.0 International
 # -------------------------------------------------------------------------
 # Copyright (c) Meta Platforms, Inc. and affiliate
-# https://creativecommons.org/licenses/by-nc/4.0/
+# https://creativecommons.org/licenses/by-nc/4.0/
 # -------------------------------------------------------------------------
 # Modifications Copyright (c) 2025 transferable-samplers contributors
 # Licensed under the MIT License (see LICENSE in the repository root).
