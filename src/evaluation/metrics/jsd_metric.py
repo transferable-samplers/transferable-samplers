@@ -6,8 +6,15 @@ import torch
 from scipy.spatial.distance import jensenshannon
 from sklearn.cluster import KMeans
 
-from src.data.preprocessing.tica import tica_features, tica_features_ca
+from src.data.preprocessing.tica import tica_features, tica_features_ca, wrap
 
+
+def compute_dihedrals(trajectory):
+    _, phi = md.compute_phi(trajectory)
+    _, psi = md.compute_psi(trajectory)
+    _, omega = md.compute_omega(trajectory)
+    dihedrals = np.concatenate([*wrap(phi), *wrap(psi), *wrap(omega)], axis=-1)
+    return dihedrals
 
 def compute_hist(states, n_clusters=20):
     counts = np.bincount(states, minlength=n_clusters)
@@ -50,5 +57,27 @@ def jsd_metric(true_samples, pred_samples, topology, tica_model=None, tica_model
 
     jsd = jensenshannon(true_dist, gen_dist, base=2) ** 2
     return {
-        f"{prefix}/jsd": jsd,
+        f"{prefix}/tica/jsd": jsd,
     }
+
+def jsd_torus_metric(true_samples, pred_samples, topology, n_clusters=20, prefix=""):
+
+    true_traj_samples = md.Trajectory(true_samples.cpu().numpy(), topology=topology)
+    pred_traj_samples = md.Trajectory(pred_samples.cpu().numpy(), topology=topology)
+
+    dihedrals_test = compute_dihedrals(true_traj_samples)
+    dihedrals = compute_dihedrals(pred_traj_samples)
+
+    n = min(len(dihedrals_test), len(dihedrals))
+    kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(dihedrals_test)
+    true_states = kmeans.labels_  # Discretized trajectory
+    gen_states = kmeans.predict(dihedrals)  # Discretized generated samples
+
+    true_dist = compute_hist(true_states, n_clusters=n_clusters)
+    gen_dist = compute_hist(gen_states, n_clusters=n_clusters)
+
+    jsd = jensenshannon(true_dist, gen_dist, base=2) ** 2
+    return {
+        f"{prefix}/torus_jsd": jsd,
+    }
+
