@@ -70,16 +70,16 @@ def run_tica_ca(trajectory, topology, lagtime=500, dim=2):
     return tica_model
 
 
-def get_tica_model(data, topology):
+def get_tica_model(data, topology, lagtime=100):
     sequence_length = topology.n_residues
     traj_samples = md.Trajectory(data, topology=topology)
 
-    if sequence_length > 4:
-        tica_model = run_tica_ca(traj_samples, topology, lagtime=100, dim=2)
-        logging.info("Using CA only for TICA")
-    else:
-        tica_model = run_tica_heavy(traj_samples, lagtime=100, dim=2)
-        logging.info("Using all heavy atoms for TICA")
+    # if sequence_length > 4:
+    #     tica_model = run_tica_ca(traj_samples, topology, lagtime=lagtime, dim=2)
+    #     logging.info("Using CA only for TICA")
+    # else:
+    tica_model = run_tica_heavy(traj_samples, lagtime=lagtime, dim=2)
+    logging.info("Using all heavy atoms for TICA")
 
     return tica_model
 
