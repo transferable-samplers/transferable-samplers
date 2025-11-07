@@ -11,6 +11,8 @@ val: False
 test: True
 task_name: eval
 
+ckpt_path: transferable/prose_up_to_8aa.pth
+
 model:
   sampling_config:
     use_com_adjustment: True
