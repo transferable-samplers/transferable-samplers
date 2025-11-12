@@ -54,6 +54,7 @@ def evaluate_peptide_data(
         )
     )
     metrics[f"{prefix}/mean_energy"] = pred_data.energy.mean().cpu()
+    metrics[f"{prefix}/median_energy"] = pred_data.energy.median().cpu()
     logging.info("Energy metrics computed")
 
     # Ramachandran metrics

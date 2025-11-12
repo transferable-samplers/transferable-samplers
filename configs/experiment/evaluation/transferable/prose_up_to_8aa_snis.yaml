@@ -16,20 +16,7 @@ model:
     num_smc_samples: 10_000
     clip_reweighting_logits: 0.002 # it was working well on AC without - lets try avoid
 
-  smc_sampler:
-    _target_: src.models.samplers.ula_sampler.SMCSamplerULA
-    _partial_: true
-    enabled: True
-    langevin_eps: 1e-7
-    num_timesteps: 100
-    ess_threshold: 1
-    systematic_resampling: True
-    warmup: 0.
-    batch_size: 32 # set for 48gb
-    input_energy_cutoff: 100 # this might need tuning if you get NaNs!
-    do_energy_plots: True
-    log_freq: 1
-
+  smc_sampler: null
   ema_decay: 0.0
 
 data:

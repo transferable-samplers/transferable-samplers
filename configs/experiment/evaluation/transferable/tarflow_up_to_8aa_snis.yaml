@@ -2,16 +2,11 @@
 
 defaults:
   - override /model: normalizing_flow
-  - override /model/net: prose
+  - override /model/net: tarflow
   - override /data: transferable/up_to_8aa
   - override /trainer: gpu
 
-train: False
-val: False
-test: True
-task_name: eval
-
-ckpt_path: transferable/prose_up_to_8aa.pth
+state_dict_hf_path: transferable/tarflow_up_to_8aa.pth
 
 model:
   sampling_config:
@@ -22,6 +17,7 @@ model:
     clip_reweighting_logits: 0.002 # it was working well on AC without - lets try avoid
 
   smc_sampler: null
+  ema_decay: 0.0
 
 data:
   batch_size: 128

@@ -7,7 +7,6 @@ from collections import defaultdict
 from copy import deepcopy
 from typing import Any, Optional
 
-import hydra
 import matplotlib.pyplot as plt
 import torch
 import torchmetrics
@@ -41,6 +40,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         drop_unfixable_symmetry: bool = False,
         use_distill_loss: bool = False,
         distill_weight: float = 0.5,
+        output_dir: str = "",
         *args,
         **kwargs,
     ) -> None:
@@ -64,10 +64,6 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         self.datamodule = datamodule
 
         self.smc_sampler = None
-        if smc_sampler is not None:
-            self.smc_sampler = smc_sampler(
-                log_image_fn=self.log_image,
-            )
 
         # loss function
         self.criterion = torch.nn.MSELoss(reduction="mean")
@@ -81,6 +77,8 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
             self.datamodule.hparams.num_dimensions,  # for transferable this will be the dim of the largest peptide
             mean_free=self.hparams.mean_free_prior,
         )
+
+        self.output_dir = output_dir
 
     def log_image(self, img: torch.Tensor, title: str = None) -> None:
         """Log an image to the logger.
@@ -394,22 +392,20 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
                 "proposal_samples": proposal_samples,
                 "proposal_log_q": proposal_log_q,
             }
-            if output_dir is None:
-                output_dir = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
             if self.local_rank == 0:
-                os.makedirs(f"{output_dir}/{prefix}", exist_ok=True)
+                os.makedirs(f"{self.output_dir}/{prefix}", exist_ok=True)
                 if self.hparams.sampling_config.get("subset_idx") is not None:
                     torch.save(
-                        samples_dict, f"{output_dir}/{prefix}/samples_{self.hparams.sampling_config.subset_idx}.pt"
+                        samples_dict, f"{self.output_dir}/{prefix}/samples_{self.hparams.sampling_config.subset_idx}.pt"
                     )
                     logging.info(
-                        f"Saving {len(proposal_samples)} samples to {output_dir} "
+                        f"Saving {len(proposal_samples)} samples to {self.output_dir} "
                         "/{prefix}/samples_{self.hparams.sampling_config.subset_idx}.pt"
                     )
                     return {}  # early return if subset_idx is set - need to post-process these samples in notebook
                 else:
-                    torch.save(samples_dict, f"{output_dir}/{prefix}/samples.pt")
-                    logging.info(f"Saving {len(proposal_samples)} samples to {output_dir}/{prefix}/samples.pt")
+                    torch.save(samples_dict, f"{self.output_dir}/{prefix}/samples.pt")
+                    logging.info(f"Saving {len(proposal_samples)} samples to {self.output_dir}/{prefix}/samples.pt")
         else:
             # Load samples from disk
             samples_path = self.hparams.sampling_config.load_samples_path
@@ -547,12 +543,10 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
                 "smc_logits": smc_logits,
             }
             if self.local_rank == 0:
-                if output_dir is None:
-                    output_dir = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
-                    os.makedirs(f"{output_dir}/{prefix}", exist_ok=True)
+                os.makedirs(f"{self.output_dir}/{prefix}", exist_ok=True)
 
-                torch.save(smc_samples_dict, f"{output_dir}/{prefix}/smc_samples.pt")
-                logging.info(f"Saving {len(smc_samples)} samples to {output_dir}/{prefix}_smc_samples.pt")
+                torch.save(smc_samples_dict, f"{self.output_dir}/{prefix}/smc_samples.pt")
+                logging.info(f"Saving {len(smc_samples)} samples to {self.output_dir}/{prefix}_smc_samples.pt")
 
             # Datatype for easier metrics and plotting
             smc_data = SamplesData(
