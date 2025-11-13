@@ -1,9 +1,10 @@
 """
-If this test collection passes, we know the self-improvement pipeline can be run end-to-end.
+Tests for the self-improvement pipeline.
 NOTE: Currently there is a hard-coded path to a checkpoint in this test, which needs to be
 updated to point to a valid checkpoint on your system.
 The entire self-improvement pipeline needs to be reworked to run from huggingface weights,
 but this is outside the scope of establishing the test suite.
+NOTE: A very basic test that only checks a single iteration and non-NaN loss.
 """
 
 import os
@@ -27,12 +28,17 @@ INITIAL_CKPT_PATH = "/network/scratch/t/tanc/ablation_models/prose_up_to_8aa_sta
 
 
 @pytest.fixture(scope="function")
-def cfg_test_self_improve(tmp_path: Path, trainer_name_param) -> DictConfig:
+def cfg_test_self_improve(tmp_path: Path, trainer_name_param: str) -> DictConfig:
     """
-    Parameterized Hydra-composed config for each experiment file under configs/experiment/evaluation.
-    Each test that takes `cfg_eval_param` will run once per config file.
+    Hydra-composed config for the transferable self-improvement experiment.
+    NOTE: Currently only a single config is used for this test, can be extended later.
 
-    This fixture safely resets Hydra between runs and patches all paths.
+    Args:
+        tmp_path: pytest-provided temporary directory path.
+        trainer_name_param: trainer name parameter supplied by parametrization fixtures.
+
+    Returns:
+        DictConfig: Composed and patched Hydra config for the test.
     """
     rel_path = EXPERIMENT_CONFIG.relative_to(CONFIG_BASE).with_suffix("")
     override = rel_path.as_posix().removeprefix("experiment/")
@@ -44,7 +50,7 @@ def cfg_test_self_improve(tmp_path: Path, trainer_name_param) -> DictConfig:
     with initialize(version_base="1.3", config_path="../configs"):
         cfg = compose(config_name="train", overrides=[f"experiment={override}", f"trainer={trainer_name_param}"])
 
-    # Patch common paths to avoid writing to the project tree
+    # Override config for testing purposes
     with open_dict(cfg):
         cfg.paths.output_dir = str(tmp_path)
         cfg.paths.log_dir = str(tmp_path)
@@ -65,12 +71,16 @@ def cfg_test_self_improve(tmp_path: Path, trainer_name_param) -> DictConfig:
     GlobalHydra.instance().clear()
 
 
-def test_self_improve(cfg_test_self_improve):
+def test_self_improve(cfg_test_self_improve: DictConfig) -> None:
     """
-    Runs eval() for every experiment config discovered via the fixture.
-    :param cfg_eval_param: The configuration for the evaluation.
-    """
+    Run the self-improvement pipeline for a single iteration and check basic metrics.
 
+    Args:
+        cfg_test_self_improve: The composed DictConfig produced by the fixture.
+
+    Asserts:
+        - 'train/loss' is present in returned metrics and is not NaN.
+    """
     metrics, _ = self_improve(cfg_test_self_improve)
 
     assert "train/loss" in metrics, "train/loss missing from metrics"

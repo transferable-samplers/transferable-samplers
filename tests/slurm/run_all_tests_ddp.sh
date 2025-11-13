@@ -10,4 +10,4 @@
 
 export PYTEST_TRAINER="ddp" # this is default value but made explicit here
 
-pytest tests --junitxml=tests/reports/report_${PYTEST_TRAINER}.xml -v
+pytest tests -v -s --junitxml=tests/report_${PYTEST_TRAINER}.xml

@@ -1,6 +1,6 @@
 """
-If this test collection passes, we know that training works for both NF and ECNF models on
-both single-system and transferable settings.
+Tests for the training pipelines.
+NOTE: A very basic test that only checks a single iteration and non-NaN loss.
 """
 
 import os
@@ -29,12 +29,17 @@ EXPERIMENT_CONFIGS = [
 
 
 @pytest.fixture(params=EXPERIMENT_CONFIGS, ids=lambda p: p.stem, scope="function")
-def cfg_test_train(request: pytest.FixtureRequest, trainer_name_param, tmp_path: Path) -> DictConfig:
+def cfg_test_train(request: pytest.FixtureRequest, trainer_name_param: str, tmp_path: Path) -> DictConfig:
     """
-    Parameterized Hydra-composed config for each experiment file under configs/experiment/evaluation.
-    Each test that takes `cfg_eval_param` will run once per config file.
+    Hydra-composed config for the training experiments.
 
-    This fixture safely resets Hydra between runs and patches all paths.
+    Args:
+        request: pytest request object to get the experiment override parameter.
+        trainer_name_param: trainer name parameter supplied by parametrization fixtures.
+        tmp_path: pytest-provided temporary directory path.
+
+    Returns:
+        DictConfig: Composed and patched Hydra config for the test.
     """
     cfg_path: Path = request.param
     rel_path = cfg_path.relative_to(CONFIG_BASE).with_suffix("")
@@ -47,7 +52,7 @@ def cfg_test_train(request: pytest.FixtureRequest, trainer_name_param, tmp_path:
     with initialize(version_base="1.3", config_path="../configs"):
         cfg = compose(config_name="train", overrides=[f"experiment={override}", f"trainer={trainer_name_param}"])
 
-    # Patch common paths to avoid writing to the project tree
+    # Override config for testing purposes
     with open_dict(cfg):
         cfg.paths.output_dir = str(tmp_path)
         cfg.paths.log_dir = str(tmp_path)
@@ -65,12 +70,13 @@ def cfg_test_train(request: pytest.FixtureRequest, trainer_name_param, tmp_path:
     GlobalHydra.instance().clear()
 
 
-def test_train(cfg_test_train: DictConfig):
+def test_train(cfg_test_train: DictConfig) -> None:
     """
-    Runs eval() for every experiment config discovered via the fixture.
-    :param cfg_eval_param: The configuration for the evaluation.
-    """
+    Runs train() for every experiment config discovered via the fixture.
 
+    Asserts:
+    - 'train/loss' is present in returned metrics and is not NaN.
+    """
     metrics, _ = train(cfg_test_train)
 
     assert "train/loss" in metrics, "train/loss missing from metrics"

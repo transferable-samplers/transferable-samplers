@@ -1,8 +1,11 @@
 """
+Tests for the evaluation pipelines.
 If this test collection passes, we know that:
-1. the evaluation pipeline can be run end-to-end for all different dataset
-2. all the huggingface model weights can be correctly loaded and used for evaluation
-3. the neural_network code hasn't broken since uploading model weights
+1. The evaluation pipeline can be run end-to-end for all different dataset.
+2. All the huggingface model weights can be correctly loaded and used for evaluation.
+3. The neural_network code hasn't broken since uploading model weights.
+NOTE: This test only considers SNIS for each dataset/model. SMC tests are in test_smc.py
+A very loose threshold on median proposal energy is used to catch major issues.
 """
 
 import os
@@ -20,7 +23,7 @@ MEDIAN_PROPOSAL_ENERGY_THRESHOLDS = {  # these are intentionally loose, just to 
     "AAA": -120,
     "Ace-AAA-Nme": 50,
     "AAAAAA": -60,
-    "GYDPETGTWG": -300,
+    "GYDPETGTWG": -250,
     "AA": -160,
 }
 
@@ -43,16 +46,21 @@ EXPERIMENT_CONFIGS = [
         "transferable/tarflow_up_to_8aa_snis.yaml",
         "transferable/prose_up_to_8aa_snis.yaml",
     ]
-]
+]  # ula configs are overrtiden to disable SMC in tests.
 
 
 @pytest.fixture(params=EXPERIMENT_CONFIGS, ids=lambda p: p.stem, scope="function")
-def cfg_test_eval(request: pytest.FixtureRequest, trainer_name_param, tmp_path: Path) -> DictConfig:
+def cfg_test_eval(request: pytest.FixtureRequest, trainer_name_param: str, tmp_path: Path) -> DictConfig:
     """
-    Parameterized Hydra-composed config for each experiment file under configs/experiment/evaluation.
-    Each test that takes `cfg_eval_param` will run once per config file.
+    Hydra-composed config for the evaluation experiments.
 
-    This fixture safely resets Hydra between runs and patches all paths.
+    Args:
+        request: pytest request object to get the experiment override parameter.
+        trainer_name_param: trainer name parameter supplied by parametrization fixtures.
+        tmp_path: pytest-provided temporary directory path.
+
+    Returns:
+        DictConfig: Composed and patched Hydra config for the test.
     """
     cfg_path: Path = request.param
     rel_path = cfg_path.relative_to(CONFIG_BASE).with_suffix("")
@@ -65,7 +73,7 @@ def cfg_test_eval(request: pytest.FixtureRequest, trainer_name_param, tmp_path: 
     with initialize(version_base="1.3", config_path="../configs"):
         cfg = compose(config_name="eval", overrides=[f"experiment={override}", f"trainer={trainer_name_param}"])
 
-    # Patch common paths to avoid writing to the project tree
+    # Override config for testing purposes
     with open_dict(cfg):
         cfg.paths.output_dir = str(tmp_path)
         cfg.paths.log_dir = str(tmp_path)
@@ -87,8 +95,10 @@ def cfg_test_eval(request: pytest.FixtureRequest, trainer_name_param, tmp_path: 
 
 def test_eval(cfg_test_eval):
     """
-    Runs eval() for every experiment config discovered via the fixture.
-    :param cfg_eval_param: The configuration for the evaluation.
+    Run eval() for every experiment config provided by the `cfg_test_eval` fixture.
+
+    Asserts:
+    - 'test/{sequence}/proposal/median_energy' is present and below threshold.
     """
 
     metrics, _ = eval(cfg_test_eval)

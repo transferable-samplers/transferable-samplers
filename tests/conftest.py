@@ -1,3 +1,9 @@
+"""
+Fixtures for configuring tests based on available hardware (GPU/DPD).
+Tests are run with the appropriate trainer based on available devices.
+Unique ids for each trainer are provided for clarity in test reports.
+"""
+
 import os
 
 import pytest

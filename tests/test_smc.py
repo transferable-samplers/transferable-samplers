@@ -1,8 +1,7 @@
 """
-If this test collection passes, we know that:
-1. the evaluation pipeline can be run end-to-end for all different dataset
-2. all the huggingface model weights can be correctly loaded and used for evaluation
-3. the neural_network code hasn't broken since uploading model weights
+Tests for the SMC pipelines.
+Only a basic test to ensure SMC runs end-to-end for single-system / transferable models.
+NOTE: A very loose threshold on median SMC energy is used to catch major issues.
 """
 
 import os
@@ -34,12 +33,18 @@ EXPERIMENT_CONFIGS = [
 
 
 @pytest.fixture(params=EXPERIMENT_CONFIGS, ids=lambda p: p.stem, scope="function")
-def cfg_test_smc(request: pytest.FixtureRequest, trainer_name_param, tmp_path: Path) -> DictConfig:
+def cfg_test_smc(request: pytest.FixtureRequest, trainer_name_param: str, tmp_path: Path) -> DictConfig:
     """
-    Parameterized Hydra-composed config for each experiment file under configs/experiment/evaluation.
-    Each test that takes `cfg_eval_param` will run once per config file.
+    Hydra-composed config for the evaluation experiments.
 
-    This fixture safely resets Hydra between runs and patches all paths.
+    Args:
+        request: pytest request object to get the experiment override parameter.
+        trainer_name_param: trainer name parameter supplied by parametrization fixtures.
+            (currently unused, need to impelement DDP SMC)
+        tmp_path: pytest-provided temporary directory path.
+
+    Returns:
+        DictConfig: Composed and patched Hydra config for the test.
     """
     rel_path = request.param.relative_to(CONFIG_BASE).with_suffix("")
     override = rel_path.as_posix().removeprefix("experiment/")
@@ -51,7 +56,7 @@ def cfg_test_smc(request: pytest.FixtureRequest, trainer_name_param, tmp_path: P
     with initialize(version_base="1.3", config_path="../configs"):
         cfg = compose(config_name="eval", overrides=[f"experiment={override}"])
 
-    # Patch common paths to avoid writing to the project tree
+    # Override config for testing purposes
     with open_dict(cfg):
         cfg.paths.output_dir = str(tmp_path)
         cfg.paths.log_dir = str(tmp_path)
@@ -70,12 +75,13 @@ def cfg_test_smc(request: pytest.FixtureRequest, trainer_name_param, tmp_path: P
 
 
 @pytest.mark.skipif(torch.cuda.device_count() > 1, reason="Not yet implemented for DDP")
-def test_smc(cfg_test_smc):
+def test_smc(cfg_test_smc: DictConfig) -> None:
     """
-    Runs eval() for every experiment config discovered via the fixture.
-    :param cfg_eval_param: The configuration for the evaluation.
-    """
+    Run eval() for every experiment config provided by the `cfg_test_smc` fixture.
 
+    Asserts:
+    - 'test/{sequence}/smc/median_energy' is present and below threshold.
+    """
     metrics, _ = eval(cfg_test_smc)
 
     if "sequence" in cfg_test_smc.data:
