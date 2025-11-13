@@ -13,26 +13,23 @@ from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, open_dict
 
 from src.eval import eval
-from tests.utils import compose_config, extract_test_sequence
+from tests.helpers.utils import compose_config, extract_test_sequence, get_config_stem
 
 MEDIAN_SMC_ENERGY_THRESHOLDS = {  # these are intentionally loose, just to catch major issues
     "AAA": -120,
     "AA": -160,
 }
 
-# Locate relevant experiment config files
-CONFIG_BASE = Path(__file__).resolve().parent.parent.parent / "configs"
-EVAL_DIR = CONFIG_BASE / "experiment" / "evaluation"
-EXPERIMENT_CONFIGS = [
-    EVAL_DIR / Path(p)
-    for p in [
+EXPERIMENT_NAMES = [
+    f"evaluation/{cfg_path}"
+    for cfg_path in [
         "single_system/tarflow_AAA_ula.yaml",
         "transferable/prose_up_to_8aa_mala.yaml",
     ]
 ]
 
 
-@pytest.fixture(params=EXPERIMENT_CONFIGS, ids=lambda p: p.stem, scope="function")
+@pytest.fixture(params=EXPERIMENT_NAMES, ids=lambda p: get_config_stem(p), scope="function")
 def cfg_test_smc_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tmp_path: Path) -> DictConfig:
     """
     Hydra-composed config for the evaluation experiments.
@@ -46,13 +43,14 @@ def cfg_test_smc_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tm
     Returns:
         DictConfig: Composed and patched Hydra config for the test.
     """
-    rel_path = request.param.relative_to(CONFIG_BASE).with_suffix("")
-    override = rel_path.as_posix().removeprefix("experiment/")
-
     # Important: clear Hydra before initializing
     GlobalHydra.instance().clear()
 
-    cfg = compose_config(config_name="eval", overrides=[f"experiment={override}"])
+    experiment_name = request.param
+
+    cfg = compose_config(
+        config_name="eval", overrides=[f"experiment={experiment_name}", f"trainer={trainer_name_param}"]
+    )
 
     # Override config for testing purposes
     with open_dict(cfg):
@@ -62,7 +60,7 @@ def cfg_test_smc_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tm
         cfg.model.sampling_config.num_test_proposal_samples = 25
         cfg.model.sampling_config.num_smc_samples = 25
         cfg.model.smc_sampler.num_timesteps = 10
-        if "transferable" in override:
+        if "transferable" in experiment_name:
             cfg.data.test_sequences = "AA"
         cfg.tags = ["pytest", "test_smc_mwe"]
 
@@ -72,6 +70,7 @@ def cfg_test_smc_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tm
     GlobalHydra.instance().clear()
 
 
+@pytest.mark.forked  # prevents OpenMM issues
 @pytest.mark.pipeline
 @pytest.mark.skipif(torch.cuda.device_count() > 1, reason="Not yet implemented for DDP")
 def test_smc_mwe(cfg_test_smc_mwe: DictConfig) -> None:
@@ -84,7 +83,6 @@ def test_smc_mwe(cfg_test_smc_mwe: DictConfig) -> None:
     metrics, _ = eval(cfg_test_smc_mwe)
 
     test_sequence = extract_test_sequence(cfg_test_smc_mwe)
-    assert test_sequence == "AA", "Only 'AA' sequence is expected in tests."
 
     median_smc_energy = metrics.get(f"test/{test_sequence}/smc/median_energy", None)
     assert median_smc_energy is not None, f"test/{test_sequence}/smc/median_energy missing"

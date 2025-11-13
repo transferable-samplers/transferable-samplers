@@ -24,3 +24,8 @@ def trainer_name_param():
     if trainer == "gpu" and torch.cuda.device_count() < 1:
         pytest.skip("No GPU available")
     return trainer
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "pipeline: long-running pipeline tests")
+    config.addinivalue_line("markers", "forked: force forked execution via pytest-forked")

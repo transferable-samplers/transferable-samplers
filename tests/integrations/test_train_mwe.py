@@ -12,14 +12,11 @@ from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, open_dict
 
 from src.train import train
-from tests.utils import compose_config
+from tests.helpers.utils import compose_config, get_config_stem
 
-# Locate relevant experiment config files
-CONFIG_BASE = Path(__file__).resolve().parent.parent.parent / "configs"
-TRAIN_DIR = CONFIG_BASE / "experiment" / "training"
-EXPERIMENT_CONFIGS = [
-    TRAIN_DIR / Path(p)
-    for p in [
+EXPERIMENT_NAMES = [
+    f"training/{cfg_path}"
+    for cfg_path in [
         "single_system/ecnf++_Ace-A-Nme.yaml",  # single system ecnf
         "single_system/tarflow_Ace-A-Nme.yaml",  # single system nf
         "transferable/ecnf++_up_to_4aa.yaml",  # transferable ecnf
@@ -28,7 +25,7 @@ EXPERIMENT_CONFIGS = [
 ]
 
 
-@pytest.fixture(params=EXPERIMENT_CONFIGS, ids=lambda p: p.stem, scope="function")
+@pytest.fixture(params=EXPERIMENT_NAMES, ids=lambda p: get_config_stem(p), scope="function")
 def cfg_test_train_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tmp_path: Path) -> DictConfig:
     """
     Hydra-composed config for the training experiments.
@@ -41,14 +38,14 @@ def cfg_test_train_mwe(request: pytest.FixtureRequest, trainer_name_param: str, 
     Returns:
         DictConfig: Composed and patched Hydra config for the test.
     """
-    cfg_path: Path = request.param
-    rel_path = cfg_path.relative_to(CONFIG_BASE).with_suffix("")
-    override = rel_path.as_posix().removeprefix("experiment/")
-
     # Important: clear Hydra before initializing
     GlobalHydra.instance().clear()
 
-    cfg = compose_config(config_name="train", overrides=[f"experiment={override}", f"trainer={trainer_name_param}"])
+    experiment_name = request.param
+
+    cfg = compose_config(
+        config_name="train", overrides=[f"experiment={experiment_name}", f"trainer={trainer_name_param}"]
+    )
 
     # Override config for testing purposes
     with open_dict(cfg):
@@ -68,6 +65,7 @@ def cfg_test_train_mwe(request: pytest.FixtureRequest, trainer_name_param: str, 
     GlobalHydra.instance().clear()
 
 
+@pytest.mark.forked  # prevents OpenMM issues
 @pytest.mark.pipeline
 def test_train_mwe(cfg_test_train_mwe: DictConfig) -> None:
     """

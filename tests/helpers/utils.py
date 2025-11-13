@@ -1,12 +1,12 @@
 from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
 
-CONFIG_PATH = "../../configs"
+RELATIVE_CONFIG_PATH = "../../configs"  # relative to this utils.py file
 
 
 def compose_config(config_name: str, overrides=None):
     GlobalHydra.instance().clear()
-    with initialize(version_base="1.3", config_path=CONFIG_PATH):
+    with initialize(version_base="1.3", config_path=RELATIVE_CONFIG_PATH):
         cfg = compose(config_name=config_name, overrides=overrides)
     return cfg
 

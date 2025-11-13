@@ -16,7 +16,7 @@ from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, open_dict
 
 from src.eval import eval
-from tests.utils import compose_config, extract_test_sequence
+from tests.helpers.utils import compose_config, extract_test_sequence, get_config_stem
 
 MEDIAN_PROPOSAL_ENERGY_THRESHOLDS = {  # these are intentionally loose, just to catch major issues
     "Ace-A-Nme": -10,
@@ -27,12 +27,9 @@ MEDIAN_PROPOSAL_ENERGY_THRESHOLDS = {  # these are intentionally loose, just to 
     "AA": -160,
 }
 
-# Locate relevant experiment config files
-CONFIG_BASE = Path(__file__).resolve().parent.parent.parent / "configs"
-EVAL_DIR = CONFIG_BASE / "experiment" / "evaluation"
-EXPERIMENT_CONFIGS = [
-    EVAL_DIR / Path(p)
-    for p in [
+EXPERIMENT_NAMES = [
+    f"evaluation/{cfg_path}"
+    for cfg_path in [
         "single_system/ecnf++_Ace-A-Nme_snis.yaml",
         "single_system/ecnf++_AAA_snis.yaml",
         "single_system/ecnf++_Ace-AAA-Nme_snis.yaml",
@@ -46,10 +43,10 @@ EXPERIMENT_CONFIGS = [
         "transferable/tarflow_up_to_8aa_snis.yaml",
         "transferable/prose_up_to_8aa_snis.yaml",
     ]
-]  # ula configs are overrtiden to disable SMC in tests.
+]
 
 
-@pytest.fixture(params=EXPERIMENT_CONFIGS, ids=lambda p: p.stem, scope="function")
+@pytest.fixture(params=EXPERIMENT_NAMES, ids=lambda p: get_config_stem(p), scope="function")
 def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tmp_path: Path) -> DictConfig:
     """
     Hydra-composed config for the evaluation experiments.
@@ -62,14 +59,14 @@ def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, t
     Returns:
         DictConfig: Composed and patched Hydra config for the test.
     """
-    cfg_path: Path = request.param
-    rel_path = cfg_path.relative_to(CONFIG_BASE).with_suffix("")
-    override = rel_path.as_posix().removeprefix("experiment/")
-
     # Important: clear Hydra before initializing
     GlobalHydra.instance().clear()
 
-    cfg = compose_config(config_name="eval", overrides=[f"experiment={override}", f"trainer={trainer_name_param}"])
+    experiment_name = request.param
+
+    cfg = compose_config(
+        config_name="eval", overrides=[f"experiment={experiment_name}", f"trainer={trainer_name_param}"]
+    )
 
     # Override config for testing purposes
     with open_dict(cfg):
@@ -77,11 +74,11 @@ def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, t
         cfg.paths.log_dir = str(tmp_path)
         cfg.paths.work_dir = os.getcwd()
         cfg.model.sampling_config.num_test_proposal_samples = 25
-        if "ula" in override:
+        if "ula" in experiment_name:
             # we disable SMC here for testing - we are mostly concerned with weights being correctly setup
             if cfg.model.get("smc_sampler") is not None:
                 cfg.model.smc_sampler.enabled = False
-        if "transferable" in override:
+        if "transferable" in experiment_name:
             cfg.data.test_sequences = "AA"
         cfg.tags = ["pytest", f"test_snis_mwe_{trainer_name_param}"]
 
@@ -91,6 +88,7 @@ def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, t
     GlobalHydra.instance().clear()
 
 
+@pytest.mark.forked  # prevents OpenMM issues
 @pytest.mark.pipeline
 def test_snis_mwe(cfg_test_snis_mwe):
     """
@@ -103,7 +101,6 @@ def test_snis_mwe(cfg_test_snis_mwe):
     metrics, _ = eval(cfg_test_snis_mwe)
 
     test_sequence = extract_test_sequence(cfg_test_snis_mwe)
-    assert test_sequence == "AA", "Only 'AA' sequence is expected in tests."
 
     median_proposal_energy = metrics.get(f"test/{test_sequence}/proposal/median_energy", None)
     assert median_proposal_energy is not None, f"test/{test_sequence}/proposal/median_energy missing"

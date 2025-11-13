@@ -16,19 +16,16 @@ from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, open_dict
 
 from src.self_improve import self_improve
-from tests.utils import compose_config
+from tests.helpers.utils import compose_config, get_config_stem
 
-# Locate relevant experiment config files
-CONFIG_BASE = Path(__file__).resolve().parent.parent.parent / "configs"
-EVAL_DIR = CONFIG_BASE / "experiment" / "evaluation"
-EXPERIMENT_CONFIG = EVAL_DIR / Path("transferable/prose_up_to_8aa_self_improvement.yaml")
+EXPERIMENT_NAMES = ["evaluation/transferable/prose_up_to_8aa_self_improve.yaml"]
 # TODO we need to setup self_improve to run from huggingface weights, but i am concerned
 # about EMA etc. so think this is outside of the scope of establishing the test suite
 INITIAL_CKPT_PATH = "/network/scratch/t/tanc/ablation_models/prose_up_to_8aa_standard_v1.ckpt"
 
 
-@pytest.fixture(scope="function")
-def cfg_test_self_improve_mwe(tmp_path: Path, trainer_name_param: str) -> DictConfig:
+@pytest.fixture(params=EXPERIMENT_NAMES, ids=lambda p: get_config_stem(p), scope="function")
+def cfg_test_self_improve_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tmp_path: Path) -> DictConfig:
     """
     Hydra-composed config for the transferable self-improvement experiment.
     NOTE: Currently only a single config is used for this test, can be extended later.
@@ -40,13 +37,14 @@ def cfg_test_self_improve_mwe(tmp_path: Path, trainer_name_param: str) -> DictCo
     Returns:
         DictConfig: Composed and patched Hydra config for the test.
     """
-    rel_path = EXPERIMENT_CONFIG.relative_to(CONFIG_BASE).with_suffix("")
-    override = rel_path.as_posix().removeprefix("experiment/")
-
     # Important: clear Hydra before initializing
     GlobalHydra.instance().clear()
 
-    cfg = compose_config(config_name="train", overrides=[f"experiment={override}", f"trainer={trainer_name_param}"])
+    experiment_name = request.param
+
+    cfg = compose_config(
+        config_name="train", overrides=[f"experiment={experiment_name}", f"trainer={trainer_name_param}"]
+    )
 
     # Override config for testing purposes
     with open_dict(cfg):
@@ -69,6 +67,7 @@ def cfg_test_self_improve_mwe(tmp_path: Path, trainer_name_param: str) -> DictCo
     GlobalHydra.instance().clear()
 
 
+@pytest.mark.forked  # prevents OpenMM issues
 @pytest.mark.pipeline
 def test_self_improve_mwe(cfg_test_self_improve_mwe: DictConfig) -> None:
     """
