@@ -8,6 +8,7 @@
 #SBATCH -c 8
 #SBATCH --get-user-env
 
-export PYTEST_TRAINER="ddp" # this is default value but made explicit here
+export PYTEST_REPORT_DIR="tests/reports"
+export PYTEST_TRAINER="ddp"
 
-pytest tests -v -s --junitxml=tests/report_${PYTEST_TRAINER}.xml
+pytest tests -v -m "pipeline" --junitxml=${PYTEST_REPORT_DIR}/report_${PYTEST_TRAINER}.xml 

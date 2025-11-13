@@ -12,14 +12,14 @@ from math import isnan
 from pathlib import Path
 
 import pytest
-from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, open_dict
 
 from src.self_improve import self_improve
+from tests.utils import compose_config
 
 # Locate relevant experiment config files
-CONFIG_BASE = Path(__file__).resolve().parent.parent / "configs"
+CONFIG_BASE = Path(__file__).resolve().parent.parent.parent / "configs"
 EVAL_DIR = CONFIG_BASE / "experiment" / "evaluation"
 EXPERIMENT_CONFIG = EVAL_DIR / Path("transferable/prose_up_to_8aa_self_improvement.yaml")
 # TODO we need to setup self_improve to run from huggingface weights, but i am concerned
@@ -28,7 +28,7 @@ INITIAL_CKPT_PATH = "/network/scratch/t/tanc/ablation_models/prose_up_to_8aa_sta
 
 
 @pytest.fixture(scope="function")
-def cfg_test_self_improve(tmp_path: Path, trainer_name_param: str) -> DictConfig:
+def cfg_test_self_improve_mwe(tmp_path: Path, trainer_name_param: str) -> DictConfig:
     """
     Hydra-composed config for the transferable self-improvement experiment.
     NOTE: Currently only a single config is used for this test, can be extended later.
@@ -46,9 +46,7 @@ def cfg_test_self_improve(tmp_path: Path, trainer_name_param: str) -> DictConfig
     # Important: clear Hydra before initializing
     GlobalHydra.instance().clear()
 
-    # Compose full Hydra config
-    with initialize(version_base="1.3", config_path="../configs"):
-        cfg = compose(config_name="train", overrides=[f"experiment={override}", f"trainer={trainer_name_param}"])
+    cfg = compose_config(config_name="train", overrides=[f"experiment={override}", f"trainer={trainer_name_param}"])
 
     # Override config for testing purposes
     with open_dict(cfg):
@@ -63,7 +61,7 @@ def cfg_test_self_improve(tmp_path: Path, trainer_name_param: str) -> DictConfig
         cfg.model.sampling_config.num_self_improve_proposal_samples = 32
         cfg.data.batch_size = 32
         cfg.data.test_sequences = "AA"
-        cfg.tags = ["pytest", f"test_self_improvement_{trainer_name_param}"]
+        cfg.tags = ["pytest", f"test_self_improve_mwe_{trainer_name_param}"]
 
     yield cfg
 
@@ -71,17 +69,18 @@ def cfg_test_self_improve(tmp_path: Path, trainer_name_param: str) -> DictConfig
     GlobalHydra.instance().clear()
 
 
-def test_self_improve(cfg_test_self_improve: DictConfig) -> None:
+@pytest.mark.pipeline
+def test_self_improve_mwe(cfg_test_self_improve_mwe: DictConfig) -> None:
     """
     Run the self-improvement pipeline for a single iteration and check basic metrics.
 
     Args:
-        cfg_test_self_improve: The composed DictConfig produced by the fixture.
+        cfg_test_self_improve_mwe: The composed DictConfig produced by the fixture.
 
     Asserts:
         - 'train/loss' is present in returned metrics and is not NaN.
     """
-    metrics, _ = self_improve(cfg_test_self_improve)
+    metrics, _ = self_improve(cfg_test_self_improve_mwe)
 
     assert "train/loss" in metrics, "train/loss missing from metrics"
     assert not isnan(metrics["train/loss"]), "train/loss is NaN"

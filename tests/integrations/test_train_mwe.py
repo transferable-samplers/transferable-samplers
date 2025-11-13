@@ -8,14 +8,14 @@ from math import isnan
 from pathlib import Path
 
 import pytest
-from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, open_dict
 
 from src.train import train
+from tests.utils import compose_config
 
 # Locate relevant experiment config files
-CONFIG_BASE = Path(__file__).resolve().parent.parent / "configs"
+CONFIG_BASE = Path(__file__).resolve().parent.parent.parent / "configs"
 TRAIN_DIR = CONFIG_BASE / "experiment" / "training"
 EXPERIMENT_CONFIGS = [
     TRAIN_DIR / Path(p)
@@ -29,7 +29,7 @@ EXPERIMENT_CONFIGS = [
 
 
 @pytest.fixture(params=EXPERIMENT_CONFIGS, ids=lambda p: p.stem, scope="function")
-def cfg_test_train(request: pytest.FixtureRequest, trainer_name_param: str, tmp_path: Path) -> DictConfig:
+def cfg_test_train_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tmp_path: Path) -> DictConfig:
     """
     Hydra-composed config for the training experiments.
 
@@ -48,9 +48,7 @@ def cfg_test_train(request: pytest.FixtureRequest, trainer_name_param: str, tmp_
     # Important: clear Hydra before initializing
     GlobalHydra.instance().clear()
 
-    # Compose full Hydra config
-    with initialize(version_base="1.3", config_path="../configs"):
-        cfg = compose(config_name="train", overrides=[f"experiment={override}", f"trainer={trainer_name_param}"])
+    cfg = compose_config(config_name="train", overrides=[f"experiment={override}", f"trainer={trainer_name_param}"])
 
     # Override config for testing purposes
     with open_dict(cfg):
@@ -62,7 +60,7 @@ def cfg_test_train(request: pytest.FixtureRequest, trainer_name_param: str, tmp_
         cfg.trainer.max_epochs = 1
         cfg.trainer.limit_train_batches = 1
         cfg.data.batch_size = 32
-        cfg.tags = ["pytest", f"test_train_{trainer_name_param}"]
+        cfg.tags = ["pytest", f"test_train_mwe_{trainer_name_param}"]
 
     yield cfg
 
@@ -70,14 +68,15 @@ def cfg_test_train(request: pytest.FixtureRequest, trainer_name_param: str, tmp_
     GlobalHydra.instance().clear()
 
 
-def test_train(cfg_test_train: DictConfig) -> None:
+@pytest.mark.pipeline
+def test_train_mwe(cfg_test_train_mwe: DictConfig) -> None:
     """
     Runs train() for every experiment config discovered via the fixture.
 
     Asserts:
     - 'train/loss' is present in returned metrics and is not NaN.
     """
-    metrics, _ = train(cfg_test_train)
+    metrics, _ = train(cfg_test_train_mwe)
 
     assert "train/loss" in metrics, "train/loss missing from metrics"
     assert not isnan(metrics["train/loss"]), "train/loss is NaN"

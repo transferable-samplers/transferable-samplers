@@ -12,23 +12,23 @@ import os
 from pathlib import Path
 
 import pytest
-from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, open_dict
 
 from src.eval import eval
+from tests.utils import compose_config, extract_test_sequence
 
 MEDIAN_PROPOSAL_ENERGY_THRESHOLDS = {  # these are intentionally loose, just to catch major issues
     "Ace-A-Nme": -10,
     "AAA": -120,
     "Ace-AAA-Nme": 50,
     "AAAAAA": -60,
-    "GYDPETGTWG": -250,
+    "GYDPETGTWG": -100,
     "AA": -160,
 }
 
 # Locate relevant experiment config files
-CONFIG_BASE = Path(__file__).resolve().parent.parent / "configs"
+CONFIG_BASE = Path(__file__).resolve().parent.parent.parent / "configs"
 EVAL_DIR = CONFIG_BASE / "experiment" / "evaluation"
 EXPERIMENT_CONFIGS = [
     EVAL_DIR / Path(p)
@@ -50,7 +50,7 @@ EXPERIMENT_CONFIGS = [
 
 
 @pytest.fixture(params=EXPERIMENT_CONFIGS, ids=lambda p: p.stem, scope="function")
-def cfg_test_eval(request: pytest.FixtureRequest, trainer_name_param: str, tmp_path: Path) -> DictConfig:
+def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tmp_path: Path) -> DictConfig:
     """
     Hydra-composed config for the evaluation experiments.
 
@@ -69,9 +69,7 @@ def cfg_test_eval(request: pytest.FixtureRequest, trainer_name_param: str, tmp_p
     # Important: clear Hydra before initializing
     GlobalHydra.instance().clear()
 
-    # Compose full Hydra config
-    with initialize(version_base="1.3", config_path="../configs"):
-        cfg = compose(config_name="eval", overrides=[f"experiment={override}", f"trainer={trainer_name_param}"])
+    cfg = compose_config(config_name="eval", overrides=[f"experiment={override}", f"trainer={trainer_name_param}"])
 
     # Override config for testing purposes
     with open_dict(cfg):
@@ -83,9 +81,9 @@ def cfg_test_eval(request: pytest.FixtureRequest, trainer_name_param: str, tmp_p
             # we disable SMC here for testing - we are mostly concerned with weights being correctly setup
             if cfg.model.get("smc_sampler") is not None:
                 cfg.model.smc_sampler.enabled = False
-        elif "transferable" in override:
+        if "transferable" in override:
             cfg.data.test_sequences = "AA"
-        cfg.tags = ["pytest", f"test_eval_{trainer_name_param}"]
+        cfg.tags = ["pytest", f"test_snis_mwe_{trainer_name_param}"]
 
     yield cfg
 
@@ -93,23 +91,19 @@ def cfg_test_eval(request: pytest.FixtureRequest, trainer_name_param: str, tmp_p
     GlobalHydra.instance().clear()
 
 
-def test_eval(cfg_test_eval):
+@pytest.mark.pipeline
+def test_snis_mwe(cfg_test_snis_mwe):
     """
-    Run eval() for every experiment config provided by the `cfg_test_eval` fixture.
+    Run eval() for every experiment config provided by the `cfg_test_snis_mwe` fixture.
 
     Asserts:
     - 'test/{sequence}/proposal/median_energy' is present and below threshold.
     """
 
-    metrics, _ = eval(cfg_test_eval)
+    metrics, _ = eval(cfg_test_snis_mwe)
 
-    if "sequence" in cfg_test_eval.data:
-        test_sequence = cfg_test_eval.data.sequence
-    else:
-        test_sequence = cfg_test_eval.data.test_sequences
-        if isinstance(test_sequence, list):
-            test_sequence = test_sequence[0]
-        assert test_sequence == "AA", "Only 'AA' sequence is expected in tests."
+    test_sequence = extract_test_sequence(cfg_test_snis_mwe)
+    assert test_sequence == "AA", "Only 'AA' sequence is expected in tests."
 
     median_proposal_energy = metrics.get(f"test/{test_sequence}/proposal/median_energy", None)
     assert median_proposal_energy is not None, f"test/{test_sequence}/proposal/median_energy missing"

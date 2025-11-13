@@ -171,4 +171,7 @@ AImplicitUnconstrained*
 ___*.py
 *.pkl
 *.pdb
-src/data/data_old/*
+
+# Pytest outputs
+*.xml
+*.html
