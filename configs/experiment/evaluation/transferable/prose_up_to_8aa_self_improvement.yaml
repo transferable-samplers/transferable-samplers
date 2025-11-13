@@ -9,13 +9,13 @@ defaults:
 state_dict_hf_path: transferable/prose_up_to_8aa.pth
 
 model:
-  self_refinement: True
+  self_improve: True
   use_distill_loss: True
   distill_weight: 0.5
   sampling_config:
     use_com_adjustment: True
     batch_size: 2_500
-    num_self_refinement_proposal_samples: 200_000
+    num_self_improve_proposal_samples: 200_000
     num_proposal_samples: 10_000
     num_test_proposal_samples: 200_000
     clip_reweighting_logits: 0.002

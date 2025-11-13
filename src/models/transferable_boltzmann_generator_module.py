@@ -629,7 +629,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         This ensures the "student" model does not drift to far from the initial model (teacher).
         """
 
-        if self.hparams.use_distill_loss and self.hparams.self_refinement:
+        if self.hparams.use_distill_loss and self.hparams.self_improve:
             self.teacher = deepcopy(self.net)
 
             # ema params as teacher model if available
@@ -646,9 +646,9 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
 
         # if doing self-refinement: generate and reweight samples
         # at start of every epoch to finetune the model
-        if self.hparams.get("self_refinement", False):
+        if self.hparams.get("self_improve", False):
             logging.info(
-                f"Generating {self.hparams.sampling_config.num_self_refinement_proposal_samples} Samples"
+                f"Generating {self.hparams.sampling_config.num_self_improve_proposal_samples} Samples"
                 " for self-consumption"
             )
             self.net.eval()
@@ -659,7 +659,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
 
                 with torch.no_grad():
                     samples = self.generate_and_resample(
-                        num_proposal_samples=self.hparams.sampling_config.num_self_refinement_proposal_samples,
+                        num_proposal_samples=self.hparams.sampling_config.num_self_improve_proposal_samples,
                     )
 
                 self.net.restore_to_model()
@@ -667,7 +667,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
             else:
                 with torch.no_grad():
                     samples = self.generate_and_resample(
-                        num_proposal_samples=self.hparams.sampling_config.num_self_refinement_proposal_samples,
+                        num_proposal_samples=self.hparams.sampling_config.num_self_improve_proposal_samples,
                     )
 
             self.net.train()

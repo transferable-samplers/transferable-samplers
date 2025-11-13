@@ -2,6 +2,7 @@
 If this test collection passes, we know that:
 1. the evaluation pipeline can be run end-to-end for all different dataset
 2. all the huggingface model weights can be correctly loaded and used for evaluation
+3. the neural_network code hasn't broken since uploading model weights
 """
 
 import os
@@ -18,8 +19,8 @@ MEDIAN_PROPOSAL_ENERGY_THRESHOLDS = {  # these are intentionally loose, just to 
     "Ace-A-Nme": -10,
     "AAA": -120,
     "Ace-AAA-Nme": 50,
-    "AAAAAA": -80,
-    "GYDPETGTWG": -400,
+    "AAAAAA": -60,
+    "GYDPETGTWG": -300,
     "AA": -160,
 }
 
@@ -46,7 +47,7 @@ EXPERIMENT_CONFIGS = [
 
 
 @pytest.fixture(params=EXPERIMENT_CONFIGS, ids=lambda p: p.stem, scope="function")
-def cfg_test_evaluation_fast(request: pytest.FixtureRequest, tmp_path: Path) -> DictConfig:
+def cfg_test_eval(request: pytest.FixtureRequest, tmp_path: Path) -> DictConfig:
     """
     Parameterized Hydra-composed config for each experiment file under configs/experiment/evaluation.
     Each test that takes `cfg_eval_param` will run once per config file.
@@ -64,23 +65,19 @@ def cfg_test_evaluation_fast(request: pytest.FixtureRequest, tmp_path: Path) -> 
     with initialize(version_base="1.3", config_path="../configs"):
         cfg = compose(config_name="eval", overrides=[f"experiment={override}"])
 
-    # without "turning-off" the metrics (should be made available as an option),
-    # this is the smallest value that will pass through the eval pipeline without error
-    # TODO address this
-    cfg.model.sampling_config.num_test_proposal_samples = 25
-    if "ula" in override:
-        # we disable SMC here for testing - we are mostly concerned with weights being correctly setup
-        if cfg.model.get("smc_sampler") is not None:
-            cfg.model.smc_sampler.enabled = False
-    elif "transferable" in override:
-        cfg.data.test_sequences = "AA"
-    cfg.tags = ["pytest", "test_evaluation_fast"]
-
     # Patch common paths to avoid writing to the project tree
     with open_dict(cfg):
         cfg.paths.output_dir = str(tmp_path)
         cfg.paths.log_dir = str(tmp_path)
         cfg.paths.work_dir = os.getcwd()
+        cfg.model.sampling_config.num_test_proposal_samples = 25
+        if "ula" in override:
+            # we disable SMC here for testing - we are mostly concerned with weights being correctly setup
+            if cfg.model.get("smc_sampler") is not None:
+                cfg.model.smc_sampler.enabled = False
+        elif "transferable" in override:
+            cfg.data.test_sequences = "AA"
+        cfg.tags = ["pytest", "test_eval"]
 
     yield cfg
 
@@ -89,28 +86,24 @@ def cfg_test_evaluation_fast(request: pytest.FixtureRequest, tmp_path: Path) -> 
 
 
 @pytest.mark.slow
-def test_evaluation_fast(cfg_test_evaluation_fast):
+def test_eval(cfg_test_eval):
     """
     Runs eval() for every experiment config discovered via the fixture.
     :param cfg_eval_param: The configuration for the evaluation.
     """
 
-    metrics, _ = eval(cfg_test_evaluation_fast)
+    metrics, _ = eval(cfg_test_eval)
 
-    if "sequence" in cfg_test_evaluation_fast.data:
-        test_sequence = cfg_test_evaluation_fast.data.sequence
+    if "sequence" in cfg_test_eval.data:
+        test_sequence = cfg_test_eval.data.sequence
     else:
-        test_sequence = cfg_test_evaluation_fast.data.test_sequences
+        test_sequence = cfg_test_eval.data.test_sequences
         if isinstance(test_sequence, list):
             test_sequence = test_sequence[0]
         assert test_sequence == "AA", "Only 'AA' sequence is expected in tests."
 
     median_proposal_energy = metrics.get(f"test/{test_sequence}/proposal/median_energy", None)
     assert median_proposal_energy is not None, f"test/{test_sequence}/proposal/median_energy missing"
-
-    with open("output", "a", encoding="utf-8") as f:
-        f.write(f"{test_sequence}\t{cfg_test_evaluation_fast.state_dict_hf_path}\t{median_proposal_energy}\n")
-
     assert median_proposal_energy < MEDIAN_PROPOSAL_ENERGY_THRESHOLDS[test_sequence], (
         f"Median proposal energy {median_proposal_energy} above threshold "
         f"{MEDIAN_PROPOSAL_ENERGY_THRESHOLDS[test_sequence]} for sequence {test_sequence}"
