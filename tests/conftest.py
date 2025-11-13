@@ -16,9 +16,10 @@ os.makedirs(report_dir, exist_ok=True)
 
 # Tests use this fixture to parametrize over trainer names will now run with
 # correct trainer, with unique ids for clarity in test reports.
-@pytest.fixture(scope="session")
-def trainer_name_param():
-    trainer = os.environ.get("PYTEST_TRAINER", "gpu")
+@pytest.fixture(scope="session", params=[os.environ.get("PYTEST_TRAINER", "gpu")], ids=lambda x: x)
+def trainer_name_param(request):
+    trainer = request.param
+
     if trainer == "ddp" and torch.cuda.device_count() < 2:
         pytest.skip("DDP requires >=2 GPUs")
     if trainer == "gpu" and torch.cuda.device_count() < 1:
