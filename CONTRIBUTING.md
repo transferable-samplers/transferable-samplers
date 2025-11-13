@@ -38,7 +38,7 @@ PYTEST_TRAINER=gpu pytest -v
 PYTEST_TRAINER=ddp pytest -v
 ```
 
-### Testing with SLURM
+### Testing with SLURM
 
 For convenience we provide SLURM scripts for background testing on SLURM-enabled clusters:
 
