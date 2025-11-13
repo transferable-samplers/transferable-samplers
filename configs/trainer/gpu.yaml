@@ -3,3 +3,7 @@ defaults:
 
 accelerator: gpu
 devices: 1
+
+plugins:
+  - SLURMEnvironment:
+      auto_requeue: false
