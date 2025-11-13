@@ -15,7 +15,6 @@ from lightning.pytorch.loggers import WandbLogger
 from torchmetrics import MeanMetric
 from tqdm import tqdm
 
-from src.data.transferable_peptide_datamodule import TransferablePeptideDataModule
 from src.models.neural_networks.ema import EMA
 from src.models.priors import NormalDistribution
 from src.models.samplers.base_sampler import SMCSampler
@@ -66,9 +65,6 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
 
         self.smc_sampler = smc_sampler
         if self.smc_sampler is not None:
-            # A hack to pass the tests before we refactor
-            if isinstance(self.smc_sampler, TransferablePeptideDataModule):
-                self.smc_sampler = smc_sampler()
             self.smc_sampler.log_image_fn = self.log_image
 
         # loss function
