@@ -18,7 +18,7 @@ from omegaconf import DictConfig, open_dict
 from src.self_improve import self_improve
 from tests.helpers.utils import compose_config, get_config_stem
 
-EXPERIMENT_NAMES = ["evaluation/transferable/prose_up_to_8aa_self_improve.yaml"]
+EXPERIMENT_NAMES = ["evaluation/utransferable/prose_up_to_8aa_self_improve.yaml"]
 # TODO we need to setup self_improve to run from huggingface weights, but i am concerned
 # about EMA etc. so think this is outside of the scope of establishing the test suite
 INITIAL_CKPT_PATH = "/network/scratch/t/tanc/ablation_models/prose_up_to_8aa_standard_v1.ckpt"
@@ -43,7 +43,7 @@ def cfg_test_self_improve_mwe(request: pytest.FixtureRequest, trainer_name_param
     experiment_name = request.param
 
     cfg = compose_config(
-        config_name="train", overrides=[f"experiment={experiment_name}", f"trainer={trainer_name_param}"]
+        config_name="eval", overrides=[f"experiment={experiment_name}", f"trainer={trainer_name_param}"]
     )
 
     # Override config for testing purposes
@@ -57,6 +57,7 @@ def cfg_test_self_improve_mwe(request: pytest.FixtureRequest, trainer_name_param
         cfg.trainer.limit_train_batches = 1
         cfg.model.sampling_config.num_proposal_samples = 32
         cfg.model.sampling_config.num_self_improve_proposal_samples = 32
+        cfg.data.num_workers = 0  # avoid multiprocessing issues in tests
         cfg.data.batch_size = 32
         cfg.data.test_sequences = "AA"
         cfg.tags = ["pytest", f"test_self_improve_mwe_{trainer_name_param}"]

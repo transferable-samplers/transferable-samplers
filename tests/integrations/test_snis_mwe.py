@@ -80,6 +80,7 @@ def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, t
                 cfg.model.smc_sampler.enabled = False
         if "transferable" in experiment_name:
             cfg.data.test_sequences = "AA"
+        cfg.data.num_workers = 0  # avoid multiprocessing issues in tests
         cfg.tags = ["pytest", f"test_snis_mwe_{trainer_name_param}"]
 
     yield cfg

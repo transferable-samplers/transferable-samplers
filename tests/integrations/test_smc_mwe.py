@@ -60,6 +60,7 @@ def cfg_test_smc_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tm
         cfg.model.sampling_config.num_test_proposal_samples = 25
         cfg.model.sampling_config.num_smc_samples = 25
         cfg.model.smc_sampler.num_timesteps = 10
+        cfg.data.num_workers = 0  # avoid multiprocessing issues in tests
         if "transferable" in experiment_name:
             cfg.data.test_sequences = "AA"
         cfg.tags = ["pytest", "test_smc_mwe"]

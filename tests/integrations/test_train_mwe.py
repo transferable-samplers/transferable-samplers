@@ -56,6 +56,7 @@ def cfg_test_train_mwe(request: pytest.FixtureRequest, trainer_name_param: str, 
         cfg.test = False  # disable test stage during training tests
         cfg.trainer.max_epochs = 1
         cfg.trainer.limit_train_batches = 1
+        cfg.data.num_workers = 0  # avoid multiprocessing issues in tests
         cfg.data.batch_size = 32
         cfg.tags = ["pytest", f"test_train_mwe_{trainer_name_param}"]
 
