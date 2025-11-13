@@ -27,7 +27,7 @@ INITIAL_CKPT_PATH = "/network/scratch/t/tanc/ablation_models/prose_up_to_8aa_sta
 
 
 @pytest.fixture(scope="function")
-def cfg_test_self_improve(tmp_path: Path) -> DictConfig:
+def cfg_test_self_improve(tmp_path: Path, trainer_name_param) -> DictConfig:
     """
     Parameterized Hydra-composed config for each experiment file under configs/experiment/evaluation.
     Each test that takes `cfg_eval_param` will run once per config file.
@@ -42,7 +42,7 @@ def cfg_test_self_improve(tmp_path: Path) -> DictConfig:
 
     # Compose full Hydra config
     with initialize(version_base="1.3", config_path="../configs"):
-        cfg = compose(config_name="train", overrides=[f"experiment={override}"])
+        cfg = compose(config_name="train", overrides=[f"experiment={override}", f"trainer={trainer_name_param}"])
 
     # Patch common paths to avoid writing to the project tree
     with open_dict(cfg):
@@ -57,7 +57,7 @@ def cfg_test_self_improve(tmp_path: Path) -> DictConfig:
         cfg.model.sampling_config.num_self_improve_proposal_samples = 32
         cfg.data.batch_size = 32
         cfg.data.test_sequences = "AA"
-        cfg.tags = ["pytest", "test_self_improvement"]
+        cfg.tags = ["pytest", f"test_self_improvement_{trainer_name_param}"]
 
     yield cfg
 
@@ -65,7 +65,6 @@ def cfg_test_self_improve(tmp_path: Path) -> DictConfig:
     GlobalHydra.instance().clear()
 
 
-@pytest.mark.slow
 def test_self_improve(cfg_test_self_improve):
     """
     Runs eval() for every experiment config discovered via the fixture.

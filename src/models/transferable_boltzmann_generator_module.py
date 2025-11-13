@@ -63,7 +63,9 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
 
         self.datamodule = datamodule
 
-        self.smc_sampler = None
+        self.smc_sampler = smc_sampler
+        if self.smc_sampler is not None:
+            self.smc_sampler.log_image_fn = self.log_image
 
         # loss function
         self.criterion = torch.nn.MSELoss(reduction="mean")

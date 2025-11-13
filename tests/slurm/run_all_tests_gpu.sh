@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J pytest-transferable-samplers                 # Job name
+#SBATCH -J pytest-gpu                 # Job name
 #SBATCH -o tests/watch_folder/%x_%j.out     # output file (%j expands to jobID)
 #SBATCH --mem=48G                     # server memory requested (per node)
 #SBATCH --partition=main,long
@@ -8,4 +8,6 @@
 #SBATCH -c 8
 #SBATCH --get-user-env
 
-pytest -v tests/test_train.py
+export PYTEST_TRAINER="gpu" # this is default value but made explicit here
+
+pytest tests --junitxml=tests/reports/report_${PYTEST_TRAINER}.xml -v

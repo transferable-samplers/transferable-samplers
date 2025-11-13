@@ -8,23 +8,11 @@ from math import isnan
 from pathlib import Path
 
 import pytest
-import torch
 from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, open_dict
 
 from src.train import train
-
-# Have to export env variable for DDP tests
-trainer_mode = os.environ.get("PYTEST_TRAINER", "gpu")  # default: gpu
-assert not (torch.cuda.device_count() > 1 and trainer_mode != "ddp")
-
-
-# Ensures the gpu vs ddp tests are separated in pytest reports
-@pytest.fixture(params=[trainer_mode], ids=[trainer_mode])
-def trainer_mode_param(request):
-    return request.param
-
 
 # Locate relevant experiment config files
 CONFIG_BASE = Path(__file__).resolve().parent.parent / "configs"
@@ -41,7 +29,7 @@ EXPERIMENT_CONFIGS = [
 
 
 @pytest.fixture(params=EXPERIMENT_CONFIGS, ids=lambda p: p.stem, scope="function")
-def cfg_test_train(request: pytest.FixtureRequest, trainer_mode_param, tmp_path: Path) -> DictConfig:
+def cfg_test_train(request: pytest.FixtureRequest, trainer_name_param, tmp_path: Path) -> DictConfig:
     """
     Parameterized Hydra-composed config for each experiment file under configs/experiment/evaluation.
     Each test that takes `cfg_eval_param` will run once per config file.
@@ -57,7 +45,7 @@ def cfg_test_train(request: pytest.FixtureRequest, trainer_mode_param, tmp_path:
 
     # Compose full Hydra config
     with initialize(version_base="1.3", config_path="../configs"):
-        cfg = compose(config_name="train", overrides=[f"experiment={override}", f"trainer={trainer_mode_param}"])
+        cfg = compose(config_name="train", overrides=[f"experiment={override}", f"trainer={trainer_name_param}"])
 
     # Patch common paths to avoid writing to the project tree
     with open_dict(cfg):
@@ -69,7 +57,7 @@ def cfg_test_train(request: pytest.FixtureRequest, trainer_mode_param, tmp_path:
         cfg.trainer.max_epochs = 1
         cfg.trainer.limit_train_batches = 1
         cfg.data.batch_size = 32
-        cfg.tags = ["pytest", f"test_train_{trainer_mode}"]
+        cfg.tags = ["pytest", f"test_train_{trainer_name_param}"]
 
     yield cfg
 
@@ -77,7 +65,6 @@ def cfg_test_train(request: pytest.FixtureRequest, trainer_mode_param, tmp_path:
     GlobalHydra.instance().clear()
 
 
-@pytest.mark.slow
 def test_train(cfg_test_train: DictConfig):
     """
     Runs eval() for every experiment config discovered via the fixture.
