@@ -1,18 +1,17 @@
 # Contributing Guide
 
 Thank you for your interest in contributing 🌟 
+
 We welcome bug reports, pull requests, and improvements of all kinds.
 
 Before contributing, please take a moment to read through this guide.
-
----
 
 ## 📦 Development Setup
 
 Clone the repository and install the development environment:
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/transferable-samplers/transferable-samplers.git
 cd transferable-samplers
 pip install -r requirements-dev.txt
 ```
@@ -22,8 +21,6 @@ pip install -r requirements-dev.txt
 ```bash
 pre-commit install
 ```
-
----
 
 ## 🧪 Running Tests
 
