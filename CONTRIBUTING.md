@@ -40,20 +40,20 @@ PYTEST_TRAINER=ddp pytest -v
 
 ### Testing with SLURM
 
-For convenience we provide SLURM scripts for background testing on SLURM-enabled clusters.
+For convenience we provide SLURM scripts for background testing on SLURM-enabled clusters:
 
 ```bash
 sbatch tests/slurm/test_integrations_gpu.sh
 sbatch tests/slurm/test_integrations_ddp.sh
 ```
 
-These will generate report files that can be merged as
+These will generate report files that can be merged as:
 
 ```bash
 junitparser merge tests/reports/report_ddp.xml tests/reports/report_gpu.xml tests/reports/report.xml
 ```
 
-And then converted to html
+And then converted to html:
 
 ```bash
 junit2html tests/reports/report.xml tests/reports/report.html
