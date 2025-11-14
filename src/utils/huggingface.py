@@ -57,15 +57,20 @@ def download_and_extract_pdb_tarfiles(data_dir: str):
 
     logging.info(f"Downloading and extracting PDB tarfiles to {data_dir}")
 
+    # Snapshot download automatically avoids re-downloading if already present
+    local_path = snapshot_download(
+        repo_id=REPO_ID,
+        repo_type="dataset",
+        local_dir=data_dir,
+        allow_patterns=["pdb_tarfiles/*"],
+        use_auth_token=True,
+    )
+
     for subset in ["train", "val", "test"]:
-        local_path = hf_hub_download(
-            repo_id=REPO_ID,
-            repo_type="dataset",
-            filename=f"pdb_tarfiles/{subset}.tar",
-            revision="main",
-            local_dir=data_dir,
-        )
-        safe_extract_tar(local_path, os.path.join(data_dir, "pdbs"))
+        tar_filepath = local_path + f"/pdb_tarfiles/{subset}.tar"
+        if not os.path.exists(tar_filepath):
+            continue
+        safe_extract_tar(tar_filepath, os.path.join(data_dir, "pdbs"))
 
 
 def download_evaluation_data(data_dir: str):
@@ -80,6 +85,7 @@ def download_evaluation_data(data_dir: str):
 
     logging.info(f"Downloading evaluation data to {data_dir}")
 
+    # Snapshot download automatically avoids re-downloading if already present
     snapshot_download(
         repo_id=REPO_ID,
         repo_type="dataset",
