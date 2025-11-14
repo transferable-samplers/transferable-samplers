@@ -11,4 +11,4 @@
 export PYTEST_REPORT_DIR="tests/reports"
 export PYTEST_TRAINER="ddp"
 
-pytest tests -v -m "pipeline" --junitxml=${PYTEST_REPORT_DIR}/report_${PYTEST_TRAINER}.xml 
+pytest tests -v -m "pipeline" --junitxml="${PYTEST_REPORT_DIR}/report_${PYTEST_TRAINER}.xml"

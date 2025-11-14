@@ -24,7 +24,7 @@ EXPERIMENT_NAMES = ["evaluation/transferable/prose_up_to_8aa_self_improve.yaml"]
 INITIAL_CKPT_PATH = "/network/scratch/t/tanc/ablation_models/prose_up_to_8aa_standard_v1.ckpt"
 
 
-@pytest.fixture(params=EXPERIMENT_NAMES, ids=lambda p: get_config_stem(p), scope="function")
+@pytest.fixture(params=EXPERIMENT_NAMES, ids=get_config_stem, scope="function")
 def cfg_test_self_improve_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tmp_path: Path) -> DictConfig:
     """
     Hydra-composed config for the transferable self-improvement experiment.

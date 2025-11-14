@@ -46,7 +46,7 @@ EXPERIMENT_NAMES = [
 ]
 
 
-@pytest.fixture(params=EXPERIMENT_NAMES, ids=lambda p: get_config_stem(p), scope="function")
+@pytest.fixture(params=EXPERIMENT_NAMES, ids=get_config_stem, scope="function")
 def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tmp_path: Path) -> DictConfig:
     """
     Hydra-composed config for the evaluation experiments.
