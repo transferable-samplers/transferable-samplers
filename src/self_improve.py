@@ -45,7 +45,7 @@ log = RankedLogger(__name__, rank_zero_only=True)
 
 
 @task_wrapper
-def train(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
+def self_improve(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
     """Trains the model. Can additionally evaluate on a testset, using best weights obtained during
     training.
 
@@ -104,10 +104,6 @@ def train(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
     except pickle.UnpicklingError:
         log.info(f"Ensure checkpoint path {initial_ckpt_path} contains weights only.")
 
-    log.info("Starting initial evaluation!")
-    # validate to get results of the initial model
-    trainer.test(model=model, datamodule=datamodule)
-
     log.info("Starting self-refinement training!")
     trainer.fit(model=model, datamodule=datamodule, ckpt_path=ckpt_path)
 
@@ -138,7 +134,7 @@ def main(cfg: DictConfig) -> Optional[float]:
     extras(cfg)
 
     # train the model
-    metric_dict, _ = train(cfg)
+    metric_dict, _ = self_improve(cfg)
 
     # safely retrieve metric value for hydra-based hyperparameter optimization
     metric_value = get_metric_value(metric_dict=metric_dict, metric_name=cfg.get("optimized_metric"))

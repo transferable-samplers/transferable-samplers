@@ -105,9 +105,8 @@ def eval(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
     ckpt_path = cfg.get("ckpt_path")
     state_dict_hf_path = cfg.get("state_dict_hf_path")
 
-    assert (ckpt_path is None) != (state_dict_hf_path is None), (
-        "You can only provide one of ckpt_path or state_dict_hf_path!"
-    )
+    # Ensure exactly one of ckpt_path or state_dict_hf_path is provided (XOR)
+    assert (ckpt_path is None) ^ (state_dict_hf_path is None), "You must provide one of ckpt_path or state_dict_hf_path"
 
     if state_dict_hf_path is not None:
         # Provided a remote state dict path

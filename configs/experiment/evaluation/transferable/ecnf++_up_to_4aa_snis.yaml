@@ -6,14 +6,9 @@ defaults:
   - override /trainer: gpu
 
 state_dict_hf_path: transferable/ecnf++_up_to_4aa.pth
-train: False
-val: False
-test: True
 
 model:
-  eval_seq_name: null
   sampling_config:
-    use_com_adjustment: False
     batch_size: 4
     num_test_proposal_samples: 10_000
     clip_reweighting_logits: 0.002
