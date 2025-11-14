@@ -1,5 +1,5 @@
 """
-Fixtures for configuring tests based on available hardware (GPU/DPD).
+Fixtures for configuring tests based on available hardware (GPU/DDP).
 Tests are run with the appropriate trainer based on available devices.
 Unique ids for each trainer are provided for clarity in test reports.
 """
