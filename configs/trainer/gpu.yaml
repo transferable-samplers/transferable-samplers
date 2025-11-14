@@ -5,5 +5,5 @@ accelerator: gpu
 devices: 1
 
 plugins:
-  - SLURMEnvironment:
-      auto_requeue: false
+  - _target_: lightning.pytorch.plugins.environments.SLURMEnvironment
+    auto_requeue: false
