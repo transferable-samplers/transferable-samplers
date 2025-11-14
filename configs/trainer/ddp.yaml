@@ -9,5 +9,5 @@ num_nodes: 1
 sync_batchnorm: true
 
 plugins:
-  - SLURMEnvironment:
-      auto_requeue: false
+  - _target_: lightning.pytorch.plugins.environments.SLURMEnvironment
+    auto_requeue: false
