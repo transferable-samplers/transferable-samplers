@@ -14,8 +14,7 @@ report_dir = os.environ.get("PYTEST_REPORT_DIR", "tests/")
 os.makedirs(report_dir, exist_ok=True)
 
 
-# Tests use this fixture to parametrize over trainer names will now run with
-# correct trainer, with unique ids for clarity in test reports.
+# Used to inject trainer name parameter into tests
 @pytest.fixture(scope="session", params=[os.environ.get("PYTEST_TRAINER", "gpu")], ids=lambda x: x)
 def trainer_name_param(request):
     trainer = request.param
