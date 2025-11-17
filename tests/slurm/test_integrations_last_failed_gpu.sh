@@ -11,4 +11,4 @@
 export PYTEST_REPORT_DIR="tests/reports"
 export PYTEST_TRAINER="gpu" # this is default value but made explicit here
 
-pytest tests -v -m "pipeline" -s --junitxml=${PYTEST_REPORT_DIR}/report_last_failed_${PYTEST_TRAINER}.xml --last-failed
+pytest tests -v -m "pipeline" -s --junitxml="${PYTEST_REPORT_DIR}/report_last_failed_${PYTEST_TRAINER}.xml" --last-failed
