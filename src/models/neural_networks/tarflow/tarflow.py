@@ -380,16 +380,15 @@ class TarFlow(torch.nn.Module):
         use_transition: bool = False,
         use_qkln: bool = False,
         dropout: float = 0.0,
-        permutation_keys: list[str] = [
-            "n2c_residue-by-residue_standard_group-by-group",
-            "n2c_residue-by-residue_standard_group-by-group_flip",
-        ],  # defaults to SBG
+        permutation_keys: list[str] = None,  # defaults to SBG
         cond_embed: nn.Module | None = None,  # TODO don't like name, could make a proper subclass
         pos_embed_type: str = "learned",  # learned, sinusoidal
         nvp: bool = True,
         debug: bool = False,  # stops the weight initialization from being zero so tokens are not all the same
         lookahead_conditioning: bool = False,
     ):
+        if permutation_keys is None:
+            permutation_keys = ["n2c_residue-by-residue_standard_group-by-group", "n2c_residue-by-residue_standard_group-by-group_flip"]
         super().__init__()
         self.input_dimension = input_dimension
         permutation_keys = list(permutation_keys) * (

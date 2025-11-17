@@ -137,7 +137,7 @@ class Energy(torch.nn.Module):
                 "This Energy instance is defined on multidimensional events. "
                 "Therefore, its Energy.dim is distributed over multiple tensor dimensions. "
                 "Consider using Energy.event_shape instead.",
-                UserWarning,
+                UserWarning, stacklevel=2,
             )
         return int(torch.prod(torch.tensor(self.event_shape, dtype=int)))
 

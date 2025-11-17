@@ -1,6 +1,7 @@
 import logging
 import os
 import tarfile
+from pathlib import Path
 
 from huggingface_hub import hf_hub_download, snapshot_download
 
@@ -16,11 +17,11 @@ def download_weights(destination_dir: str, hf_filepath: str) -> str:
         hf_filepath (str): The filepath in the Hugging Face repo
     """
 
-    REPO_ID = "transferable-samplers/model-weights"
+    repo_id = "transferable-samplers/model-weights"
 
     try:
-        os.makedirs(destination_dir, exist_ok=True)
-        local_path = hf_hub_download(repo_id=REPO_ID, filename=hf_filepath, local_dir=destination_dir)
+        Path(destination_dir).mkdir(parents=True, exist_ok=True)
+        local_path = hf_hub_download(repo_id=repo_id, filename=hf_filepath, local_dir=destination_dir)
         print(f"Model weights downloaded successfully to {destination_dir}")
         return local_path
     except Exception as e:
@@ -53,13 +54,13 @@ def download_and_extract_pdb_tarfiles(data_dir: str):
         data_dir (str): The top-level data dir in which to build the pdb file subdirectories
     """
 
-    REPO_ID = "transferable-samplers/many-peptides-md"
+    repo_id = "transferable-samplers/many-peptides-md"
 
     logging.info(f"Downloading and extracting PDB tarfiles to {data_dir}")
 
     for subset in ["train", "val", "test"]:
         local_path = hf_hub_download(
-            repo_id=REPO_ID,
+            repo_id=repo_id,
             repo_type="dataset",
             filename=f"pdb_tarfiles/{subset}.tar",
             revision="main",
@@ -76,12 +77,12 @@ def download_evaluation_data(data_dir: str):
         data_dir (str): The top-level data dir in which to build the evaluation data subdirectories
     """
 
-    REPO_ID = "transferable-samplers/many-peptides-md"
+    repo_id = "transferable-samplers/many-peptides-md"
 
     logging.info(f"Downloading evaluation data to {data_dir}")
 
     snapshot_download(
-        repo_id=REPO_ID,
+        repo_id=repo_id,
         repo_type="dataset",
         local_dir=data_dir,
         allow_patterns=["trajectories_subsampled/*"],

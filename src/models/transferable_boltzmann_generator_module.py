@@ -5,6 +5,7 @@ import statistics as stats
 import time
 from collections import defaultdict
 from copy import deepcopy
+from pathlib import Path
 from typing import Any, Optional
 
 import matplotlib.pyplot as plt
@@ -408,7 +409,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
                 "proposal_log_q": proposal_log_q,
             }
             if self.local_rank == 0:
-                os.makedirs(f"{self.output_dir}/{prefix}", exist_ok=True)
+                Path(f"{self.output_dir}/{prefix}").mkdir(parents=True, exist_ok=True)
                 if self.hparams.sampling_config.get("subset_idx") is not None:
                     torch.save(
                         samples_dict,
@@ -561,8 +562,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
                 "smc_logits": smc_logits,
             }
             if self.local_rank == 0:
-                os.makedirs(f"{self.output_dir}/{prefix}", exist_ok=True)
-
+                Path(f"{self.output_dir}/{prefix}").mkdir(parents=True, exist_ok=True)
                 torch.save(smc_samples_dict, f"{self.output_dir}/{prefix}/smc_samples.pt")
                 logging.info(f"Saving {len(smc_samples)} samples to {self.output_dir}/{prefix}_smc_samples.pt")
 

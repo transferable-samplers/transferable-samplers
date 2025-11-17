@@ -4,7 +4,6 @@ Only a basic test to ensure SMC runs end-to-end for single-system / transferable
 NOTE: A very loose threshold on median SMC energy is used to catch major issues.
 """
 
-import os
 from pathlib import Path
 
 import pytest
@@ -29,7 +28,7 @@ EXPERIMENT_NAMES = [
 ]
 
 
-@pytest.fixture(params=EXPERIMENT_NAMES, ids=get_config_stem, scope="function")
+@pytest.fixture(params=EXPERIMENT_NAMES, ids=get_config_stem)
 def cfg_test_smc_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tmp_path: Path) -> DictConfig:
     """
     Hydra-composed config for the evaluation experiments.
@@ -57,7 +56,7 @@ def cfg_test_smc_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tm
     with open_dict(cfg):
         cfg.paths.output_dir = str(tmp_path)
         cfg.paths.log_dir = str(tmp_path)
-        cfg.paths.work_dir = os.getcwd()
+        cfg.paths.work_dir = Path.cwd()
         cfg.model.sampling_config.num_test_proposal_samples = 25
         cfg.model.sampling_config.num_smc_samples = 25
         cfg.model.smc_sampler.num_timesteps = 10

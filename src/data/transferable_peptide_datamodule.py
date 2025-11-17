@@ -2,6 +2,7 @@ import glob
 import logging
 import os
 import pickle
+from pathlib import Path
 from typing import Optional, Union
 
 import numpy as np
@@ -98,8 +99,8 @@ class TransferablePeptideDataModule(BaseDataModule):
         Do not use it to assign state (self.x = y).
         """
 
-        os.makedirs(self.wds_cache_dir, exist_ok=True)
-        os.makedirs(self.preproc_cache_dir, exist_ok=True)
+        Path(self.wds_cache_dir).mkdir(parents=True, exist_ok=True)
+        Path(self.preproc_cache_dir).mkdir(parents=True, exist_ok=True)
 
         download_and_extract_pdb_tarfiles(self.hparams.data_dir)
         download_evaluation_data(self.hparams.data_dir)

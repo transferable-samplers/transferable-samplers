@@ -7,7 +7,6 @@ but this is outside the scope of establishing the test suite.
 NOTE: A very basic test that only checks a single iteration and non-NaN loss.
 """
 
-import os
 from math import isnan
 from pathlib import Path
 
@@ -24,7 +23,7 @@ EXPERIMENT_NAMES = ["evaluation/transferable/prose_up_to_8aa_self_improve.yaml"]
 INITIAL_CKPT_PATH = "/network/scratch/t/tanc/ablation_models/prose_up_to_8aa_standard_v1.ckpt"
 
 
-@pytest.fixture(params=EXPERIMENT_NAMES, ids=get_config_stem, scope="function")
+@pytest.fixture(params=EXPERIMENT_NAMES, ids=get_config_stem)
 def cfg_test_self_improve_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tmp_path: Path) -> DictConfig:
     """
     Hydra-composed config for the transferable self-improvement experiment.
@@ -51,7 +50,7 @@ def cfg_test_self_improve_mwe(request: pytest.FixtureRequest, trainer_name_param
     with open_dict(cfg):
         cfg.paths.output_dir = str(tmp_path)
         cfg.paths.log_dir = str(tmp_path)
-        cfg.paths.work_dir = os.getcwd()
+        cfg.paths.work_dir = Path.cwd()
         cfg.initial_ckpt_path = INITIAL_CKPT_PATH
         cfg.trainer.num_sanity_val_steps = 0  # disable val sanity checks
         cfg.trainer.max_epochs = 1

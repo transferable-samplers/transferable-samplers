@@ -156,7 +156,7 @@ def get_encodings(topology):
 def get_encodings_dict(topology_dict):
     encodings_dict = {}
 
-    for i, (sequence, topology) in tqdm(
+    for _, (sequence, topology) in tqdm(
         enumerate(topology_dict.items()),
         desc="Generating encodings",
         total=len(topology_dict),

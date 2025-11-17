@@ -8,7 +8,6 @@ NOTE: This test only considers SNIS for each dataset/model. SMC tests are in tes
 A very loose threshold on median proposal energy is used to catch major issues.
 """
 
-import os
 from pathlib import Path
 
 import pytest
@@ -46,7 +45,7 @@ EXPERIMENT_NAMES = [
 ]
 
 
-@pytest.fixture(params=EXPERIMENT_NAMES, ids=get_config_stem, scope="function")
+@pytest.fixture(params=EXPERIMENT_NAMES, ids=get_config_stem)
 def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tmp_path: Path) -> DictConfig:
     """
     Hydra-composed config for the evaluation experiments.
@@ -73,7 +72,7 @@ def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, t
     with open_dict(cfg):
         cfg.paths.output_dir = str(tmp_path)
         cfg.paths.log_dir = str(tmp_path)
-        cfg.paths.work_dir = os.getcwd()
+        cfg.paths.work_dir = Path.cwd()
         cfg.model.sampling_config.num_test_proposal_samples = 25
         if "ula" in experiment_name:
             # we disable SMC here for testing - we are mostly concerned with weights being correctly setup

@@ -5,13 +5,14 @@ Unique ids for each trainer are provided for clarity in test reports.
 """
 
 import os
+from pathlib import Path
 
 import pytest
 import torch
 
 # Create report directory if it doesn't exist
 report_dir = os.environ.get("PYTEST_REPORT_DIR", "tests/")
-os.makedirs(report_dir, exist_ok=True)
+Path(report_dir).mkdir(parents=True, exist_ok=True)
 
 
 # Used to inject trainer name parameter into tests

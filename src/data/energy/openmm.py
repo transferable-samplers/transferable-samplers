@@ -224,8 +224,10 @@ class MultiContext:
         A dictionary of platform properties.
     """
 
-    def __init__(self, n_workers, system, integrator, platform_name, platform_properties={}):
+    def __init__(self, n_workers, system, integrator, platform_name, platform_properties=None):
         """Set up workers and queues."""
+        if platform_properties is None:
+            platform_properties = {}
         self._n_workers = n_workers
         self._system = system
         self._integrator = integrator
@@ -241,7 +243,7 @@ class MultiContext:
                 "It looks like you are using an OpenMMBridge with multiple workers in an ipython environment. "
                 "This can behave a bit silly upon KeyboardInterrupt (e.g., kill the stdout stream). "
                 "If you experience any issues, consider initializing the bridge with n_workers=1 in ipython/jupyter.",
-                UserWarning,
+                UserWarning, stacklevel=2,
             )
         except NameError:
             pass
@@ -253,7 +255,7 @@ class MultiContext:
         self._task_queue = mp.Queue()
         self._result_queue = mp.Queue()
         self._workers = []
-        for i in range(self._n_workers):
+        for _ in range(self._n_workers):
             worker = MultiContext.Worker(
                 self._task_queue,
                 self._result_queue,
@@ -449,7 +451,7 @@ class MultiContext:
                     new_positions = state.getPositions().value_in_unit(unit.nanometers) if evaluate_positions else None
                 except Exception as e:
                     if err_handling == "warning":
-                        warnings.warn(f"Suppressed exception: {e}")
+                        warnings.warn(f"Suppressed exception: {e}", stacklevel=2)
                     elif err_handling == "exception":
                         raise e
 
@@ -474,8 +476,10 @@ class SingleContext:
         A dictionary of platform properties.
     """
 
-    def __init__(self, n_workers, system, integrator, platform_name, platform_properties={}):
+    def __init__(self, n_workers, system, integrator, platform_name, platform_properties=None):
         """Set up workers and queues."""
+        if platform_properties is None:
+            platform_properties = {}
         try:
             from openmm import Context, Platform
         except ImportError:  # fall back to older version < 7.6
@@ -571,7 +575,7 @@ class SingleContext:
 
             except Exception as e:
                 if err_handling == "warning":
-                    warnings.warn(f"Suppressed exception: {e}")
+                    warnings.warn(f"Suppressed exception: {e}", stacklevel=2)
                 elif err_handling == "exception":
                     raise e
 
@@ -589,6 +593,6 @@ class OpenMMEnergy(_BridgeEnergy):
             warnings.warn(
                 "dimension argument in OpenMMEnergy is deprecated and will be ignored. "
                 "The dimension is directly inferred from the system.",
-                DeprecationWarning,
+                DeprecationWarning, stacklevel=2,
             )
         super().__init__(bridge, two_event_dims=two_event_dims)

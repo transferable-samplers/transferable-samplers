@@ -1,5 +1,5 @@
 import logging
-import os
+from pathlib import Path
 from typing import Optional
 
 import mdtraj as md
@@ -58,7 +58,7 @@ class SinglePeptideDataModule(BaseDataModule):
 
         Do not use it to assign state (self.x = y).
         """
-        os.makedirs(f"{self.hparams.data_dir}/{self.repo_name}", exist_ok=True)
+        Path(f"{self.hparams.data_dir}/{self.repo_name}").mkdir(parents=True, exist_ok=True)
 
         local_dir = snapshot_download(
             repo_id=self.hparams.repo_id,

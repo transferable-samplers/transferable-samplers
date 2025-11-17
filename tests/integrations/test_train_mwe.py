@@ -3,7 +3,6 @@ Tests for the training pipelines.
 NOTE: A very basic test that only checks a single iteration and non-NaN loss.
 """
 
-import os
 from math import isnan
 from pathlib import Path
 
@@ -25,7 +24,7 @@ EXPERIMENT_NAMES = [
 ]
 
 
-@pytest.fixture(params=EXPERIMENT_NAMES, ids=get_config_stem, scope="function")
+@pytest.fixture(params=EXPERIMENT_NAMES, ids=get_config_stem)
 def cfg_test_train_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tmp_path: Path) -> DictConfig:
     """
     Hydra-composed config for the training experiments.
@@ -52,7 +51,7 @@ def cfg_test_train_mwe(request: pytest.FixtureRequest, trainer_name_param: str, 
     with open_dict(cfg):
         cfg.paths.output_dir = str(tmp_path)
         cfg.paths.log_dir = str(tmp_path)
-        cfg.paths.work_dir = os.getcwd()
+        cfg.paths.work_dir = Path.cwd()
         cfg.trainer.num_sanity_val_steps = 0  # disable val sanity checks
         cfg.test = False  # disable test stage during training tests
         cfg.trainer.max_epochs = 1
