@@ -3,8 +3,10 @@
 defaults:
   - override /model: flow_matching++
   - override /model/net: egnn_dynamics_ad2_cat
-  - override /data: single_system/AAA
+  - override /data: single_system/Ace-AAA-Nme
   - override /trainer: gpu
+
+state_dict_hf_path: single_system/ecnf++_Ace-AAA-Nme_0.pth
 
 model:
   net:
@@ -13,7 +15,6 @@ model:
   sampling_config:
     batch_size: 8
     num_test_proposal_samples: 10_000
-
   ema_decay: 0.0
 
 data:
@@ -23,5 +24,3 @@ data:
 trainer:
   limit_test_batches: 1
   limit_val_batches: 1
-
-state_dict_hf_path: single_system/ecnf++_AAA_0.pth

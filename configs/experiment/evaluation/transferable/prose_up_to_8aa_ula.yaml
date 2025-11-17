@@ -6,10 +6,7 @@ defaults:
   - override /data: transferable/up_to_8aa
   - override /trainer: gpu
 
-train: False
-val: False
-test: True
-task_name: eval
+state_dict_hf_path: transferable/prose_up_to_8aa.pth
 
 model:
   sampling_config:
@@ -21,7 +18,6 @@ model:
 
   smc_sampler:
     _target_: src.models.samplers.ula_sampler.SMCSamplerULA
-    _partial_: true
     enabled: True
     langevin_eps: 1e-7
     num_timesteps: 100
@@ -32,6 +28,8 @@ model:
     input_energy_cutoff: 100 # this might need tuning if you get NaNs!
     do_energy_plots: True
     log_freq: 1
+
+  ema_decay: 0.0
 
 data:
   batch_size: 128

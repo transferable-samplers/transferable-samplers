@@ -6,6 +6,8 @@ defaults:
   - override /data: single_system/GYDPETGTWG
   - override /trainer: gpu
 
+state_dict_hf_path: single_system/tarflow_GYDPETGTWG_0.pth
+
 model:
   net:
     channels: 384
@@ -41,5 +43,3 @@ data:
 trainer:
   limit_test_batches: 1
   limit_val_batches: 1
-
-state_dict_hf_path: single_system/tarflow_GYDPETGTWG_0.pth
