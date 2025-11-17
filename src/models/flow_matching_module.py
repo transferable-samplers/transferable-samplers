@@ -128,12 +128,12 @@ class FlowMatchLitModule(TransferableBoltzmannGeneratorLitModule):
                         f"test_integrators/{integrator}_{n}/x_err": torch.norm(base_x - x),
                         f"test_integrators/{integrator}_{n}/dlog_p_err": torch.norm(base_dlog_p - dlog_p),
                         f"test_integrators/{integrator}_{n}/nfe": self.nfe / (max(self.num_integrations, 1e-4)),
-                    }
+                    },
                 )
                 logger.info(
                     f"estimator: {integrator} n: {n}, x_err: {torch.norm(base_x - x)}, "
                     f"dlog_p_err: {torch.norm(base_dlog_p - dlog_p)}, "
-                    f"nfe: {self.nfe / max(self.num_integrations, 1e-4)}"
+                    f"nfe: {self.nfe / max(self.num_integrations, 1e-4)}",
                 )
                 self.nfe = 0
 
@@ -336,7 +336,9 @@ class FlowMatchLitModule(TransferableBoltzmannGeneratorLitModule):
 
     @torch.no_grad()
     def batched_generate_samples_no_ll(
-        self, total_size: int, batch_size: Optional[int] = None
+        self,
+        total_size: int,
+        batch_size: Optional[int] = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         return super().batched_generate_samples(total_size, batch_size, dummy_ll=True)
 

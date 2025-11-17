@@ -43,7 +43,8 @@ def cfg_test_self_improve_mwe(request: pytest.FixtureRequest, trainer_name_param
     experiment_name = request.param
 
     cfg = compose_config(
-        config_name="train", overrides=[f"experiment={experiment_name}", f"trainer={trainer_name_param}"]
+        config_name="train",
+        overrides=[f"experiment={experiment_name}", f"trainer={trainer_name_param}"],
     )
 
     # Override config for testing purposes

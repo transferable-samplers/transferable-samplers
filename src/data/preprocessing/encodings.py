@@ -120,9 +120,9 @@ def get_encodings(topology):
             atom_name = atom.name
 
             # TODO double check this with Leon
-            # Standarize side-chain H atom encodings
+            # Standardize side-chain H atom encodings
             if atom_name[0] == "H" and atom_name[-1] in ("1", "2", "3"):
-                # For these AA the H-X-N atoms are not interchangable
+                # For these AA the H-X-N atoms are not interchangeable
                 if aa.name in ("HIS", "HIE", "PHE", "TRP", "TYR") and atom_name[:2] in (
                     "HE",
                     "HD",
@@ -133,7 +133,7 @@ def get_encodings(topology):
                 else:
                     atom_name = atom_name[:-1]
 
-            # Standarize side-chain O atom encodings
+            # Standardize side-chain O atom encodings
             if atom_name[:2] == "OE" or atom_name[:2] == "OD":
                 atom_name = atom_name[:-1]
 
@@ -157,7 +157,9 @@ def get_encodings_dict(topology_dict):
     encodings_dict = {}
 
     for i, (sequence, topology) in tqdm(
-        enumerate(topology_dict.items()), desc="Generating encodings", total=len(topology_dict)
+        enumerate(topology_dict.items()),
+        desc="Generating encodings",
+        total=len(topology_dict),
     ):
         encodings_dict[sequence] = get_encodings(topology)
 

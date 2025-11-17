@@ -154,7 +154,8 @@ class EGNNDynamicsTransferableMD(nn.Module):
 
         if self.num_valid_seq_lens > 1:
             seq_len_onehot = torch.nn.functional.one_hot(
-                seq_len_encoding.expand(-1, num_atoms), num_classes=self.num_valid_seq_lens
+                seq_len_encoding.expand(-1, num_atoms),
+                num_classes=self.num_valid_seq_lens,
             )
             h = torch.cat(
                 [h, seq_len_onehot],

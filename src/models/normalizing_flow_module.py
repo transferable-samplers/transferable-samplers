@@ -94,7 +94,7 @@ class NormalizingFlowLitModule(TransferableBoltzmannGeneratorLitModule):
         com = x.mean(dim=1, keepdim=False)
         com_norm = com.norm(dim=-1)
         com_energy = com_norm**2 / (2 * sigma**2) - torch.log(
-            com_norm**2 / (math.sqrt(2) * sigma**3 * scipy.special.gamma(3 / 2))
+            com_norm**2 / (math.sqrt(2) * sigma**3 * scipy.special.gamma(3 / 2)),
         )
 
         return com_energy
@@ -224,7 +224,7 @@ class NormalizingFlowLitModule(TransferableBoltzmannGeneratorLitModule):
             x_recon, fwd_logdets = self.net(x_pred, _permutations, encodings=_encodings)
             fwd_logdets = fwd_logdets * data_dim  # rescale from mean to sum
 
-            # TODO refector these all into a metrics
+            # TODO refactor these all into a metrics
             if log_invert_error:
                 self.log("invert/mse", torch.mean((prior_samples - x_recon) ** 2), sync_dist=True)
                 self.log(

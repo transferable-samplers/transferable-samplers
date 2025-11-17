@@ -139,7 +139,7 @@ class TransferablePeptideDataModule(BaseDataModule):
             if self.hparams.batch_size % self.trainer.world_size != 0:
                 raise RuntimeError(
                     f"Batch size ({self.hparams.batch_size}) is not divisible by "
-                    f"the number of devices ({self.trainer.world_size})."
+                    f"the number of devices ({self.trainer.world_size}).",
                 )
             self.batch_size_per_device = self.hparams.batch_size // self.trainer.world_size
 
@@ -235,7 +235,7 @@ class TransferablePeptideDataModule(BaseDataModule):
         nonbondedCutoff = 2.0 * openmm.unit.nanometer
         temperature = 310
 
-        # Initalize forcefield systemq
+        # Initialize forcefield systemq
         system = forcefield.createSystem(
             self.pdb_dict[sequence].topology,
             nonbondedMethod=nonbondedMethod,

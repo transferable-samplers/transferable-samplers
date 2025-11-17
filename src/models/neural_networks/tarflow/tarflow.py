@@ -167,7 +167,7 @@ class MetaBlock(torch.nn.Module):
                     dropout=dropout,
                 )
                 for _ in range(num_layers)
-            ]
+            ],
         )
 
         self.nvp = nvp
@@ -203,7 +203,8 @@ class MetaBlock(torch.nn.Module):
             cond = self.permutation(cond, permutations)
             if self.lookahead_conditioning:
                 lookahead_cond = torch.cat(
-                    [cond[:, 1:], torch.zeros_like(cond[:, :1])], dim=1
+                    [cond[:, 1:], torch.zeros_like(cond[:, :1])],
+                    dim=1,
                 )  # shift back one token w/ zero pad
                 cond = torch.cat([cond, lookahead_cond], dim=-1)  # concatenate the two
             cond_emb = self.proj_cond(cond)
@@ -255,7 +256,7 @@ class MetaBlock(torch.nn.Module):
 
         if tokenization_map is not None:
             data_dim = (tokenization_map != -1).int().sum(
-                dim=[1, 2]
+                dim=[1, 2],
             ) * 3  # this will inherently account for full padded residue tokens # TODO could be better
         elif mask is not None:
             data_dim = mask.sum(dim=-1) * 3  # TODO ugly and makes assumptions
@@ -281,7 +282,8 @@ class MetaBlock(torch.nn.Module):
         if cond is not None:
             if self.lookahead_conditioning:
                 lookahead_cond = torch.cat(
-                    [cond[:, 1:], torch.zeros_like(cond[:, :1])], dim=1
+                    [cond[:, 1:], torch.zeros_like(cond[:, :1])],
+                    dim=1,
                 )  # shift back one token w/ zero pad
                 cond = torch.cat([cond, lookahead_cond], dim=-1)  # concatenate the two
             cond_in = cond[:, i : i + 1]
@@ -299,7 +301,13 @@ class MetaBlock(torch.nn.Module):
 
         for block in self.attn_blocks:
             x = block(
-                x, cond=cond_emb, pair=pair_emb, mask=None, attn_mask=None, attn_temp=attn_temp, which_cache=which_cache
+                x,
+                cond=cond_emb,
+                pair=pair_emb,
+                mask=None,
+                attn_mask=None,
+                attn_temp=attn_temp,
+                which_cache=which_cache,
             )  # here we use kv caching, so no attn_mask
 
         x = self.proj_out(x)
@@ -412,7 +420,7 @@ class TarFlow(torch.nn.Module):
                     pos_embed_type=pos_embed_type,
                     debug=debug,
                     lookahead_conditioning=lookahead_conditioning,
-                )
+                ),
             )
         self.blocks = torch.nn.ModuleList(blocks)
 

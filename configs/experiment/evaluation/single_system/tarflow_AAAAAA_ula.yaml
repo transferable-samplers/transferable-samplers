@@ -16,7 +16,7 @@ model:
   sampling_config:
     batch_size: 10_000
     num_test_proposal_samples: 10_000
-    num_smc_samples: 10_000 
+    num_smc_samples: 10_000
     clip_reweighting_logits: 0.002
 
   smc_sampler:
@@ -31,7 +31,7 @@ model:
     input_energy_cutoff: -20.0
     do_energy_plots: True
     log_freq: 1
-    
+
   ema_decay: 0.0
 
 data:

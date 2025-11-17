@@ -48,7 +48,7 @@ torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
 logging.info(
     "Some numerical settings applied for TarFlow invertibility. No slowdown was "
-    "observed for ECNF but other neural networks may be slower than expected."
+    "observed for ECNF but other neural networks may be slower than expected.",
 )
 # TODO consolidate codebase logging into single library.
 log = RankedLogger(__name__, rank_zero_only=True)

@@ -21,7 +21,7 @@ model:
     clip_reweighting_logits: 0.002
 
   smc_sampler: null
-  
+
   optimizer:
     lr: 5.e-6
   ema_decay: 0.0

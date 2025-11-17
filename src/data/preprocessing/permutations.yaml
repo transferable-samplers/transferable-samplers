@@ -1,7 +1,7 @@
 backbone:
   n2c:
     before_sidechain:
-      - N 
+      - N
       - H # not on Proline
       - H2 # only on N-terminal
       - H3 # only on N-terminal
@@ -145,7 +145,7 @@ sidechain:
       - OE2
 
   GLY:
-    standard: []  # HA3 is considered part of the backbone, no side chain
+    standard: [] # HA3 is considered part of the backbone, no side chain
 
   HIE:
     standard:
@@ -183,7 +183,7 @@ sidechain:
       - CE1
       - HE1
       - ND1
-    
+
   ILE:
     standard:
       # β-carbon group (methyl branch)
@@ -365,7 +365,6 @@ sidechain:
       - HE1
       - CD1
       - HD1
-
 
   PRO:
     standard:

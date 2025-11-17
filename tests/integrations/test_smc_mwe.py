@@ -37,7 +37,7 @@ def cfg_test_smc_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tm
     Args:
         request: pytest request object to get the experiment override parameter.
         trainer_name_param: trainer name parameter supplied by parametrization fixtures.
-            (currently unused, need to impelement DDP SMC)
+            (currently unused, need to implement DDP SMC)
         tmp_path: pytest-provided temporary directory path.
 
     Returns:
@@ -49,7 +49,8 @@ def cfg_test_smc_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tm
     experiment_name = request.param
 
     cfg = compose_config(
-        config_name="eval", overrides=[f"experiment={experiment_name}", f"trainer={trainer_name_param}"]
+        config_name="eval",
+        overrides=[f"experiment={experiment_name}", f"trainer={trainer_name_param}"],
     )
 
     # Override config for testing purposes

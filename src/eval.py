@@ -50,7 +50,7 @@ torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
 logging.info(
     "Some numerical settings applied for TarFlow invertibility. No slowdown was "
-    "observed for ECNF but other neural networks may be slower than expected."
+    "observed for ECNF but other neural networks may be slower than expected.",
 )
 # TODO consolidate codebase logging into single library.
 log = RankedLogger(__name__, rank_zero_only=True)
@@ -126,7 +126,9 @@ def eval(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
     if cfg.get("val"):
         log.info("Starting validation!")
         trainer.validate(
-            model=model, datamodule=datamodule, ckpt_path=ckpt_path
+            model=model,
+            datamodule=datamodule,
+            ckpt_path=ckpt_path,
         )  # ckpt_path is None if using state_dict_hf_path
         val_metrics = trainer.callback_metrics
     else:
@@ -135,7 +137,9 @@ def eval(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
     if cfg.get("test"):
         log.info("Starting testing!")
         trainer.test(
-            model=model, datamodule=datamodule, ckpt_path=ckpt_path
+            model=model,
+            datamodule=datamodule,
+            ckpt_path=ckpt_path,
         )  # ckpt_path is None if using state_dict_hf_path
         test_metrics = trainer.callback_metrics
     else:

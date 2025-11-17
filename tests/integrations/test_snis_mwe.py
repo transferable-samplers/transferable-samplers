@@ -65,7 +65,8 @@ def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, t
     experiment_name = request.param
 
     cfg = compose_config(
-        config_name="eval", overrides=[f"experiment={experiment_name}", f"trainer={trainer_name_param}"]
+        config_name="eval",
+        overrides=[f"experiment={experiment_name}", f"trainer={trainer_name_param}"],
     )
 
     # Override config for testing purposes

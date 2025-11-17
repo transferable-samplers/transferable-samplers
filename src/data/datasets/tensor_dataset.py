@@ -17,6 +17,6 @@ class TensorDataset(torch.utils.data.Dataset):
             sample = self.transform(
                 {
                     "x": x,
-                }
+                },
             )
         return sample

@@ -5,8 +5,8 @@ max_num_tokens: ${data.num_atoms}
 num_blocks: 8
 layers_per_block: 8
 permutation_keys:
-- "n2c_residue-by-residue_standard"
-- "n2c_residue-by-residue_standard_flip"
+  - "n2c_residue-by-residue_standard"
+  - "n2c_residue-by-residue_standard_flip"
 cond_embed:
   _target_: src.models.neural_networks.embedder.ConditionalEmbedder
   hidden_dim: ${model.net.channels}

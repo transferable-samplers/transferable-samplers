@@ -1,4 +1,4 @@
-This project contains adaptations of third-party code under licenses other than MIT.  
+This project contains adaptations of third-party code under licenses other than MIT.
 The affected files are listed below with references to their sources and licenses.
 
 - src/data/preprocessing/tica.py

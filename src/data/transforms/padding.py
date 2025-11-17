@@ -20,7 +20,9 @@ class PaddingTransform(torch.nn.Module):
         self.max_num_atoms = max_num_atoms
 
     def create_permutation_mask(
-        self, permutations: dict[str, torch.Tensor], padded_seq_len: int
+        self,
+        permutations: dict[str, torch.Tensor],
+        padded_seq_len: int,
     ) -> dict[str, torch.Tensor]:
         num_tokens = next(iter(permutations.values())).shape[0]
         assert all(len(v) == num_tokens for v in permutations.values()), "All permutations must have same length"
@@ -40,7 +42,7 @@ class PaddingTransform(torch.nn.Module):
         for key, value in encodings.items():
             if not key == "seq_len":  # don't pad seq_len - is single value per sample
                 padded_encodings[key] = torch.cat(
-                    [value, torch.zeros(self.max_num_atoms - value.shape[0], dtype=torch.int64)]
+                    [value, torch.zeros(self.max_num_atoms - value.shape[0], dtype=torch.int64)],
                 )
             else:
                 padded_encodings[key] = value

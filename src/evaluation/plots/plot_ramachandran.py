@@ -36,7 +36,7 @@ def plot_ramachandran(log_image_fn, samples, topology, prefix: str = ""):
                 np.exp(-4.0) * h.max(),
                 np.exp(-2) * h.max(),
                 h.max(),
-            ]
+            ],
         )
         ax.set_xlabel(r"$\varphi$", fontsize=45)
         # ax.set_title("Boltzmann Generator", fontsize=45)

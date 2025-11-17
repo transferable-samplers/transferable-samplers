@@ -191,7 +191,13 @@ class MultiHeadAttentionADALN(nn.Module):
         # TODO I think in long run we should factor out the condiioning from the mhd
         # could just have an "AdditiveConditioningAttentionBlock" module that adds the conditioning
         x = self.mha(
-            x, cond=None, pair=pair, mask=mask, attn_mask=attn_mask, attn_temp=attn_temp, which_cache=which_cache
+            x,
+            cond=None,
+            pair=pair,
+            mask=mask,
+            attn_mask=attn_mask,
+            attn_temp=attn_temp,
+            which_cache=which_cache,
         )
         x = self.scale_output(x, cond, mask)
         return x * mask[..., None]  # [b, n, channels]
@@ -235,9 +241,9 @@ class AdaptiveAttnAndTransition(torch.nn.Module):
         residual_mha: Whether to use a residual connection in the mha layer.
         residual_transition: Whether to use a residual connection in the transition layer.
         parallel_mha_transition: Whether to run mha and transition in parallel or sequentially.
-        use_attn_pair_bias: Whether to use a pair represnetation to bias attention.
+        use_attn_pair_bias: Whether to use a pair representation to bias attention.
         use_qkln: Whether to use layer norm on keyus and queries for attention.
-        dropout: droput use in the self-attention layer.
+        dropout: dropout use in the self-attention layer.
     """
 
     def __init__(
@@ -273,7 +279,13 @@ class AdaptiveAttnAndTransition(torch.nn.Module):
 
     def _apply_mha(self, x, cond, mask, pair=None, attn_mask=None, attn_temp: float = 1.0, which_cache: str = "cond"):
         x_attn = self.mha(
-            x, cond=cond, pair=pair, mask=mask, attn_mask=attn_mask, attn_temp=attn_temp, which_cache=which_cache
+            x,
+            cond=cond,
+            pair=pair,
+            mask=mask,
+            attn_mask=attn_mask,
+            attn_temp=attn_temp,
+            which_cache=which_cache,
         )
         if self.residual_mha:
             x_attn = x_attn + x
@@ -300,7 +312,13 @@ class AdaptiveAttnAndTransition(torch.nn.Module):
 
         x = x * mask[..., None]
         x = self._apply_mha(
-            x, cond=cond, pair=pair, mask=mask, attn_mask=attn_mask, attn_temp=attn_temp, which_cache=which_cache
+            x,
+            cond=cond,
+            pair=pair,
+            mask=mask,
+            attn_mask=attn_mask,
+            attn_temp=attn_temp,
+            which_cache=which_cache,
         )
         if self.use_transition:
             x = self._apply_transition(x, cond, mask)

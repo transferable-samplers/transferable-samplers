@@ -15,7 +15,7 @@ model:
     num_test_proposal_samples: 10_000
     num_smc_samples: 10_000
     clip_reweighting_logits: 0.002 # it was working well on AC without - lets try avoid
-    
+
   smc_sampler:
     _target_: src.models.samplers.mala_sampler.SMCSamplerMALA
     enabled: True
@@ -29,7 +29,7 @@ model:
     input_energy_cutoff: 100 # this might need tuning if you get NaNs!
     do_energy_plots: True
     log_freq: 1
-    
+
   ema_decay: 0.0
 
 data:

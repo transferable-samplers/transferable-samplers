@@ -175,14 +175,20 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         prior_samples = []
         for _ in tqdm(range(total_size // batch_size)):
             s, lp, ps = self.generate_samples(
-                batch_size, permutations=permutations, encodings=encodings, dummy_ll=dummy_ll
+                batch_size,
+                permutations=permutations,
+                encodings=encodings,
+                dummy_ll=dummy_ll,
             )
             samples.append(s)
             log_ps.append(lp)
             prior_samples.append(ps)
         if total_size % batch_size > 0:
             s, lp, ps = self.generate_samples(
-                total_size % batch_size, permutations=permutations, encodings=encodings, dummy_ll=dummy_ll
+                total_size % batch_size,
+                permutations=permutations,
+                encodings=encodings,
+                dummy_ll=dummy_ll,
             )
             samples.append(s)
             log_ps.append(lp)
@@ -193,7 +199,10 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         return samples, log_ps, prior_samples
 
     def generate_samples(
-        self, batch_size: int, encodings: Optional[dict[str, torch.Tensor]] = None, n_timesteps: int = None
+        self,
+        batch_size: int,
+        encodings: Optional[dict[str, torch.Tensor]] = None,
+        n_timesteps: int = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Generate samples from the model.
 
@@ -285,7 +294,8 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         return metrics
 
     def detach_and_cpu(
-        self, obj
+        self,
+        obj,
     ):  # TODO hack to have this here? at all? you could just be more careful to detach / cpu?
         """
         Recursively detach and move all tensors to CPU within a nested structure.
@@ -308,7 +318,8 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         for sequence in eval_sequences:
             # TODO: single peptides expects prefix as input while transferable expects sequence as input
             true_samples, permutations, encodings, energy_fn, tica_model = self.datamodule.prepare_eval(
-                prefix=prefix, sequence=sequence
+                prefix=prefix,
+                sequence=sequence,
             )
             logging.info(f"Evaluating {sequence} samples")
             metrics.update(
@@ -321,7 +332,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
                     tica_model,
                     prefix=f"{prefix}/{sequence}",
                     proposal_generator=self.batched_generate_samples,
-                )
+                ),
             )
 
         # Aggregate metrics across all sequences
@@ -375,7 +386,9 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
             torch.cuda.synchronize()
             start_time = time.time()
             proposal_samples, proposal_log_q, prior_samples = proposal_generator(
-                num_proposal_samples, permutations, encodings
+                num_proposal_samples,
+                permutations,
+                encodings,
             )
             torch.cuda.synchronize()
             time_duration = time.time() - start_time
@@ -385,7 +398,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
                     f"{prefix}/samples_walltime": time_duration,
                     f"{prefix}/samples_per_second": len(proposal_samples) / time_duration,
                     f"{prefix}/seconds_per_sample": time_duration / len(proposal_samples),
-                }
+                },
             )
 
             # Save samples to disk
@@ -398,11 +411,12 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
                 os.makedirs(f"{self.output_dir}/{prefix}", exist_ok=True)
                 if self.hparams.sampling_config.get("subset_idx") is not None:
                     torch.save(
-                        samples_dict, f"{self.output_dir}/{prefix}/samples_{self.hparams.sampling_config.subset_idx}.pt"
+                        samples_dict,
+                        f"{self.output_dir}/{prefix}/samples_{self.hparams.sampling_config.subset_idx}.pt",
                     )
                     logging.info(
                         f"Saving {len(proposal_samples)} samples to {self.output_dir} "
-                        "/{prefix}/samples_{self.hparams.sampling_config.subset_idx}.pt"
+                        "/{prefix}/samples_{self.hparams.sampling_config.subset_idx}.pt",
                     )
                     return {}  # early return if subset_idx is set - need to post-process these samples in notebook
                 else:
@@ -468,7 +482,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
             {
                 f"{prefix}/proposal/correct_symmetry_rate": correct_symmetry_rate,
                 f"{prefix}/proposal/uncorrectable_symmetry_rate": uncorrectable_symmetry_rate,
-            }
+            },
         )
 
         # Datatype for easier metrics and plotting
@@ -532,7 +546,9 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
             # TODO: Make conditional proposal energy
             cond_proposal_energy = lambda _x: self.proposal_energy(_x, permutations=permutations, encodings=encodings)
             smc_samples, smc_logits = self.smc_sampler.sample(
-                proposal_samples[:num_smc_samples], cond_proposal_energy, energy_fn
+                proposal_samples[:num_smc_samples],
+                cond_proposal_energy,
+                energy_fn,
             )  # already returned resampled
             torch.cuda.synchronize()
             time_duration = time.time() - start_time
@@ -571,7 +587,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
                     smc_data,
                     tica_model,
                     prefix=prefix,
-                )
+                ),
             )
         else:
             metrics = {}
@@ -589,7 +605,10 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         _, permutations, eval_encoding, energy_fn, _ = self.datamodule.prepare_eval(self.datamodule.test_sequences[0])
 
         proposal_samples, proposal_log_p, _ = self.batched_generate_samples(
-            num_proposal_samples, permutations=permutations, encodings=eval_encoding, log_invert_error=False
+            num_proposal_samples,
+            permutations=permutations,
+            encodings=eval_encoding,
+            log_invert_error=False,
         )
 
         # Compute energy
@@ -651,7 +670,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         if self.hparams.get("self_improve", False):
             logging.info(
                 f"Generating {self.hparams.sampling_config.num_self_improve_proposal_samples} Samples"
-                " for self-consumption"
+                " for self-consumption",
             )
             self.net.eval()
 

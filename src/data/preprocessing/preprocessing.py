@@ -11,7 +11,9 @@ from src.data.preprocessing.permutations import get_permutations_dict
 
 
 def prepare_and_cache_pdb_dict(
-    pdb_paths: list[str], cache_path: str, delimiter: str = "-"
+    pdb_paths: list[str],
+    cache_path: str,
+    delimiter: str = "-",
 ) -> dict[str, openmm.app.PDBFile]:
     if os.path.isfile(cache_path):
         logging.info(f"Loading cached PDB dict from {cache_path}")

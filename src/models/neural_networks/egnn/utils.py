@@ -209,7 +209,9 @@ def compute_chirality_sign(coords: torch.Tensor, chirality_centers: torch.Tensor
 
 
 def check_symmetry_change(
-    coords: torch.Tensor, chirality_centers: torch.Tensor, reference_signs: torch.Tensor
+    coords: torch.Tensor,
+    chirality_centers: torch.Tensor,
+    reference_signs: torch.Tensor,
 ) -> torch.Tensor:
     """
     Check for a batch if the chirality changed wrt to some reference reference_signs.

@@ -259,8 +259,8 @@ class SMCSampler(torch.nn.Module):
                     [
                         self.linear_energy_interpolation(source_energy, target_energy, timesteps[0], X_batches[i]).cpu()
                         for i in range(len(X_batches))
-                    ]
-                )
+                    ],
+                ),
             ]
 
         t_previous = 0.0
@@ -283,7 +283,12 @@ class SMCSampler(torch.nn.Module):
 
                 # Update coordinates and weights according to mcmc kernel
                 X_batch, A_batch, acceptance_rate = self.mcmc_kernel(
-                    source_energy=source_energy, target_energy=target_energy, t=t, x=X_batch, logw=A_batch, dt=dt
+                    source_energy=source_energy,
+                    target_energy=target_energy,
+                    t=t,
+                    x=X_batch,
+                    logw=A_batch,
+                    dt=dt,
                 )
 
                 # apply the updates to the batch in the list
@@ -293,7 +298,7 @@ class SMCSampler(torch.nn.Module):
                 if self.do_energy_plots:
                     target_energy_batches.append(target_energy(X_batch).cpu())
                     interpolation_energy_batches.append(
-                        self.linear_energy_interpolation(source_energy, target_energy, t, X_batch).cpu()
+                        self.linear_energy_interpolation(source_energy, target_energy, t, X_batch).cpu(),
                     )
 
                 batch_acceptance_rate_list.append(acceptance_rate.view(-1))
@@ -368,8 +373,8 @@ class SMCSampler(torch.nn.Module):
                             [
                                 self.linear_energy_interpolation(source_energy, target_energy, t + 1e-9, X_batch).cpu()
                                 for X_batch in X_batches
-                            ]
-                        )
+                            ],
+                        ),
                     )
 
             t_previous = t

@@ -17,7 +17,7 @@ class SinusoidalEmbedding(nn.Module):
         # TODO fix docstring
         position = data.float().unsqueeze(-1)  # Shape: [..., 1]
         div_term = torch.exp(
-            torch.arange(0, self.embed_size, 2, device=data.device) * -(math.log(self.div_value) / self.embed_size)
+            torch.arange(0, self.embed_size, 2, device=data.device) * -(math.log(self.div_value) / self.embed_size),
         )  # Shape: [embed_size // 2]
         sinusoid_inp = position * div_term  # Shape: [..., embed_size // 2]
         pos_embedding = torch.zeros(*sinusoid_inp.shape[:-1], self.embed_size, device=data.device)
@@ -50,7 +50,9 @@ class ConditionalEmbedder(nn.Module):
             self.time_embed = SinusoidalEmbedding(embed_size=hidden_dim, div_value=10_000)  # always 10000 for time
         self.embed_time = embed_time
         self.mlp = nn.Sequential(
-            nn.Linear(5 if embed_time else 4 * hidden_dim, hidden_dim), nn.GELU(), nn.Linear(hidden_dim, output_dim)
+            nn.Linear(5 if embed_time else 4 * hidden_dim, hidden_dim),
+            nn.GELU(),
+            nn.Linear(hidden_dim, output_dim),
         )
 
     def forward(self, atom_type, aa_type, aa_pos, seq_len, t=None, mask=None):
@@ -64,7 +66,7 @@ class ConditionalEmbedder(nn.Module):
         residue_emb = self.residue_embed(aa_type)
         pos_embed = self.residue_pos_embed(aa_pos)
 
-        # t / seq_len is of shape [b, 1], once embeded it will be [b, 1, channels]
+        # t / seq_len is of shape [b, 1], once embedded it will be [b, 1, channels]
         # so we expand it to [b, n, channels] to be concatenated with the other embeddings
         num_tokens = atom_type.shape[1]
         if self.embed_time:

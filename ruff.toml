@@ -32,29 +32,51 @@ exclude = [
 line-length = 120
 indent-width = 4
 
-# Assume Python 3.9
+# Assume Python 3.9+
 target-version = "py39"
 
+# ----------------------------------------
+# Linting configuration
+# ----------------------------------------
 [lint]
 select = [
-  "E",      # pycodestyle (style errors)
-  "F",      # Pyflakes (logic issues like unused vars/imports)
-  # "B",      # flake8-bugbear (common bugs)
-  "I",      # isort (import sorting)
-  "UP",     # pyupgrade (use modern Python features)
-  # "C90",    # mccabe (cyclomatic complexity)
-  "S",      # bandit (security issues)
-  # "N",      # pep8-naming (PEP8 naming conventions)
-]
-ignore = ["E731", "S101"]
+    # Core flake8
+    "E",      # pycodestyle errors
+    "F",      # pyflakes (logical issues)
+    "W",      # pycodestyle warnings
 
-# Allow fix for all enabled rules (when `--fix`) is provided.
+    # Additional useful plugins
+    "B",      # flake8-bugbear (common bugs, recommended)
+    "I",      # isort (import sorting)
+    "UP",     # pyupgrade (modern Python syntax)
+    "N",      # pep8-naming
+    "C90",    # mccabe complexity
+    "S",      # bandit (security rules)
+
+    # Ruff-native rules
+    "COM",    # flake8-commas
+    "ISC",    # implicit string concatenation
+    "PT",     # pytest style
+    "PTH",    # pathlib usage recommendations
+    "T10",    # debugger detection (replaces debug-statements hook)
+]
+
+ignore = [
+    "E203",  # whitespace before ':', black compatibility
+    "E731",  # assigning a lambda to a variable (stylistic preference)
+    "S101",  # use of assert (allowed in your code)
+]
+
+# Allow fix for all enabled rules (when `--fix` is passed).
 fixable = ["ALL"]
 unfixable = []
 
-# Allow unused variables when underscore-prefixed.
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+# Allow unused variables if underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+))$"
 
+# ----------------------------------------
+# Formatting (Black-compatible)
+# ----------------------------------------
 [format]
 # Like Black, use double quotes for strings.
 quote-style = "double"

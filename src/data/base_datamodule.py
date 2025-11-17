@@ -67,7 +67,9 @@ class BaseDataModule(LightningDataModule):
 
         if is_iterable:
             data_loader = wds.WebLoader(
-                self.data_train, batch_size=self.batch_size_per_device, num_workers=self.hparams.num_workers
+                self.data_train,
+                batch_size=self.batch_size_per_device,
+                num_workers=self.hparams.num_workers,
             )
 
             # Define epoch length (can be overridden by Lightning's `limit_train_batches`)
@@ -234,7 +236,7 @@ class BaseDataModule(LightningDataModule):
                     num_eval_samples=self.hparams.num_eval_samples,
                     prefix=prefix + name,
                     compute_distribution_distances=False,
-                )
+                ),
             )
             if do_plots:
                 plot_ramachandran(log_image_fn, data.samples, self.topology_dict[sequence], prefix=prefix + name)

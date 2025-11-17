@@ -84,7 +84,7 @@ class SinglePeptideDataModule(BaseDataModule):
             if self.hparams.batch_size % self.trainer.world_size != 0:
                 raise RuntimeError(
                     f"Batch size ({self.hparams.batch_size}) is not divisible by the number "
-                    "of devices ({self.trainer.world_size})."
+                    "of devices ({self.trainer.world_size}).",
                 )
             self.batch_size_per_device = self.hparams.batch_size // self.trainer.world_size
         else:

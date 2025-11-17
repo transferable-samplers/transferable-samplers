@@ -16,7 +16,7 @@ def load_yaml_as_dict(path: str | Path) -> dict:
 
 def standardize_atom_name(atom_name: str, aa_name: str) -> str:
     if atom_name[0] == "H" and atom_name[-1] in ("1", "2", "3"):
-        # For these AA the H-X-N atoms are not interchangable
+        # For these AA the H-X-N atoms are not interchangeable
         if aa_name in ("HIS", "HIE", "PHE", "TRP", "TYR") and atom_name[:2] in (
             "HE",
             "HD",
@@ -27,7 +27,7 @@ def standardize_atom_name(atom_name: str, aa_name: str) -> str:
         else:
             atom_name = atom_name[:-1]
 
-    # Standarize side-chain O atom encodings
+    # Standardize side-chain O atom encodings
     if atom_name[:2] == "OE" or atom_name[:2] == "OD":
         atom_name = atom_name[:-1]
 
@@ -35,7 +35,12 @@ def standardize_atom_name(atom_name: str, aa_name: str) -> str:
 
 
 def get_permutation(
-    permutations_definition_dict, topology, sequence_ordering, global_type, sidechain_variant, residue_cache=None
+    permutations_definition_dict,
+    topology,
+    sequence_ordering,
+    global_type,
+    sidechain_variant,
+    residue_cache=None,
 ):
     # Validate input strategy options
     if sequence_ordering not in ["n2c", "c2n"]:
@@ -65,7 +70,7 @@ def get_permutation(
 
     # Iterate through each residue to build permutations
     for i, residue in enumerate(residue_list):
-        # Get standarized residue name with terminal labels for cache
+        # Get standardized residue name with terminal labels for cache
         residue_name = residue.name if residue.name != "HIS" else "HIE"  # Timewarp data has HIE labelled as HIS
         assert residue_name in permutations_definition_dict["sidechain"], (
             f"Residue {residue_name} not found in sidechain definitions"
@@ -86,7 +91,7 @@ def get_permutation(
                 # Assertion to check consistent residue definition
                 raise AssertionError(
                     f"Inconsistent atom name order for {residue_name_with_terminals}.\n"
-                    f"Expected: {cached['input_atom_ordering']}\nFound:    {input_atom_ordering}"
+                    f"Expected: {cached['input_atom_ordering']}\nFound:    {input_atom_ordering}",
                 )
             # Add to per-residue list from cache
             before_sidechain_permutations.append(cached["before_sidechain"] + first_atom_index)
@@ -173,7 +178,7 @@ def get_permutation(
                         if atom_index.item() not in hydrogen_indices
                     ],
                     dtype=torch.long,
-                )
+                ),
             )
             # store the hydrogen indices separately
             before_sidechain_hydrogen_permutations.append(
@@ -184,7 +189,7 @@ def get_permutation(
                         if atom_index.item() in hydrogen_indices
                     ],
                     dtype=torch.long,
-                )
+                ),
             )
             after_sidechain_hydrogen_permutations.append(
                 torch.tensor(
@@ -194,10 +199,10 @@ def get_permutation(
                         if atom_index.item() in hydrogen_indices
                     ],
                     dtype=torch.long,
-                )
+                ),
             )
         for i in range(
-            topology.n_residues
+            topology.n_residues,
         ):  # Loop through residues again - taking backbone hydrogens and sidechain atoms
             # add backbone hydrogens + sidechain atoms
             permutation.append(before_sidechain_hydrogen_permutations[i])
@@ -250,7 +255,8 @@ def get_permutations_dict(topology_dict):
                 )
                 permutations_dict[sequence][key] = permutation
                 permutations_dict[sequence][key + "_flip"] = torch.flip(
-                    permutation, dims=[0]
+                    permutation,
+                    dims=[0],
                 )  # Also add flipped version of the permutation
 
                 pbar.update(1)

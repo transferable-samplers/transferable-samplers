@@ -85,16 +85,24 @@ class OpenMMBridge(_Bridge):
         self._openmm_integrator = openmm_integrator
         if platform_name in ["CUDA", "OpenCL"] or n_workers == 1:
             self.context_wrapper = SingleContext(
-                1, openmm_system, openmm_integrator, platform_name, platform_properties
+                1,
+                openmm_system,
+                openmm_integrator,
+                platform_name,
+                platform_properties,
             )
         else:
             self.context_wrapper = MultiContext(
-                n_workers, openmm_system, openmm_integrator, platform_name, platform_properties
+                n_workers,
+                openmm_system,
+                openmm_integrator,
+                platform_name,
+                platform_properties,
             )
         self._err_handling = err_handling
         self._n_simulation_steps = n_simulation_steps
         self._unit_reciprocal = 1 / (openmm_integrator.getTemperature() * unit.MOLAR_GAS_CONSTANT_R).value_in_unit(
-            unit.kilojoule_per_mole
+            unit.kilojoule_per_mole,
         )
         super().__init__()
 
@@ -321,7 +329,7 @@ class MultiContext:
                         evaluate_path_probability_ratio,
                         err_handling,
                         n_simulation_steps,
-                    ]
+                    ],
                 )
             results = [self._result_queue.get() for _ in positions]
         except Exception as e:
@@ -397,7 +405,10 @@ class MultiContext:
             # see also https://github.com/openmm/openmm/issues/2602
             openmm_platform = Platform.getPlatformByName(self._openmm_platform_name)
             self._openmm_context = Context(
-                self._openmm_system, self._openmm_integrator, openmm_platform, self._openmm_platform_properties
+                self._openmm_system,
+                self._openmm_integrator,
+                openmm_platform,
+                self._openmm_platform_properties,
             )
             self._openmm_context.reinitialize(preserveState=True)
 
@@ -423,7 +434,9 @@ class MultiContext:
 
                     # compute energy and forces
                     state = self._openmm_context.getState(
-                        getEnergy=evaluate_energy, getForces=evaluate_force, getPositions=evaluate_positions
+                        getEnergy=evaluate_energy,
+                        getForces=evaluate_force,
+                        getPositions=evaluate_positions,
                     )
                     energy = (
                         state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole) if evaluate_energy else None
@@ -539,7 +552,9 @@ class SingleContext:
 
                 # compute energy and forces
                 state = self._openmm_context.getState(
-                    getEnergy=evaluate_energy, getForces=evaluate_force, getPositions=evaluate_positions
+                    getEnergy=evaluate_energy,
+                    getForces=evaluate_force,
+                    getPositions=evaluate_positions,
                 )
                 energy = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole) if evaluate_energy else None
                 force = (

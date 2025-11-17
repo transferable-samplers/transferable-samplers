@@ -110,7 +110,7 @@ def get_metric_value(metric_dict: dict[str, Any], metric_name: Optional[str]) ->
         raise Exception(
             f"Metric value not found! <metric_name={metric_name}>\n"
             "Make sure metric name logged in LightningModule is correct!\n"
-            "Make sure `optimized_metric` name in `hparams_search` config is correct!"
+            "Make sure `optimized_metric` name in `hparams_search` config is correct!",
         )
 
     metric_value = metric_dict[metric_name].item()

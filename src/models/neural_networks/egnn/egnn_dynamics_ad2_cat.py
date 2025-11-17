@@ -138,7 +138,8 @@ class EGNN_dynamics_AD2_cat(nn.Module):
                 atom_types.append(atom_name.name)
         atom_types_dict = np.array([self.atom_types_encodings[atom_type] for atom_type in atom_types])
         atom_onehot = torch.nn.functional.one_hot(
-            torch.tensor(atom_types_dict), num_classes=len(self.atom_types_encodings)
+            torch.tensor(atom_types_dict),
+            num_classes=len(self.atom_types_encodings),
         )
         if self._n_particles == 53:
             num_classes = 5

@@ -41,7 +41,7 @@ def evaluate_peptide_data(
         metrics[f"{prefix}/effective_sample_size"] = ess
 
     if compute_distribution_distances:  # this is expensive - sometimes we don't want to compute it
-        # Distribtuion distance metrics
+        # Distribution distance metrics
         metrics.update(distribution_distances(true_data.samples, pred_data.samples, prefix=prefix))
         logging.info("Distance metrics computed")
 
@@ -51,7 +51,7 @@ def evaluate_peptide_data(
             true_data.energy,
             pred_data.energy,
             prefix=prefix,
-        )
+        ),
     )
     metrics[f"{prefix}/mean_energy"] = pred_data.energy.mean().cpu()
     metrics[f"{prefix}/median_energy"] = pred_data.energy.median().cpu()

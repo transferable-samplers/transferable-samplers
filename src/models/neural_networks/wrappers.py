@@ -87,7 +87,8 @@ class TorchdynWrapper(torch.nn.Module):
         else:
             dx = self.model(t, x)
             dlog_p = -torch.vmap(self.div_fn, in_dims=(None, 0), randomness="different")(
-                torch.tensor([t], device=x.device), x
+                torch.tensor([t], device=x.device),
+                x,
             )
 
         self.nfe += 1

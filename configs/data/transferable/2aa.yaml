@@ -1,7 +1,7 @@
 _target_: src.data.transferable_peptide_datamodule.TransferablePeptideDataModule
 data_dir: ${paths.data_dir}
 num_dimensions: 3
-num_atoms: 51 
+num_atoms: 51
 num_aa_min: 2
 num_aa_max: 2
 precomputed_std: 0.21
@@ -9,44 +9,44 @@ batch_size: 512 # Needs to be divisible by the number of devices (e.g., if in a 
 num_workers: 2
 pin_memory: False
 val_sequences:
-- AL
-- EC
-- FT
-- GQ
-- HV
-- ND
-- PF
-- RS
-- WI
-- WY
+  - AL
+  - EC
+  - FT
+  - GQ
+  - HV
+  - ND
+  - PF
+  - RS
+  - WI
+  - WY
 test_sequences:
-- AA
-- CE
-- CL
-- DG
-- DI
-- FK
-- HL
-- HM
-- IK
-- IM
-- KG
-- LE
-- MQ
-- NA
-- NC
-- PG
-- PY
-- QR
-- RL
-- RT
-- SS
-- TD
-- VF
-- VS
-- WA
-- WH
-- WQ
-- WS
-- YC
-- YQ
+  - AA
+  - CE
+  - CL
+  - DG
+  - DI
+  - FK
+  - HL
+  - HM
+  - IK
+  - IM
+  - KG
+  - LE
+  - MQ
+  - NA
+  - NC
+  - PG
+  - PY
+  - QR
+  - RL
+  - RT
+  - SS
+  - TD
+  - VF
+  - VS
+  - WA
+  - WH
+  - WQ
+  - WS
+  - YC
+  - YQ

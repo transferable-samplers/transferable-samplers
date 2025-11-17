@@ -206,7 +206,7 @@ class MetaBlock(torch.nn.Module):
         else:
             self.class_embed = None
         self.attn_blocks = torch.nn.ModuleList(
-            [AttentionBlock(channels, head_dim, expansion, dropout=dropout) for _ in range(num_layers)]
+            [AttentionBlock(channels, head_dim, expansion, dropout=dropout) for _ in range(num_layers)],
         )
         self.nvp = nvp
         output_dim = in_channels * 2 if nvp else in_channels
@@ -355,7 +355,7 @@ class TarFlow(torch.nn.Module):
                     nvp=nvp,
                     num_classes=num_classes,
                     dropout=dropout,
-                )
+                ),
             )
         self.blocks = torch.nn.ModuleList(blocks)
         self.in_channels = in_channels
@@ -364,7 +364,11 @@ class TarFlow(torch.nn.Module):
             assert not self.img_size % self.in_channels
 
     def forward(
-        self, x: torch.Tensor, y: torch.Tensor | None = None, *args, **kwargs
+        self,
+        x: torch.Tensor,
+        y: torch.Tensor | None = None,
+        *args,
+        **kwargs,
     ) -> tuple[torch.Tensor, list[torch.Tensor], torch.Tensor]:
         original_channels = x.shape[-1]
         if self.in_channels != original_channels:

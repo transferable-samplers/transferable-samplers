@@ -75,7 +75,7 @@ def _parse_dim(dim):
             "dim must be either:"
             "\n\t- an integer"
             "\n\t- a non-empty list of integers"
-            "\n\t- a list with len > 1 containing non-empty lists containing integers"
+            "\n\t- a list with len > 1 containing non-empty lists containing integers",
         )
 
 
@@ -130,7 +130,7 @@ class Energy(torch.nn.Module):
             raise ValueError(
                 "This energy instance is defined for multiple events."
                 "Therefore there exists no coherent way to define the dimension of an event."
-                "Consider using Energy.event_shapes instead."
+                "Consider using Energy.event_shapes instead.",
             )
         elif len(self._event_shapes[0]) > 1:
             warnings.warn(
@@ -147,7 +147,7 @@ class Energy(torch.nn.Module):
             raise ValueError(
                 "This energy instance is defined for multiple events."
                 "Therefore therefore there exists no single event shape."
-                "Consider using Energy.event_shapes instead."
+                "Consider using Energy.event_shapes instead.",
             )
         return self._event_shapes[0]
 
@@ -280,7 +280,12 @@ class _Bridge:
         self.last_forces = None
 
     def evaluate(
-        self, positions: torch.Tensor, *args, evaluate_force: bool = True, evaluate_energy: bool = True, **kwargs
+        self,
+        positions: torch.Tensor,
+        *args,
+        evaluate_force: bool = True,
+        evaluate_energy: bool = True,
+        **kwargs,
     ):
         shape = positions.shape
         assert shape[-2:] == (self.n_atoms, 3) or shape[-1] == self.n_atoms * 3
@@ -294,7 +299,11 @@ class _Bridge:
 
         for i, pos in enumerate(position_batch):
             energy_batch[i], force_batch[i] = self._evaluate_single(
-                pos, *args, evaluate_energy=evaluate_energy, evaluate_force=evaluate_force, **kwargs
+                pos,
+                *args,
+                evaluate_energy=evaluate_energy,
+                evaluate_force=evaluate_force,
+                **kwargs,
             )
 
         energies = torch.tensor(energy_batch.reshape(*energy_shape)).to(positions)

@@ -193,7 +193,7 @@ def get_adj_list(topology):
         np.array(
             [(b.atom1.index, b.atom2.index) for b in topology.bonds],
             dtype=np.int32,
-        )
+        ),
     )
     return adj_list
 
