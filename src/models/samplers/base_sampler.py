@@ -67,7 +67,7 @@ class SMCSampler(torch.nn.Module):
         energy = (1 - t) * E_source + t * E_target
         return energy
 
-    def linear_energy_interpolation_gradients(self, source_energy, target_energy, t, x):
+    def linear_energy_interpolation_gradients(self, source_energy, target_energy, t, x, return_t_grad=False):
         t = t.repeat(x.shape[0]).to(x)
 
         with torch.set_grad_enabled(True):
@@ -82,12 +82,19 @@ class SMCSampler(torch.nn.Module):
             # the energy function is defined properly and
             # doesn't mix batch items
 
-            x_grad = torch.autograd.grad(et.sum(), x)[0]
-
-            assert x_grad.shape == x.shape, "x_grad should have the same shape as x"
+            if return_t_grad:
+                t_grad, x_grad = torch.autograd.grad(et.sum(), (t, x))
+                assert x_grad.shape == x.shape, "x_grad should have the same shape as x"
+                assert t_grad.shape == t.shape, "t_grad should have the same shape as t"
+            else:
+                x_grad = torch.autograd.grad(et.sum(), x)[0]
+                assert x_grad.shape == x.shape, "x_grad should have the same shape as x"
 
         assert x_grad is not None, "x_grad should not be None"
 
+        if return_t_grad:
+            assert t_grad is not None, "t_grad should not be None"
+            return x_grad.detach(), t_grad.detach()
         return x_grad.detach()
 
     def plot_stepwise_energy(self, target_energy_list, interpolation_energy_list, t_list):
