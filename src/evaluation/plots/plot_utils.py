@@ -1,7 +1,6 @@
 """Shared utility functions for plotting."""
 
 import matplotlib
-import matplotlib.pyplot as plt
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
