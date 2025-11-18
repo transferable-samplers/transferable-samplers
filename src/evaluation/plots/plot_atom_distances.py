@@ -6,6 +6,8 @@ import numpy as np
 import torch
 from lightning.pytorch.loggers import WandbLogger
 
+from src.evaluation.plots.plot_utils import plot_histogram_comparison
+
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
 
@@ -63,49 +65,15 @@ def plot_atom_distances(
     fig.patch.set_facecolor("white")
     bin_edges = np.linspace(min_dist, max_dist, 100)
 
-    ax.hist(
-        true_samples_dist,
-        bins=bin_edges,
-        density=True,
-        alpha=0.4,
-        color="g",
-        histtype="step",
-        linewidth=3,
-        label="True data",
-    )
-    if proposal_samples is not None:
-        ax.hist(
-            proposal_samples_dist,
-            bins=bin_edges,
-            density=True,
-            alpha=0.4,
-            color="r",
-            histtype="step",
-            linewidth=3,
-            label="Proposal",
-        )
-    if resampled_samples is not None:
-        ax.hist(
-            resampled_samples_dist,
-            bins=bin_edges,
-            density=True,
-            alpha=0.4,
-            histtype="step",
-            linewidth=3,
-            color="b",
-            label="Proposal (reweighted)",
-        )
-    if smc_samples is not None:
-        ax.hist(
-            smc_samples_dist,
-            bins=bin_edges,
-            density=True,
-            alpha=0.4,
-            histtype="step",
-            linewidth=3,
-            color="orange",
-            label="SMC",
-        )
+    # Prepare data for plotting
+    data_dict = {
+        "true": true_samples_dist,
+        "proposal": proposal_samples_dist if proposal_samples is not None else None,
+        "resampled": resampled_samples_dist if resampled_samples is not None else None,
+        "smc": smc_samples_dist if smc_samples is not None else None,
+    }
+
+    plot_histogram_comparison(ax, data_dict, bin_edges)
 
     if ylim is not None:
         ax.set_ylim(ylim)
