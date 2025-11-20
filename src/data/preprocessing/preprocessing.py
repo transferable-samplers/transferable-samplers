@@ -11,112 +11,82 @@ from src.data.preprocessing.encodings import get_encodings_dict
 from src.data.preprocessing.permutations import get_permutations_dict
 
 
-def prepare_and_cache_pdb_dict(
-    pdb_paths: list[str], cache_path: str, delimiter: str = "-"
-) -> dict[str, openmm.app.PDBFile]:
-    if os.path.isfile(cache_path):
-        logging.info(f"Loading cached PDB dict from {cache_path}")
-        with open(cache_path, "rb") as f:
-            pdb_dict = pickle.load(f)  # noqa:S301
-    else:
-        pdb_dict = {}
-        logging.info(f"Creating pdb dict and caching to {cache_path}")
-        for path in tqdm(pdb_paths, desc="Loading PDBs", total=len(pdb_paths)):
-            pdb = openmm.app.PDBFile(path)
-            assert len(list(pdb.topology.chains())) == 1, "Only single chain PDBs are supported"
-            sequence = os.path.basename(path).split(delimiter)[0]
-            pdb_dict[sequence] = pdb
+def load_preprocessing_cache(cache_path: str) -> tuple[dict, dict, dict, dict]:
+    """
+    Load preprocessing cache from a single pickle file.
 
-        with open(cache_path, "wb") as f:
-            pickle.dump(pdb_dict, f)
+    Args:
+        cache_path: Path to the cache pickle file.
 
-    return pdb_dict
-
-
-def prepare_and_cache_topology_dict(pdb_dict: dict[str, openmm.app.PDBFile], cache_path: str) -> dict[str, md.Topology]:
-    if os.path.isfile(cache_path):
-        logging.info(f"Loading cached topology dict from {cache_path}")
-        with open(cache_path, "rb") as f:
-            topology_dict = pickle.load(f)  # noqa:S301
-    else:
-        logging.info(f"Creating topology dict and caching to {cache_path}")
-        topology_dict = {}
-        for sequence, pdb in tqdm(pdb_dict.items(), desc="Extracting topologies"):
-            topology = md.Topology.from_openmm(pdb.topology)
-            topology_dict[sequence] = topology
-
-        with open(cache_path, "wb") as f:
-            pickle.dump(topology_dict, f)
-
-    return topology_dict
-
-
-def prepare_and_cache_encodings_dict(topology_dict: dict[str, md.Topology], cache_path: str) -> dict[str, dict]:
-    if os.path.isfile(cache_path):
-        logging.info(f"Loading cached encodings dict from {cache_path}")
-        with open(cache_path, "rb") as f:
-            encodings_dict = pickle.load(f)  # noqa:S301
-    else:
-        logging.info(f"Creating encodings dict and caching to {cache_path}")
-        encodings_dict = get_encodings_dict(topology_dict)
-        with open(cache_path, "wb") as f:
-            pickle.dump(encodings_dict, f)
-
-    return encodings_dict
-
-
-def prepare_and_cache_permutations_dict(topology_dict: dict[str, md.Topology], cache_path: str) -> dict[str, dict]:
-    if os.path.isfile(cache_path):
-        logging.info(f"Loading cached permutations dict from {cache_path}")
-        with open(cache_path, "rb") as f:
-            permutations_dict = pickle.load(f)  # noqa:S301
-    else:
-        logging.info(f"Creating permutations dict and caching to {cache_path}")
-        permutations_dict = get_permutations_dict(topology_dict)
-        with open(cache_path, "wb") as f:
-            pickle.dump(permutations_dict, f)
-
-    return permutations_dict
+    Returns:
+        Tuple of (pdb_dict, topology_dict, encodings_dict, permutations_dict).
+    """
+    with open(cache_path, "rb") as f:
+        cache = pickle.load(f)  # noqa: S301
+    
+    return (
+        cache["pdb_dict"],
+        cache["topology_dict"],
+        cache["encodings_dict"],
+        cache["permutations_dict"],
+    )
 
 
 def prepare_preprocessing_cache(
     pdb_paths: list[str],
-    pdb_dict_pkl_path: str,
-    topology_dict_pkl_path: str,
-    encodings_dict_pkl_path: str,
-    permutations_dict_pkl_path: str,
+    cache_path: str,
     delimiter: str = ".",
 ) -> None:
     """
     Prepare and cache preprocessing data (PDB, topology, encodings, and permutations dicts).
 
-    Checks if all preprocessing cache files already exist. If not, prepares and caches
-    PDB dict, topology dict, encodings dict, and permutations dict from the provided PDB files.
+    Checks if preprocessing cache file already exists. If not, prepares and caches
+    all preprocessing dicts (PDB, topology, encodings, permutations) into a single pickle file.
 
     Args:
         pdb_paths: List of paths to PDB files to process.
-        pdb_dict_pkl_path: Path to cache the PDB dict.
-        topology_dict_pkl_path: Path to cache the topology dict.
-        encodings_dict_pkl_path: Path to cache the encodings dict.
-        permutations_dict_pkl_path: Path to cache the permutations dict.
+        cache_path: Path to the cache pickle file.
         delimiter: Delimiter used to extract sequence names from PDB filenames. Defaults to ".".
     """
-    # Check if the preprocessing cache already exists
-    if not all(
-        os.path.exists(p)
-        for p in [
-            pdb_dict_pkl_path,
-            topology_dict_pkl_path,
-            encodings_dict_pkl_path,
-            permutations_dict_pkl_path,
-        ]
-    ):
-        logging.info(f"Preparing and caching PDB, topology, encodings, and permutations dicts for {len(pdb_paths)} files.")
-        
-        # Do data preprocessing here and cache the results - to be loaded by workers later.
-        pdb_dict = prepare_and_cache_pdb_dict(pdb_paths, pdb_dict_pkl_path, delimiter=delimiter)
-        topology_dict = prepare_and_cache_topology_dict(pdb_dict, topology_dict_pkl_path)
-        _ = prepare_and_cache_encodings_dict(topology_dict, encodings_dict_pkl_path)
-        _ = prepare_and_cache_permutations_dict(topology_dict, permutations_dict_pkl_path)
-    else:
-        logging.info("PDB, topology, encodings, permutation dicts already cached")
+    if os.path.exists(cache_path):
+        logging.info(f"Preprocessing cache already exists at {cache_path}")
+        return
+    
+    logging.info(f"Preparing and caching preprocessing data for {len(pdb_paths)} files to {cache_path}")
+    
+    # Create PDB dict
+    pdb_dict = {}
+    logging.info("Loading PDBs...")
+    for path in tqdm(pdb_paths, desc="Loading PDBs", total=len(pdb_paths)):
+        pdb = openmm.app.PDBFile(path)
+        assert len(list(pdb.topology.chains())) == 1, "Only single chain PDBs are supported"
+        sequence = os.path.basename(path).split(delimiter)[0]
+        pdb_dict[sequence] = pdb
+    
+    # Create topology dict
+    logging.info("Extracting topologies...")
+    topology_dict = {}
+    for sequence, pdb in tqdm(pdb_dict.items(), desc="Extracting topologies"):
+        topology = md.Topology.from_openmm(pdb.topology)
+        topology_dict[sequence] = topology
+    
+    # Create encodings dict
+    logging.info("Creating encodings...")
+    encodings_dict = get_encodings_dict(topology_dict)
+    
+    # Create permutations dict
+    logging.info("Creating permutations...")
+    permutations_dict = get_permutations_dict(topology_dict)
+    
+    # Save all dicts to single cache file
+    cache = {
+        "pdb_dict": pdb_dict,
+        "topology_dict": topology_dict,
+        "encodings_dict": encodings_dict,
+        "permutations_dict": permutations_dict,
+    }
+    
+    with open(cache_path, "wb") as f:
+        pickle.dump(cache, f)
+    
+    logging.info(f"Saved preprocessing cache to {cache_path}")
