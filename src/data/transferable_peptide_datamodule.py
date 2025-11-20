@@ -2,7 +2,8 @@ import glob
 import logging
 import os
 import pickle
-from typing import Optional, Union
+from dataclasses import dataclass
+from typing import Callable, Optional, Union
 
 import numpy as np
 import openmm
@@ -25,6 +26,23 @@ from src.data.transforms.padding import PaddingTransform
 from src.data.transforms.rotation import Random3DRotationTransform
 from src.data.transforms.standardize import StandardizeTransform
 from src.utils.huggingface import download_and_extract_pdb_tarfiles, download_evaluation_data
+
+
+@dataclass
+class ModelInputs:
+    """Inputs needed for model inference."""
+    permutations: dict
+    encodings: dict
+
+
+@dataclass
+class EvaluationInputs:
+    """Inputs needed for evaluation metrics."""
+    true_samples: torch.Tensor
+    tica_model: TicaModel
+    topology: object  # mdtraj.Topology
+    num_eval_samples: int
+    do_plots: bool = True
 
 
 class TransferablePeptideDataModule(BaseDataModule):
@@ -293,7 +311,7 @@ class TransferablePeptideDataModule(BaseDataModule):
 
         return potential
 
-    def prepare_eval(self, sequence: str, prefix: str = None):
+    def prepare_eval(self, sequence: str, prefix: str = None) -> tuple[ModelInputs, EvaluationInputs, Callable]:
         """
         Prepare evaluation data and energy function for a given peptide sequence.
 
@@ -301,17 +319,16 @@ class TransferablePeptideDataModule(BaseDataModule):
         applies normalization, retrieves permutations and encodings, and constructs
         the potential energy function. Returns all components required for evaluation.
 
-        Args: sequence (str): Peptide sequence identifier to prepare evaluation data for.
+        Args:
+            sequence (str): Peptide sequence identifier to prepare evaluation data for.
             prefix (str): Unused compatibility argument for integration with
                 SinglePeptideDatamodule.
 
         Returns:
-            tuple: A 5-tuple containing:
-                - true_samples (torch.Tensor): Normalized trajectory samples.
-                - permutations (Any): Permutations associated with the sequence.
-                - encodings (Any): Encodings associated with the sequence.
+            tuple: A 3-tuple containing:
+                - model_inputs (ModelInputs): Permutations and encodings for model.
+                - evaluation_inputs (EvaluationInputs): True samples and TICA model for evaluation.
                 - energy_fn (Callable): Function mapping positions → energy values.
-                - tica_model (TicaModel): Model with TICA projection parameters.
         """
         subsampled_trajectory_npz = np.load(
             os.path.join(self.val_data_path, f"{len(sequence)}AA", f"{sequence}_subsampled.npz")
@@ -332,11 +349,22 @@ class TransferablePeptideDataModule(BaseDataModule):
         if sequence in self.val_sequences:
             permutations = self.val_permutations_dict[sequence]
             encodings = self.val_encodings_dict[sequence]
+            topology = self.val_topology_dict[sequence]
         else:
             permutations = self.test_permutations_dict[sequence]
             encodings = self.test_encodings_dict[sequence]
+            topology = self.test_topology_dict[sequence]
         
         potential = self.setup_potential(sequence)
         energy_fn = lambda x: potential.energy(self.unnormalize(x)).flatten()
 
-        return true_samples, permutations, encodings, energy_fn, tica_model
+        model_inputs = ModelInputs(permutations=permutations, encodings=encodings)
+        evaluation_inputs = EvaluationInputs(
+            true_samples=true_samples,
+            tica_model=tica_model,
+            topology=topology,
+            num_eval_samples=self.hparams.num_eval_samples,
+            do_plots=self.hparams.get("do_plots", True),
+        )
+
+        return model_inputs, evaluation_inputs, energy_fn

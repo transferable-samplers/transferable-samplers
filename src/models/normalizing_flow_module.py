@@ -58,7 +58,8 @@ class NormalizingFlowLitModule(TransferableBoltzmannGeneratorLitModule):
 
             if self.eval_encodings is None:
                 # on first step, we need to prepare the eval encodings
-                _, self.eval_encodings, self.eval_energy = self.datamodule.prepare_eval(self.hparams.eval_sequence)
+                model_inputs, _, self.eval_energy = self.datamodule.prepare_eval(self.hparams.eval_sequence)
+                self.eval_encodings = model_inputs.encodings
 
             samples, log_q_theta, _ = self.generate_samples(
                 self.hparams.energy_kl_batch_size,

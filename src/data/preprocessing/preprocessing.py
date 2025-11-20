@@ -10,28 +10,6 @@ from tqdm import tqdm
 from src.data.preprocessing.encodings import get_encodings_dict
 from src.data.preprocessing.permutations import get_permutations_dict
 
-
-def load_preprocessing_cache(cache_path: str) -> tuple[dict, dict, dict, dict]:
-    """
-    Load preprocessing cache from a single pickle file.
-
-    Args:
-        cache_path: Path to the cache pickle file.
-
-    Returns:
-        Tuple of (pdb_dict, topology_dict, encodings_dict, permutations_dict).
-    """
-    with open(cache_path, "rb") as f:
-        cache = pickle.load(f)  # noqa: S301
-    
-    return (
-        cache["pdb_dict"],
-        cache["topology_dict"],
-        cache["encodings_dict"],
-        cache["permutations_dict"],
-    )
-
-
 def prepare_preprocessing_cache(
     pdb_paths: list[str],
     cache_path: str,
@@ -90,3 +68,24 @@ def prepare_preprocessing_cache(
         pickle.dump(cache, f)
     
     logging.info(f"Saved preprocessing cache to {cache_path}")
+
+
+def load_preprocessing_cache(cache_path: str) -> tuple[dict, dict, dict, dict]:
+    """
+    Load preprocessing cache from a single pickle file.
+
+    Args:
+        cache_path: Path to the cache pickle file.
+
+    Returns:
+        Tuple of (pdb_dict, topology_dict, encodings_dict, permutations_dict).
+    """
+    with open(cache_path, "rb") as f:
+        cache = pickle.load(f)  # noqa: S301
+    
+    return (
+        cache["pdb_dict"],
+        cache["topology_dict"],
+        cache["encodings_dict"],
+        cache["permutations_dict"],
+    )

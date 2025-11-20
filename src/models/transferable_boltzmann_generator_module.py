@@ -15,6 +15,7 @@ from lightning.pytorch.loggers import WandbLogger
 from torchmetrics import MeanMetric
 from tqdm import tqdm
 
+from src.evaluation.metrics_and_plots import metrics_and_plots
 from src.models.neural_networks.ema import EMA
 from src.models.priors import NormalDistribution
 from src.models.samplers.base_sampler import SMCSampler
@@ -307,18 +308,16 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         eval_sequences = self.datamodule.val_sequences if prefix.startswith("val") else self.datamodule.test_sequences
         for sequence in eval_sequences:
             # TODO: single peptides expects prefix as input while transferable expects sequence as input
-            true_samples, permutations, encodings, energy_fn, tica_model = self.datamodule.prepare_eval(
+            model_inputs, evaluation_inputs, energy_fn = self.datamodule.prepare_eval(
                 prefix=prefix, sequence=sequence
             )
             logging.info(f"Evaluating {sequence} samples")
             metrics.update(
                 self.evaluate(
                     sequence,
-                    true_samples,
-                    permutations,
-                    encodings,
+                    evaluation_inputs,
+                    model_inputs,
                     energy_fn,
-                    tica_model,
                     prefix=f"{prefix}/{sequence}",
                     proposal_generator=self.batched_generate_samples,
                 )
@@ -339,24 +338,22 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
     def evaluate(
         self,
         sequence,
-        true_samples,
-        permutations,
-        encodings,
+        evaluation_inputs,
+        model_inputs,
         energy_fn,
-        tica_model=None,
         prefix: str = "val",
         proposal_generator=None,
         output_dir=None,
     ) -> None:
         """Generates samples from the proposal and runs SMC if enabled.
-        Also computes metrics, through the datamodule function "metrics_and_plots".
+        Also computes metrics and plots using the standalone metrics_and_plots function.
         """
 
         metrics = {}
 
         true_data = SamplesData(
-            self.datamodule.unnormalize(true_samples),
-            energy_fn(true_samples),
+            self.datamodule.unnormalize(evaluation_inputs.true_samples),
+            energy_fn(evaluation_inputs.true_samples),
         )
 
         # Define proposal generator
@@ -375,7 +372,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
             torch.cuda.synchronize()
             start_time = time.time()
             proposal_samples, proposal_log_q, prior_samples = proposal_generator(
-                num_proposal_samples, permutations, encodings
+                num_proposal_samples, model_inputs.permutations, model_inputs.encodings
             )
             torch.cuda.synchronize()
             time_duration = time.time() - start_time
@@ -562,14 +559,17 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         if self.local_rank == 0:
             # log dataset metrics
             metrics.update(
-                self.datamodule.metrics_and_plots(
-                    self.log_image,
-                    sequence,
-                    true_data,
-                    proposal_data,
-                    reweighted_data,
-                    smc_data,
-                    tica_model,
+                metrics_and_plots(
+                    log_image_fn=self.log_image,
+                    sequence=sequence,
+                    topology=evaluation_inputs.topology,
+                    tica_model=evaluation_inputs.tica_model,
+                    num_eval_samples=evaluation_inputs.num_eval_samples,
+                    true_data=true_data,
+                    proposal_data=proposal_data,
+                    resampled_data=reweighted_data,
+                    smc_data=smc_data,
+                    do_plots=evaluation_inputs.do_plots,
                     prefix=prefix,
                 )
             )
@@ -586,10 +586,10 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
             num_proposal_samples = self.hparams.sampling_config.num_proposal_samples
 
         # on first step, we need to prepare the eval encoding
-        _, permutations, eval_encoding, energy_fn, _ = self.datamodule.prepare_eval(self.datamodule.test_sequences[0])
+        model_inputs, _, energy_fn = self.datamodule.prepare_eval(self.datamodule.test_sequences[0])
 
         proposal_samples, proposal_log_p, _ = self.batched_generate_samples(
-            num_proposal_samples, permutations=permutations, encodings=eval_encoding, log_invert_error=False
+            num_proposal_samples, permutations=model_inputs.permutations, encodings=model_inputs.encodings, log_invert_error=False
         )
 
         # Compute energy
