@@ -1,3 +1,4 @@
+import glob
 import logging
 import os
 import pickle
@@ -76,3 +77,46 @@ def prepare_and_cache_permutations_dict(topology_dict: dict[str, md.Topology], c
             pickle.dump(permutations_dict, f)
 
     return permutations_dict
+
+
+def prepare_preprocessing_cache(
+    pdb_paths: list[str],
+    pdb_dict_pkl_path: str,
+    topology_dict_pkl_path: str,
+    encodings_dict_pkl_path: str,
+    permutations_dict_pkl_path: str,
+    delimiter: str = ".",
+) -> None:
+    """
+    Prepare and cache preprocessing data (PDB, topology, encodings, and permutations dicts).
+
+    Checks if all preprocessing cache files already exist. If not, prepares and caches
+    PDB dict, topology dict, encodings dict, and permutations dict from the provided PDB files.
+
+    Args:
+        pdb_paths: List of paths to PDB files to process.
+        pdb_dict_pkl_path: Path to cache the PDB dict.
+        topology_dict_pkl_path: Path to cache the topology dict.
+        encodings_dict_pkl_path: Path to cache the encodings dict.
+        permutations_dict_pkl_path: Path to cache the permutations dict.
+        delimiter: Delimiter used to extract sequence names from PDB filenames. Defaults to ".".
+    """
+    # Check if the preprocessing cache already exists
+    if not all(
+        os.path.exists(p)
+        for p in [
+            pdb_dict_pkl_path,
+            topology_dict_pkl_path,
+            encodings_dict_pkl_path,
+            permutations_dict_pkl_path,
+        ]
+    ):
+        logging.info(f"Preparing and caching PDB, topology, encodings, and permutations dicts for {len(pdb_paths)} files.")
+        
+        # Do data preprocessing here and cache the results - to be loaded by workers later.
+        pdb_dict = prepare_and_cache_pdb_dict(pdb_paths, pdb_dict_pkl_path, delimiter=delimiter)
+        topology_dict = prepare_and_cache_topology_dict(pdb_dict, topology_dict_pkl_path)
+        _ = prepare_and_cache_encodings_dict(topology_dict, encodings_dict_pkl_path)
+        _ = prepare_and_cache_permutations_dict(topology_dict, permutations_dict_pkl_path)
+    else:
+        logging.info("PDB, topology, encodings, permutation dicts already cached")

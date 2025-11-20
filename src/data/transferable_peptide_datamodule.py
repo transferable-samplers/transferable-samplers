@@ -16,12 +16,7 @@ from src.data.datasets.buffer import ReplayBuffer
 from src.data.datasets.peptides_dataset import PeptidesDatasetWithBuffer, build_peptides_dataset
 from src.data.datasets.webdataset import build_webdataset
 from src.data.energy.openmm import OpenMMBridge, OpenMMEnergy
-from src.data.preprocessing.preprocessing import (
-    prepare_and_cache_encodings_dict,
-    prepare_and_cache_pdb_dict,
-    prepare_and_cache_permutations_dict,
-    prepare_and_cache_topology_dict,
-)
+from src.data.preprocessing.preprocessing import prepare_preprocessing_cache
 from src.data.preprocessing.tica import TicaModel
 from src.data.transforms.add_encodings import AddEncodingsTransform
 from src.data.transforms.add_permutations import AddPermutationsTransform
@@ -64,10 +59,29 @@ class TransferablePeptideDataModule(BaseDataModule):
         self.test_data_path = os.path.join(self.evaluation_data_path, "test")
 
         self.preproc_cache_dir = os.path.join(data_dir, "preprocessing_cache")
-        self.pdb_dict_pkl_path = os.path.join(self.preproc_cache_dir, "pdb_dict.pkl")
-        self.topology_dict_pkl_path = os.path.join(self.preproc_cache_dir, "topology_dict.pkl")
-        self.encodings_dict_pkl_path = os.path.join(self.preproc_cache_dir, "encodings_dict.pkl")
-        self.permutations_dict_pkl_path = os.path.join(self.preproc_cache_dir, "permutations_dict.pkl")
+        
+        # Separate cache paths for train, val, test
+        self.train_cache_dir = os.path.join(self.preproc_cache_dir, "train")
+        self.val_cache_dir = os.path.join(self.preproc_cache_dir, "val")
+        self.test_cache_dir = os.path.join(self.preproc_cache_dir, "test")
+        
+        # Train cache paths
+        self.train_pdb_dict_pkl_path = os.path.join(self.train_cache_dir, "pdb_dict.pkl")
+        self.train_topology_dict_pkl_path = os.path.join(self.train_cache_dir, "topology_dict.pkl")
+        self.train_encodings_dict_pkl_path = os.path.join(self.train_cache_dir, "encodings_dict.pkl")
+        self.train_permutations_dict_pkl_path = os.path.join(self.train_cache_dir, "permutations_dict.pkl")
+        
+        # Val cache paths
+        self.val_pdb_dict_pkl_path = os.path.join(self.val_cache_dir, "pdb_dict.pkl")
+        self.val_topology_dict_pkl_path = os.path.join(self.val_cache_dir, "topology_dict.pkl")
+        self.val_encodings_dict_pkl_path = os.path.join(self.val_cache_dir, "encodings_dict.pkl")
+        self.val_permutations_dict_pkl_path = os.path.join(self.val_cache_dir, "permutations_dict.pkl")
+        
+        # Test cache paths
+        self.test_pdb_dict_pkl_path = os.path.join(self.test_cache_dir, "pdb_dict.pkl")
+        self.test_topology_dict_pkl_path = os.path.join(self.test_cache_dir, "topology_dict.pkl")
+        self.test_encodings_dict_pkl_path = os.path.join(self.test_cache_dir, "encodings_dict.pkl")
+        self.test_permutations_dict_pkl_path = os.path.join(self.test_cache_dir, "permutations_dict.pkl")
 
         self.buffer = buffer
         self.buffer_ckpt_path = buffer_ckpt_path
@@ -99,30 +113,51 @@ class TransferablePeptideDataModule(BaseDataModule):
         """
 
         os.makedirs(self.wds_cache_dir, exist_ok=True)
-        os.makedirs(self.preproc_cache_dir, exist_ok=True)
+        os.makedirs(self.train_cache_dir, exist_ok=True)
+        os.makedirs(self.val_cache_dir, exist_ok=True)
+        os.makedirs(self.test_cache_dir, exist_ok=True)
 
         download_and_extract_pdb_tarfiles(self.hparams.data_dir)
         download_evaluation_data(self.hparams.data_dir)
 
-        # Check if the preprocessing cache already exists
-        if not all(
-            os.path.exists(p)
-            for p in [
-                self.pdb_dict_pkl_path,
-                self.topology_dict_pkl_path,
-                self.encodings_dict_pkl_path,
-                self.permutations_dict_pkl_path,
-            ]
-        ):
-            logging.info("Preparing and caching PDB, topology, encodings, and permutations dicts.")
-            pdb_paths = glob.glob(os.path.join(self.pdb_dir, "*", "*.pdb"))
-            # Do data preprocessinging here and cache the results - to be loaded by workers later.
-            pdb_dict = prepare_and_cache_pdb_dict(pdb_paths, self.pdb_dict_pkl_path, delimiter=".")
-            topology_dict = prepare_and_cache_topology_dict(pdb_dict, self.topology_dict_pkl_path)
-            _ = prepare_and_cache_encodings_dict(topology_dict, self.encodings_dict_pkl_path)
-            _ = prepare_and_cache_permutations_dict(topology_dict, self.permutations_dict_pkl_path)
-        else:
-            logging.info("PDB, topology, encodings, permutation dicts already cached")
+        # Discover PDB files for each subset
+        train_pdb_paths = glob.glob(os.path.join(self.pdb_dir, "train", "*.pdb"))
+        val_pdb_paths = glob.glob(os.path.join(self.pdb_dir, "val", "*.pdb"))
+        test_pdb_paths = glob.glob(os.path.join(self.pdb_dir, "test", "*.pdb"))
+        
+        logging.info(f"Found {len(train_pdb_paths)} train PDB files")
+        logging.info(f"Found {len(val_pdb_paths)} val PDB files")
+        logging.info(f"Found {len(test_pdb_paths)} test PDB files")
+
+        # Prepare train cache from train PDB files
+        prepare_preprocessing_cache(
+            pdb_paths=train_pdb_paths,
+            pdb_dict_pkl_path=self.train_pdb_dict_pkl_path,
+            topology_dict_pkl_path=self.train_topology_dict_pkl_path,
+            encodings_dict_pkl_path=self.train_encodings_dict_pkl_path,
+            permutations_dict_pkl_path=self.train_permutations_dict_pkl_path,
+            delimiter=".",
+        )
+
+        # Prepare val cache from val PDB files
+        prepare_preprocessing_cache(
+            pdb_paths=val_pdb_paths,
+            pdb_dict_pkl_path=self.val_pdb_dict_pkl_path,
+            topology_dict_pkl_path=self.val_topology_dict_pkl_path,
+            encodings_dict_pkl_path=self.val_encodings_dict_pkl_path,
+            permutations_dict_pkl_path=self.val_permutations_dict_pkl_path,
+            delimiter=".",
+        )
+
+        # Prepare test cache from test PDB files
+        prepare_preprocessing_cache(
+            pdb_paths=test_pdb_paths,
+            pdb_dict_pkl_path=self.test_pdb_dict_pkl_path,
+            topology_dict_pkl_path=self.test_topology_dict_pkl_path,
+            encodings_dict_pkl_path=self.test_encodings_dict_pkl_path,
+            permutations_dict_pkl_path=self.test_permutations_dict_pkl_path,
+            delimiter=".",
+        )
 
     def setup(self, stage: Optional[str] = None) -> None:
         """Load data. Set variables: `self.data_train`, `self.data_val`, `self.data_test`.
@@ -143,19 +178,41 @@ class TransferablePeptideDataModule(BaseDataModule):
                 )
             self.batch_size_per_device = self.hparams.batch_size // self.trainer.world_size
 
-        # Load cached data preprocessing dict
-        with open(self.pdb_dict_pkl_path, "rb") as f:
-            self.pdb_dict = pickle.load(f)  # noqa: S301
-        logging.info(f"Loaded pdb dict from {self.pdb_dict_pkl_path}")
-        with open(self.topology_dict_pkl_path, "rb") as f:
-            self.topology_dict = pickle.load(f)  # noqa: S301
-        logging.info(f"Loaded topology dict from {self.topology_dict_pkl_path}")
-        with open(self.encodings_dict_pkl_path, "rb") as f:
-            self.encodings_dict = pickle.load(f)  # noqa: S301
-        logging.info(f"Loaded encodings dict from {self.encodings_dict_pkl_path}")
-        with open(self.permutations_dict_pkl_path, "rb") as f:
-            self.permutations_dict = pickle.load(f)  # noqa: S301
-        logging.info(f"Loaded permutations dict from {self.permutations_dict_pkl_path}")
+        # Load train preprocessing cache
+        logging.info("Loading train preprocessing cache...")
+        with open(self.train_pdb_dict_pkl_path, "rb") as f:
+            self.train_pdb_dict = pickle.load(f)  # noqa: S301
+        with open(self.train_topology_dict_pkl_path, "rb") as f:
+            self.train_topology_dict = pickle.load(f)  # noqa: S301
+        with open(self.train_encodings_dict_pkl_path, "rb") as f:
+            self.train_encodings_dict = pickle.load(f)  # noqa: S301
+        with open(self.train_permutations_dict_pkl_path, "rb") as f:
+            self.train_permutations_dict = pickle.load(f)  # noqa: S301
+        logging.info(f"Loaded train cache: {len(self.train_pdb_dict)} sequences")
+
+        # Load val preprocessing cache
+        logging.info("Loading val preprocessing cache...")
+        with open(self.val_pdb_dict_pkl_path, "rb") as f:
+            self.val_pdb_dict = pickle.load(f)  # noqa: S301
+        with open(self.val_topology_dict_pkl_path, "rb") as f:
+            self.val_topology_dict = pickle.load(f)  # noqa: S301
+        with open(self.val_encodings_dict_pkl_path, "rb") as f:
+            self.val_encodings_dict = pickle.load(f)  # noqa: S301
+        with open(self.val_permutations_dict_pkl_path, "rb") as f:
+            self.val_permutations_dict = pickle.load(f)  # noqa: S301
+        logging.info(f"Loaded val cache: {len(self.val_pdb_dict)} sequences")
+
+        # Load test preprocessing cache
+        logging.info("Loading test preprocessing cache...")
+        with open(self.test_pdb_dict_pkl_path, "rb") as f:
+            self.test_pdb_dict = pickle.load(f)  # noqa: S301
+        with open(self.test_topology_dict_pkl_path, "rb") as f:
+            self.test_topology_dict = pickle.load(f)  # noqa: S301
+        with open(self.test_encodings_dict_pkl_path, "rb") as f:
+            self.test_encodings_dict = pickle.load(f)  # noqa: S301
+        with open(self.test_permutations_dict_pkl_path, "rb") as f:
+            self.test_permutations_dict = pickle.load(f)  # noqa: S301
+        logging.info(f"Loaded test cache: {len(self.test_pdb_dict)} sequences")
 
         # Build train transformations pipeline
         train_transform_list = [
@@ -165,8 +222,8 @@ class TransferablePeptideDataModule(BaseDataModule):
         if self.hparams.com_augmentation:
             train_transform_list.append(CenterOfMassTransform())
         train_transform_list = train_transform_list + [
-            AddEncodingsTransform(self.encodings_dict),
-            AddPermutationsTransform(self.permutations_dict),
+            AddEncodingsTransform(self.train_encodings_dict),
+            AddPermutationsTransform(self.train_permutations_dict),
             PaddingTransform(self.hparams.num_atoms),
         ]
         train_transforms = torchvision.transforms.Compose(train_transform_list)
@@ -197,20 +254,34 @@ class TransferablePeptideDataModule(BaseDataModule):
                 transform=train_transforms,
             )
 
+        # Build val transformations pipeline
+        val_transform_list = [
+            StandardizeTransform(self.std),
+            Random3DRotationTransform(),
+        ]
+        if self.hparams.com_augmentation:
+            val_transform_list.append(CenterOfMassTransform())
+        val_transform_list = val_transform_list + [
+            AddEncodingsTransform(self.val_encodings_dict),
+            AddPermutationsTransform(self.val_permutations_dict),
+            PaddingTransform(self.hparams.num_atoms),
+        ]
+        val_transforms = torchvision.transforms.Compose(val_transform_list)
+
         self.data_val = build_peptides_dataset(
             path=self.val_data_path,
             num_aa_min=self.hparams.num_aa_min,
             num_aa_max=self.hparams.num_aa_max,
-            transform=train_transforms,
+            transform=val_transforms,
         )
 
+        # Build test transformations pipeline
         test_transform_list = [
             StandardizeTransform(self.std),
-            AddEncodingsTransform(self.encodings_dict),
-            AddPermutationsTransform(self.permutations_dict),
+            AddEncodingsTransform(self.test_encodings_dict),
+            AddPermutationsTransform(self.test_permutations_dict),
             PaddingTransform(self.hparams.num_atoms),
         ]
-
         test_transforms = torchvision.transforms.Compose(test_transform_list)
 
         self.data_test = build_peptides_dataset(
@@ -235,9 +306,17 @@ class TransferablePeptideDataModule(BaseDataModule):
         nonbondedCutoff = 2.0 * openmm.unit.nanometer
         temperature = 310
 
+        # Get PDB from the appropriate split cache
+        if sequence in self.val_pdb_dict:
+            pdb = self.val_pdb_dict[sequence]
+        elif sequence in self.test_pdb_dict:
+            pdb = self.test_pdb_dict[sequence]
+        else:
+            pdb = self.train_pdb_dict[sequence]
+
         # Initalize forcefield systemq
         system = forcefield.createSystem(
-            self.pdb_dict[sequence].topology,
+            pdb.topology,
             nonbondedMethod=nonbondedMethod,
             nonbondedCutoff=nonbondedCutoff,
             constraints=None,
@@ -290,8 +369,15 @@ class TransferablePeptideDataModule(BaseDataModule):
         )
 
         true_samples = self.normalize(true_samples)
-        permutations = self.permutations_dict[sequence]
-        encodings = self.encodings_dict[sequence]
+        
+        # Get permutations and encodings from the appropriate split cache
+        if sequence in self.val_sequences:
+            permutations = self.val_permutations_dict[sequence]
+            encodings = self.val_encodings_dict[sequence]
+        else:
+            permutations = self.test_permutations_dict[sequence]
+            encodings = self.test_encodings_dict[sequence]
+        
         potential = self.setup_potential(sequence)
         energy_fn = lambda x: potential.energy(self.unnormalize(x)).flatten()
 
