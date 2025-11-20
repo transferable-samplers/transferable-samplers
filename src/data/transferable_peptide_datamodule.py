@@ -113,22 +113,117 @@ class TransferablePeptideDataModule(BaseDataModule):
         prepare_preprocessing_cache(
             pdb_paths=train_pdb_paths,
             cache_path=self.train_cache_path,
-            delimiter=".",
         )
 
         # Prepare val cache from val PDB files
         prepare_preprocessing_cache(
             pdb_paths=val_pdb_paths,
             cache_path=self.val_cache_path,
-            delimiter=".",
         )
 
         # Prepare test cache from test PDB files
         prepare_preprocessing_cache(
             pdb_paths=test_pdb_paths,
             cache_path=self.test_cache_path,
-            delimiter=".",
         )
+
+    def setup_train(self) -> None:
+        """Setup training data and preprocessing."""
+        # Load train preprocessing cache
+        logging.info("Loading train preprocessing cache...")
+        (
+            self.train_pdb_dict,
+            self.train_topology_dict,
+            self.train_encodings_dict,
+            self.train_permutations_dict,
+        ) = load_preprocessing_cache(self.train_cache_path)
+        logging.info(f"Loaded train cache: {len(self.train_pdb_dict)} sequences")
+
+        # Build train transformations pipeline
+        train_transform_list = [
+            StandardizeTransform(self.std),
+            Random3DRotationTransform(),
+        ]
+        if self.hparams.com_augmentation:
+            train_transform_list.append(CenterOfMassTransform())
+        train_transform_list = train_transform_list + [
+            AddEncodingsTransform(self.train_encodings_dict),
+            AddPermutationsTransform(self.train_permutations_dict),
+            PaddingTransform(self.hparams.num_atoms),
+        ]
+        train_transforms = torchvision.transforms.Compose(train_transform_list)
+
+        # Build training webdataset
+        self.data_train = build_webdataset(
+            repo_id=self.hparams.hf_repo_id,
+            repo_path=self.hparams.wds_repo_path,
+            cache_dir=self.wds_cache_dir,
+            num_aa_min=self.hparams.num_aa_min,
+            num_aa_max=self.hparams.num_aa_max,
+            transform=train_transforms,
+        )
+
+    def setup_eval(self, split: str) -> None:
+        """
+        Setup evaluation data for a specific split.
+
+        Args:
+            split: Either "val" or "test".
+        """
+        assert split in ["val", "test"], f"split must be 'val' or 'test', got {split}"
+        
+        # Get split-specific paths and attributes
+        if split == "val":
+            cache_path = self.val_cache_path
+            data_path = self.val_data_path
+        else:  # test
+            cache_path = self.test_cache_path
+            data_path = self.test_data_path
+        
+        # Load preprocessing cache
+        logging.info(f"Loading {split} preprocessing cache...")
+        (
+            pdb_dict,
+            topology_dict,
+            encodings_dict,
+            permutations_dict,
+        ) = load_preprocessing_cache(cache_path)
+        logging.info(f"Loaded {split} cache: {len(pdb_dict)} sequences")
+        
+        # Store in split-specific attributes
+        if split == "val":
+            self.val_pdb_dict = pdb_dict
+            self.val_topology_dict = topology_dict
+            self.val_encodings_dict = encodings_dict
+            self.val_permutations_dict = permutations_dict
+        else:
+            self.test_pdb_dict = pdb_dict
+            self.test_topology_dict = topology_dict
+            self.test_encodings_dict = encodings_dict
+            self.test_permutations_dict = permutations_dict
+        
+        # Build transformations pipeline
+        transform_list = [
+            StandardizeTransform(self.std),
+            AddEncodingsTransform(encodings_dict),
+            AddPermutationsTransform(permutations_dict),
+            PaddingTransform(self.hparams.num_atoms),
+        ]
+        transforms = torchvision.transforms.Compose(transform_list)
+        
+        # Build dataset
+        dataset = build_peptides_dataset(
+            path=data_path,
+            num_aa_min=self.hparams.num_aa_min,
+            num_aa_max=self.hparams.num_aa_max,
+            transform=transforms,
+        )
+        
+        # Store in split-specific attribute
+        if split == "val":
+            self.data_val = dataset
+        else:
+            self.data_test = dataset
 
     def setup(self, stage: Optional[str] = None) -> None:
         """Load data. Set variables: `self.data_train`, `self.data_val`, `self.data_test`.
@@ -149,112 +244,10 @@ class TransferablePeptideDataModule(BaseDataModule):
                 )
             self.batch_size_per_device = self.hparams.batch_size // self.trainer.world_size
 
-        # Load train preprocessing cache
-        logging.info("Loading train preprocessing cache...")
-        (
-            self.train_pdb_dict,
-            self.train_topology_dict,
-            self.train_encodings_dict,
-            self.train_permutations_dict,
-        ) = load_preprocessing_cache(self.train_cache_path)
-        logging.info(f"Loaded train cache: {len(self.train_pdb_dict)} sequences")
-
-        # Load val preprocessing cache
-        logging.info("Loading val preprocessing cache...")
-        (
-            self.val_pdb_dict,
-            self.val_topology_dict,
-            self.val_encodings_dict,
-            self.val_permutations_dict,
-        ) = load_preprocessing_cache(self.val_cache_path)
-        logging.info(f"Loaded val cache: {len(self.val_pdb_dict)} sequences")
-
-        # Load test preprocessing cache
-        logging.info("Loading test preprocessing cache...")
-        (
-            self.test_pdb_dict,
-            self.test_topology_dict,
-            self.test_encodings_dict,
-            self.test_permutations_dict,
-        ) = load_preprocessing_cache(self.test_cache_path)
-        logging.info(f"Loaded test cache: {len(self.test_pdb_dict)} sequences")
-
-        # Build train transformations pipeline
-        train_transform_list = [
-            StandardizeTransform(self.std),
-            Random3DRotationTransform(),
-        ]
-        if self.hparams.com_augmentation:
-            train_transform_list.append(CenterOfMassTransform())
-        train_transform_list = train_transform_list + [
-            AddEncodingsTransform(self.train_encodings_dict),
-            AddPermutationsTransform(self.train_permutations_dict),
-            PaddingTransform(self.hparams.num_atoms),
-        ]
-        train_transforms = torchvision.transforms.Compose(train_transform_list)
-
-        # Resume buffer if needed
-        if self.buffer_ckpt_path is not None:
-            if os.path.exists(self.buffer_ckpt_path):
-                logging.info(f"Resuming buffer from checkpoint: {self.buffer_ckpt_path}")
-                self.buffer.load(self.buffer_ckpt_path)
-                logging.info(f"Number of Samples Loaded: {len(self.buffer)}")
-            else:
-                logging.info(f"Buffer checkpoint path {self.buffer_ckpt_path} not found! Ignoring...")
-
-        if self.buffer is None:
-            # Build training webdataset
-            self.data_train = build_webdataset(
-                repo_id=self.hparams.hf_repo_id,
-                repo_path=self.hparams.wds_repo_path,
-                cache_dir=self.wds_cache_dir,
-                num_aa_min=self.hparams.num_aa_min,
-                num_aa_max=self.hparams.num_aa_max,
-                transform=train_transforms,
-            )
-        else:
-            assert len(self.test_sequences) == 1, "Can currently only self-refine on one system at a time."
-            self.data_train = PeptidesDatasetWithBuffer(
-                buffer=self.buffer,
-                transform=train_transforms,
-            )
-
-        # Build val transformations pipeline
-        val_transform_list = [
-            StandardizeTransform(self.std),
-            Random3DRotationTransform(),
-        ]
-        if self.hparams.com_augmentation:
-            val_transform_list.append(CenterOfMassTransform())
-        val_transform_list = val_transform_list + [
-            AddEncodingsTransform(self.val_encodings_dict),
-            AddPermutationsTransform(self.val_permutations_dict),
-            PaddingTransform(self.hparams.num_atoms),
-        ]
-        val_transforms = torchvision.transforms.Compose(val_transform_list)
-
-        self.data_val = build_peptides_dataset(
-            path=self.val_data_path,
-            num_aa_min=self.hparams.num_aa_min,
-            num_aa_max=self.hparams.num_aa_max,
-            transform=val_transforms,
-        )
-
-        # Build test transformations pipeline
-        test_transform_list = [
-            StandardizeTransform(self.std),
-            AddEncodingsTransform(self.test_encodings_dict),
-            AddPermutationsTransform(self.test_permutations_dict),
-            PaddingTransform(self.hparams.num_atoms),
-        ]
-        test_transforms = torchvision.transforms.Compose(test_transform_list)
-
-        self.data_test = build_peptides_dataset(
-            path=self.test_data_path,
-            num_aa_min=self.hparams.num_aa_min,
-            num_aa_max=self.hparams.num_aa_max,
-            transform=test_transforms,
-        )
+        # Setup train, val, and test data
+        self.setup_train()
+        self.setup_eval("val")
+        self.setup_eval("test")
 
     def setup_potential(self, sequence: str):
         """
@@ -347,17 +340,3 @@ class TransferablePeptideDataModule(BaseDataModule):
         energy_fn = lambda x: potential.energy(self.unnormalize(x)).flatten()
 
         return true_samples, permutations, encodings, energy_fn, tica_model
-
-    def save_buffer(self):
-        """
-        Save the training buffer checkpoint to disk, if a path is configured.
-
-        Uses the buffer checkpoint path defined in the object to persist
-        the current training buffer state.
-
-        Returns:
-            None
-        """
-        if self.buffer_ckpt_path is not None:
-            logging.info(f"Saving Buffer: {self.buffer_ckpt_path}")
-            self.data_train.buffer.save(self.buffer_ckpt_path)
