@@ -14,7 +14,7 @@ from omegaconf import ListConfig, OmegaConf
 
 from src.data.base_datamodule import BaseDataModule
 from src.data.datasets.buffer import ReplayBuffer
-from src.data.datasets.peptides_dataset import PeptidesDatasetWithBuffer, build_peptides_dataset
+from src.data.datasets.peptides_dataset import PeptideDatasetWithBuffer, build_peptide_dataset
 from src.data.datasets.webdataset import build_webdataset
 from src.data.energy.openmm import OpenMMBridge, OpenMMEnergy
 from src.data.preprocessing.preprocessing import load_preprocessing_cache, prepare_preprocessing_cache
@@ -46,6 +46,10 @@ class EvaluationInputs:
 
 
 class TransferablePeptideDataModule(BaseDataModule):
+    # Hardcoded HuggingFace repository configuration
+    HF_REPO_ID = "transferable-samplers/many-peptides-md"
+    WDS_REPO_PATH = "webdatasets/single_frames"
+    
     def __init__(
         self,
         data_dir: str,
@@ -54,8 +58,6 @@ class TransferablePeptideDataModule(BaseDataModule):
         num_dimensions: int,
         num_atoms: int,
         precomputed_std: float,
-        hf_repo_id: str = "transferable-samplers/many-peptides-md",
-        wds_repo_path: str = "webdatasets/single_frames",
         com_augmentation: bool = False,
         num_eval_samples: int = 10000,
         val_sequences: Union[str, list[str]] = None,
@@ -70,7 +72,7 @@ class TransferablePeptideDataModule(BaseDataModule):
 
         self.pdb_dir = os.path.join(data_dir, "pdbs")
 
-        self.wds_cache_dir = os.path.join(data_dir, wds_repo_path)
+        self.wds_cache_dir = os.path.join(data_dir, self.WDS_REPO_PATH)
 
         self.evaluation_data_path = os.path.join(data_dir, "trajectories_subsampled")
         self.val_data_path = os.path.join(self.evaluation_data_path, "val")
@@ -173,8 +175,8 @@ class TransferablePeptideDataModule(BaseDataModule):
 
         # Build training webdataset
         self.data_train = build_webdataset(
-            repo_id=self.hparams.hf_repo_id,
-            repo_path=self.hparams.wds_repo_path,
+            repo_id=self.HF_REPO_ID,
+            repo_path=self.WDS_REPO_PATH,
             cache_dir=self.wds_cache_dir,
             num_aa_min=self.hparams.num_aa_min,
             num_aa_max=self.hparams.num_aa_max,
@@ -229,9 +231,13 @@ class TransferablePeptideDataModule(BaseDataModule):
         ]
         transforms = torchvision.transforms.Compose(transform_list)
         
+        # Discover NPZ files
+        npz_file_paths = glob.glob(os.path.join(data_path, "*/*.npz"))
+        logging.info(f"Found {len(npz_file_paths)} NPZ files in {data_path}")
+        
         # Build dataset
-        dataset = build_peptides_dataset(
-            path=data_path,
+        dataset = build_peptide_dataset(
+            file_paths=npz_file_paths,
             num_aa_min=self.hparams.num_aa_min,
             num_aa_max=self.hparams.num_aa_max,
             transform=transforms,

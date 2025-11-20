@@ -1,34 +1,50 @@
-import glob
-import os
+from typing import Union
 
 import numpy as np
 import torch
 
-# TODO this should be factored together with tensor_dataset.py
 
-
-class PeptidesDataset(torch.utils.data.Dataset):
+class PeptideDataset(torch.utils.data.Dataset):
+    """
+    Unified dataset class for handling both plain tensors and dict-formatted data.
+    
+    - If data is a plain tensor, each item is wrapped in a dict with "x" key
+    - If data is a list of dicts, items are used as-is
+    """
     def __init__(
         self,
-        data: torch.Tensor,
+        data: Union[torch.Tensor, list],
         transform=None,
+        sequence: str = None,
     ):
         self.data = data
         self.transform = transform
+        self.sequence = sequence
+        
+        # Determine if data is plain tensors or dict-formatted
+        self.is_dict_data = isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict)
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        sample = self.data[idx]
-        assert "sequence" in sample
+        if self.is_dict_data:
+            # Data is already in dict format (peptides case)
+            sample = self.data[idx]
+            assert "sequence" in sample, "Dict data must contain 'sequence' key"
+        else:
+            # Data is plain tensors (single peptide case)
+            x = self.data[idx].float()
+            sample = {"x": x}
+            if self.sequence is not None:
+                sample["sequence"] = self.sequence
 
         if self.transform is not None:
             sample = self.transform(sample)
         return sample
 
 
-class PeptidesDatasetWithBuffer(torch.utils.data.Dataset):
+class PeptideDatasetWithBuffer(torch.utils.data.Dataset):
     def __init__(
         self,
         buffer,
@@ -70,21 +86,27 @@ class PeptidesDatasetWithBuffer(torch.utils.data.Dataset):
         self.buffer.add(x, seq_name)
 
 
-def build_peptides_dataset(
-    path: str,
-    suffix: str = "npz",
+def build_peptide_dataset(
+    file_paths: list[str],
     num_dimensions: int = 3,
     num_aa_min: int = None,
     num_aa_max: int = None,
     transform=None,
 ):
-    if os.path.isdir(path):
-        file_paths = glob.glob(os.path.join(path, "*/*.npz"))
-        assert file_paths, f"No .{suffix} files found!"
-    elif os.path.isfile(path):
-        file_paths = [path]
-    else:
-        raise ValueError(f"File or directory {path} is not found!")
+    """
+    Build a PeptideDataset from a list of NPZ file paths.
+
+    Args:
+        file_paths: List of paths to NPZ files containing peptide data.
+        num_dimensions: Number of spatial dimensions (default: 3).
+        num_aa_min: Minimum amino acid sequence length to include (optional).
+        num_aa_max: Maximum amino acid sequence length to include (optional).
+        transform: Optional transform to apply to each sample.
+
+    Returns:
+        PeptideDataset: Dataset containing all samples from the provided files.
+    """
+    assert file_paths, "file_paths list cannot be empty"
 
     data = []
     for file_path in file_paths:
@@ -99,4 +121,4 @@ def build_peptides_dataset(
         data_dict_list = [{"sequence": sequence, "x": x.reshape(-1, num_dimensions)} for x in positions]
         data.extend(data_dict_list)
 
-    return PeptidesDataset(data=data, transform=transform)
+    return PeptideDataset(data=data, transform=transform)

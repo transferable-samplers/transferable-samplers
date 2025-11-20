@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Optional
+from typing import Callable, Optional
 
 import mdtraj as md
 import numpy as np
@@ -11,18 +11,22 @@ import torchvision
 from huggingface_hub import snapshot_download
 
 from src.data.base_datamodule import BaseDataModule
-from src.data.datasets.tensor_dataset import TensorDataset
+from src.data.datasets.peptides_dataset import PeptideDataset
 from src.data.energy.openmm import OpenMMBridge, OpenMMEnergy
-from src.data.preprocessing.tica import get_tica_model
+from src.data.preprocessing.tica import get_tica_model, TicaModel
 from src.data.transforms.center_of_mass import CenterOfMassTransform
 from src.data.transforms.rotation import Random3DRotationTransform
 from src.data.transforms.standardize import StandardizeTransform
+from src.data.transferable_peptide_datamodule import EvaluationInputs, ModelInputs
 
 
 class SinglePeptideDataModule(BaseDataModule):
+    # Hardcoded HuggingFace repository configuration
+    REPO_ID = "transferable-samplers/single-peptide-md"
+    REPO_TYPE = "dataset"
+    
     def __init__(
         self,
-        repo_id: str,
         data_dir: str,
         sequence: str,
         temperature: float,
@@ -36,7 +40,7 @@ class SinglePeptideDataModule(BaseDataModule):
     ):
         super().__init__(batch_size=batch_size, num_workers=num_workers, pin_memory=pin_memory)
 
-        self.repo_name = self.hparams.repo_id.split("/")[-1]
+        self.repo_name = self.REPO_ID.split("/")[-1]
         self.trajectory_name = f"{self.hparams.sequence}_{self.hparams.temperature}K"
 
         # Setup paths
@@ -61,8 +65,8 @@ class SinglePeptideDataModule(BaseDataModule):
         os.makedirs(f"{self.hparams.data_dir}/{self.repo_name}", exist_ok=True)
 
         local_dir = snapshot_download(
-            repo_id=self.hparams.repo_id,
-            repo_type="dataset",
+            repo_id=self.REPO_ID,
+            repo_type=self.REPO_TYPE,
             local_dir=f"{self.hparams.data_dir}/{self.repo_name}",
             allow_patterns=[f"{self.trajectory_name}/*"],
             use_auth_token=True,
@@ -119,19 +123,22 @@ class SinglePeptideDataModule(BaseDataModule):
         if self.hparams.com_augmentation:
             transform_list.append(CenterOfMassTransform())
         train_transforms = torchvision.transforms.Compose(transform_list)
-        self.data_train = TensorDataset(
+        self.data_train = PeptideDataset(
             data=data_train,
             transform=train_transforms,
+            sequence=self.hparams.sequence,
         )
 
         test_transforms = StandardizeTransform(self.std)
-        self.data_val = TensorDataset(
+        self.data_val = PeptideDataset(
             data=data_val,
             transform=test_transforms,
+            sequence=self.hparams.sequence,
         )
-        self.data_test = TensorDataset(
+        self.data_test = PeptideDataset(
             data=data_test,
             transform=test_transforms,
+            sequence=self.hparams.sequence,
         )
 
         logging.info(f"Train dataset size: {len(self.data_train)}")
@@ -184,7 +191,7 @@ class SinglePeptideDataModule(BaseDataModule):
 
         return potential
 
-    def prepare_eval(self, sequence: str, prefix: str):
+    def prepare_eval(self, sequence: str, prefix: str) -> tuple[ModelInputs, EvaluationInputs, Callable]:
         """
         Prepare evaluation data and energy function for validation or test trajectories.
 
@@ -198,12 +205,10 @@ class SinglePeptideDataModule(BaseDataModule):
             prefix (str): Dataset split to evaluate on. Must be either "val" or "test".
 
         Returns:
-            tuple: A 5-tuple containing:
-                - true_samples (torch.Tensor): Normalized and subsampled trajectory samples.
-                - permutations (None): Placeholder for compatibility, not used here.
-                - encodings (None): Placeholder for compatibility, not used here.
+            tuple: A 3-tuple containing:
+                - model_inputs (ModelInputs): Permutations and encodings (None for single peptide).
+                - evaluation_inputs (EvaluationInputs): True samples and TICA model for evaluation.
                 - energy_fn (Callable): Function mapping positions → energy values.
-                - tica_model: Model with TICA projection parameters computed from the trajectory.
         """
         if prefix == "test":
             true_samples = self.data_test.data
@@ -218,9 +223,16 @@ class SinglePeptideDataModule(BaseDataModule):
         true_samples = true_samples[:: len(true_samples) // self.hparams.num_eval_samples]
         true_samples = self.normalize(true_samples)
 
-        permutations = None
-        encodings = None
         potential = self.setup_potential()
         energy_fn = lambda x: potential.energy(self.unnormalize(x)).flatten()
 
-        return true_samples, permutations, encodings, energy_fn, tica_model
+        model_inputs = ModelInputs(permutations=None, encodings=None)
+        evaluation_inputs = EvaluationInputs(
+            true_samples=true_samples,
+            tica_model=tica_model,
+            topology=self.topology,
+            num_eval_samples=self.hparams.num_eval_samples,
+            do_plots=self.hparams.get("do_plots", True),
+        )
+
+        return model_inputs, evaluation_inputs, energy_fn
