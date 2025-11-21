@@ -16,6 +16,7 @@ from torchmetrics import MeanMetric
 from tqdm import tqdm
 
 from src.evaluation.metrics_and_plots import metrics_and_plots
+from src.models.base_lightning_module import BaseLightningModule
 from src.models.neural_networks.ema import EMA
 from src.models.priors import NormalDistribution
 from src.models.samplers.base_sampler import SMCSampler
@@ -25,7 +26,7 @@ from src.utils.data_types import SamplesData
 logger = logging.getLogger(__name__)
 
 
-class TransferableBoltzmannGeneratorLitModule(LightningModule):
+class TransferableBoltzmannGeneratorLitModule(BaseLightningModule):
     def __init__(
         self,
         net: torch.nn.Module,
@@ -577,171 +578,17 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
             metrics = {}
         return metrics
 
-    def generate_and_resample(self, num_proposal_samples: int = None):
-        assert self.datamodule.test_sequences is not None, "Eval sequence name should be set"
-        assert len(self.datamodule.test_sequences) == 1, "Can only self-refine on 1 test sequence at a time."
-        assert self.datamodule.buffer is not None, "Need to have buffer instantiated in datamodule for self-consumption"
-
-        if num_proposal_samples is None:
-            num_proposal_samples = self.hparams.sampling_config.num_proposal_samples
-
-        # on first step, we need to prepare the eval encoding
-        model_inputs, _, energy_fn = self.datamodule.prepare_eval(self.datamodule.test_sequences[0])
-
-        proposal_samples, proposal_log_p, _ = self.batched_generate_samples(
-            num_proposal_samples, permutations=model_inputs.permutations, encodings=model_inputs.encodings, log_invert_error=False
-        )
-
-        # Compute energy
-        proposal_samples_energy = energy_fn(proposal_samples)
-
-        # Compute proposal center of mass std
-        coms = proposal_samples.mean(dim=1, keepdim=False)
-        proposal_com_std = coms.std()
-        # TODO little scary relying on this class attribute! - gets used in self.proposal_energy
-        # when use_com_adjustment=True
-        self.proposal_com_std = proposal_com_std
-
-        # Apply CoM adjustment to energy, this must be done here for compatibility with CNFs
-        if self.hparams.sampling_config.get("use_com_adjustment", False):
-            proposal_log_p = proposal_log_p + self.com_energy_adjustment(proposal_samples)
-
-        # Compute resampling index
-        resampling_logits = -proposal_samples_energy - proposal_log_p
-
-        # Filter samples based on logit clipping - this affects both IS and SMC
-        if self.hparams.sampling_config.clip_reweighting_logits:
-            clipped_logits_mask = resampling_logits > torch.quantile(
-                resampling_logits,
-                1 - float(self.hparams.sampling_config.clip_reweighting_logits),
-            )
-            proposal_samples = proposal_samples[~clipped_logits_mask]
-            proposal_samples_energy = proposal_samples_energy[~clipped_logits_mask]
-            resampling_logits = resampling_logits[~clipped_logits_mask]
-            logging.info("Clipped logits for resampling")
-
-        _, resampling_index = resample(proposal_samples, resampling_logits, return_index=True)
-        reweighted_samples = self.datamodule.unnormalize(proposal_samples[resampling_index])
-        return reweighted_samples
-
-    def on_fit_start(self) -> None:
-        """
-        Called at the very beginning of the fit loop, after setup() has been called.
-        Here we make a copy of the model to serve as a teacher during self-refinement.
-        This ensures the "student" model does not drift to far from the initial model (teacher).
-        """
-
-        if self.hparams.use_distill_loss and self.hparams.self_improve:
-            self.teacher = deepcopy(self.net)
-
-            # ema params as teacher model if available
-            if self.hparams.ema_decay > 0:
-                self.teacher.backup()
-                self.teacher.copy_to_model()
-
-            # Freeze the teacher network's parameters
-            for param in self.teacher.parameters():
-                param.requires_grad = False
-
-    def on_train_epoch_start(self) -> None:
-        logging.info("Train epoch start")
-
-        # if doing self-refinement: generate and reweight samples
-        # at start of every epoch to finetune the model
-        if self.hparams.get("self_improve", False):
-            logging.info(
-                f"Generating {self.hparams.sampling_config.num_self_improve_proposal_samples} Samples"
-                " for self-consumption"
-            )
-            self.net.eval()
-
-            if self.hparams.ema_decay > 0:
-                self.net.backup()
-                self.net.copy_to_model()
-
-                with torch.no_grad():
-                    samples = self.generate_and_resample(
-                        num_proposal_samples=self.hparams.sampling_config.num_self_improve_proposal_samples,
-                    )
-
-                self.net.restore_to_model()
-
-            else:
-                with torch.no_grad():
-                    samples = self.generate_and_resample(
-                        num_proposal_samples=self.hparams.sampling_config.num_self_improve_proposal_samples,
-                    )
-
-            self.net.train()
-
-            # add the IS samples into the buffer
-            self.datamodule.data_train.buffer.add(samples, self.datamodule.test_sequences[0])
-
-            # save the buffer into memory
-            self.datamodule.save_buffer()
-
-        self.train_metrics.reset()
-
-    def on_validation_epoch_start(self) -> None:
-        logging.info("Validation epoch start")
-        self.val_metrics.reset()
-
-    def on_test_epoch_start(self) -> None:
-        logging.info("Test epoch start")
-        self.test_metrics.reset()
-
-    def on_train_epoch_end(self) -> None:
-        self.train_metrics.reset()
-        logging.info("Train epoch end")
-
-    def on_validation_epoch_end(self):
-        self.on_eval_epoch_end(self.val_metrics, "val")
-        logging.info("Validation epoch end")
-
-    def on_test_epoch_end(self) -> None:
-        self.on_eval_epoch_end(self.test_metrics, "test")
-        logging.info("Test epoch end")
-
-    def on_after_backward(self) -> None:
-        valid_gradients = True
-        flat_grads = torch.cat([p.grad.view(-1) for p in self.parameters() if p.grad is not None])
-        global_norm = torch.norm(flat_grads, p=2)
-        for _name, param in self.named_parameters():
-            if param.grad is not None:
-                valid_gradients = not (torch.isnan(param.grad).any() or torch.isinf(param.grad).any())
-
-                if not valid_gradients:
-                    break
-
-        self.log("global_gradient_norm", global_norm, on_step=True, prog_bar=True)
-        if not valid_gradients:
-            logger.warning("detected inf or nan values in gradients. not updating model parameters")
-            self.zero_grad()
-            return
-
-    # https://github.com/Lightning-AI/pytorch-lightning/issues/1462
-    def on_before_optimizer_step(self, optimizer, *args, **kwargs) -> None:
-        total_norm = 0.0
-        for param in self.trainer.lightning_module.parameters():
-            if param.grad is not None:
-                param_norm = param.grad.detach().data.norm(2)
-                total_norm += param_norm.item() ** 2
-        total_norm = total_norm ** (1.0 / 2)
-        self.log_dict({"train/grad_norm": total_norm}, prog_bar=True)
-
-    def optimizer_step(self, *args, **kwargs):
-        super().optimizer_step(*args, **kwargs)
-        if isinstance(self.net, EMA):
-            self.net.update_ema()
-
     def proposal_energy(self, x: torch.Tensor) -> torch.Tensor:
+        """Compute proposal energy for a given input.
+        
+        Args:
+            x: Input tensor representing samples from the proposal distribution.
+            
+        Returns:
+            Energy values for the proposal samples.
+        """
         # x is considered to be a sample from the proposal distribution
         raise NotImplementedError
-
-    def state_dict(self, *args, **kwargs):
-        sd = super().state_dict(*args, **kwargs)
-        return {k: v for k, v in sd.items() if not k.startswith("teacher.")}
-
 
 if __name__ == "__main__":
     _ = TransferableBoltzmannGeneratorLitModule(None, None, None, None)
