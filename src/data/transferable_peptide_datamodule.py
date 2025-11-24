@@ -117,8 +117,8 @@ class TransferablePeptideDataModule(BaseDataModule):
         os.makedirs(self.wds_cache_dir, exist_ok=True)
         os.makedirs(self.preproc_cache_dir, exist_ok=True)
 
-        download_and_extract_pdb_tarfiles(self.hparams.data_dir)
-        download_evaluation_data(self.hparams.data_dir)
+        # download_and_extract_pdb_tarfiles(self.hparams.data_dir)
+        # download_evaluation_data(self.hparams.data_dir)
 
         # Discover PDB files for each subset
         train_pdb_paths = glob.glob(os.path.join(self.pdb_dir, "train", "*.pdb"))

@@ -1,14 +1,19 @@
 class BaseSampler(ABC):
-    def __init__(self, num_samples: int, output_dir: str, local_rank: int):
+    def __init__(self, num_samples: int, logit_clip_filter_pct: float = 0.0):
         self.num_samples = num_samples
-        self.output_dir = output_dir
-        self.local_rank = local_rank
+        self.logit_clip_filter_pct = logit_clip_filter # Applied to the initial proposal samples
 
-    def save_samples_dict(self, samples_dict, prefix):
-        if self.local_rank == 0:
-            os.makedirs(f"{self.output_dir}/{prefix}", exist_ok=True)
-            torch.save(samples_dict, f"{self.output_dir}/{prefix}/samples.pt")
-            logging.info(f"Saving samples to {self.output_dir}/{prefix}/samples.pt")
+    def get_logit_clip_mask(self, logits: torch.Tensor, clip_threshold: float) -> torch.Tensor:
+        logit_clip_mask = logits < torch.quantile(
+            logits,
+            1 - float(self.logit_clip_filter_pct) / 100.0,
+        )
+        return logit_clip_mask
+
+    def get_resampling_index(logits):
+        probs = torch.softmax(logits, dim=-1)
+        resampling_index = torch.multinomial(probs, logits.size(0), replacement=True)
+        return resampling_index
 
     @abstractmethod
     def sample(self, proposal_generator, source_energy, target_energy):

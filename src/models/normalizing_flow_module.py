@@ -136,23 +136,46 @@ class NormalizingFlowLitModule(TransferableBoltzmannGeneratorLitModule):
 
         return energy
 
-    def generate_samples(
-        self,
-        batch_size: int,
-        permutations: dict[str, torch.Tensor],
-        encodings: Optional[dict[str, torch.Tensor]] = None,
-        n_timesteps: int = None,
-        dummy_ll=False,
-        log_invert_error: bool = True,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Generate samples from the model.
+    def batchify_model_input(self, model_inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+        return {
+            key: tensor.unsqueeze(0).repeat(local_batch_size, 1).to(self.device)
+            for key, tensor in model_inputs.items()
+        }
+        return model_inputs
 
-        :param batch_size: The batch size to use for generating samples.
-        :param n_timesteps: The number of timesteps to use when generating samples.
-        :param device: The device to use for generating samples.
+    def invertibility_metrics(self, z, z_recon):
+
+        metrics = {}
+
+        metrics["mse"] = torch.mean((z - z_recon) ** 2)
+        metrics["max_abs"] = torch.max(abs(z - z_recon))
+        metrics["mean_abs"] = torch.mean(abs(z - z_recon))
+        metrics["median_abs"] = torch.median(abs(z - z_recon))
+
+        for cutoff in [0.01, 0.001, 0.0001]:
+            metrics[f"pointwise_fail_at_{cutoff}"] = torch.sum(abs(z - z_recon) > cutoff)
+            metrics[f"sample_fail_at_{cutoff}"] = (torch.sum(abs(z - z_recon) > cutoff, dim=1) > 0).sum()
+
+        return metrics
+
+    def all_gather_batch_dim(self, tensor: torch.Tensor) -> torch.Tensor:
+        return self.all_gather(tensor).reshape(-1, *tensor.shape[1:])
+
+    def sample_proposal(
+        self,
+        num_samples: int,
+        model_inputs: dict[str, torch.Tensor],
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Sample proposal from the model.
+
+        :param num_samples: The number of samples to generate.
+        :param model_inputs: The model inputs to use for generating samples.
         :return: A tuple containing the generated samples, the prior samples, and the log
             probability.
         """
+
+        encodings = model_inputs.get("encodings")
+        permutations = model_inputs.get("permutations")
 
         if encodings is None:
             num_atoms = self.datamodule.hparams.num_atoms
@@ -161,119 +184,29 @@ class NormalizingFlowLitModule(TransferableBoltzmannGeneratorLitModule):
 
         data_dim = num_atoms * self.datamodule.hparams.num_dimensions
 
-        local_batch_size = batch_size // self.trainer.world_size
+        local_batch_size = num_samples // self.trainer.world_size
         prior_samples = self.prior.sample(local_batch_size, num_atoms, device=self.device)
 
         # need to rescale to the "sum" of the log p (the prior returns the position-wise mean)
-        prior_log_q = -self.prior.energy(prior_samples) * data_dim
+        prior_samples_energy = -self.prior.energy(prior_samples_energy) * data_dim
 
-        _permutations = None
-        if permutations is not None:
-            _permutations = {
-                subkey: tensor.unsqueeze(0).repeat(local_batch_size, 1).to(self.device)
-                for subkey, tensor in permutations.items()
-            }
+        _permutations = self.batchify_model_input(permutations)
+        _encodings = self.batchify_model_input(encodings)
 
-        _encodings = None
-        if encodings is not None:
-            _encodings = {
-                key: tensor.unsqueeze(0).repeat(local_batch_size, 1).to(self.device)
-                for key, tensor in encodings.items()
-            }
+        proposal_samples = self.net.reverse(prior_samples, _permutations, encodings=_encodings)
+        z_recon, logdets = self.net(proposal_samples, _permutations, encodings=_encodings)
+        logdets = logdets * data_dim  # rescale from mean to sum
 
-        # def test_logdet(model, x_i, permutations_i, enc_i):
-        # # TODO refactor into a compute true logdet function
-        # and then compare over a subset of batch
-        #     x_pred = model.reverse(x_i, permutations_i, encodings=enc_i)
-        #     _, fwd_logdets = model(x_pred, permutations_i, encodings=enc_i)
-        #     fwd_logdets = fwd_logdets * x_i.shape[1]  # rescale from mean to sum
+        invertibility_metrics = self.invertibility_metrics(z, z_recon)
 
-        #     reverse_func = lambda x: model.reverse(x=x, permutations=permutations_i, encodings=enc_i)
-        #     rev_jac_true = torch.autograd.functional.jacobian(reverse_func, x_i, vectorize=True)
-        #     rev_logdets_true = torch.logdet(rev_jac_true[0].squeeze())
+        x_pred = self.all_gather_batch_dim(x_pred)
+        logdets = self.all_gather_batch_dim(logdets)
+        z_energy = self.all_gather_batch_dim(z_energy)
+        prior_samples = self.all_gather_batch_dim(prior_samples)
 
-        #     logdets_diff = torch.mean(abs(-fwd_logdets - rev_logdets_true))
-        #     return logdets_diff
+        proposal_energy = - (z_energy.flatten() + logdets.flatten())
 
-        # diffs = []
-        # for i in range(16):
-        #     print("\nbatch item", i)
-
-        #     x_i = prior_samples[i : i + 1]
-
-        #     permutations_i = {
-        #         "atom": {
-        #             "permutations": {k: v[i : i + 1] for k, v in permutations["atom"]["permutations"].items()}
-        #         },
-        #         "residue": {
-        #             "permutations": {k: v[i : i + 1] for k, v in permutations["residue"]["permutations"].items()},
-        #             "tokenization_map": permutations["residue"]["tokenization_map"][i : i + 1],
-        #         },
-        #     }
-
-        #     enc_i = {k: v[i : i + 1] for k, v in encodings.items()}
-
-        #     logdets_diff = test_logdet(self.net, x_i, permutations_i, enc_i)  # test logdet of the original model
-        #     diffs.append(logdets_diff.item())
-
-        # mean_logdets_diff = torch.mean(torch.tensor(diffs))
-        # print(f"Mean logdet difference: {mean_logdets_diff}")
-        # self.log("invert/logdet_diff", mean_logdets_diff, sync_dist=True)
-
-        with torch.no_grad():
-            x_pred = self.net.reverse(prior_samples, _permutations, encodings=_encodings)
-            x_recon, fwd_logdets = self.net(x_pred, _permutations, encodings=_encodings)
-            fwd_logdets = fwd_logdets * data_dim  # rescale from mean to sum
-
-            # TODO refector these all into a metrics
-            if log_invert_error:
-                self.log(f"{prefix}/invert/mse", torch.mean((prior_samples - x_recon) ** 2), sync_dist=True)
-                self.log(
-                    f"{prefix}/invert/max_abs",
-                    torch.max(abs(prior_samples - x_recon)),
-                    sync_dist=True,
-                )
-                self.log(
-                    f"{prefix}/invert/mean_abs",
-                    torch.mean(abs(prior_samples - x_recon)),
-                    sync_dist=True,
-                )
-                self.log(
-                    f"{prefix}/invert/median_abs",
-                    torch.median(abs(prior_samples - x_recon)),
-                    sync_dist=True,
-                )
-                cutoff = 0.01
-                self.log(
-                    f"{prefix}/invert/fail_count_{cutoff}",
-                    torch.sum(abs(prior_samples - x_recon) > cutoff).sum().float(),
-                    sync_dist=True,
-                )
-                self.log(
-                    f"{prefix}/invert/fail_count_sample_{cutoff}",
-                    (torch.sum(abs(prior_samples - x_recon) > cutoff, dim=1) > 0).sum().float(),
-                    sync_dist=True,
-                )
-                cutoff = 0.001
-                self.log(
-                    f"{prefix}/invert/fail_count_{cutoff}",
-                    torch.sum(abs(prior_samples - x_recon) > cutoff).sum().float(),
-                    sync_dist=True,
-                )
-                self.log(
-                    f"{prefix}/invert/fail_count_sample_{cutoff}",
-                    (torch.sum(abs(prior_samples - x_recon) > cutoff, dim=1) > 0).sum().float(),
-                    sync_dist=True,
-                )
-            x_pred = self.all_gather(x_pred).reshape(-1, *x_pred.shape[1:])
-            fwd_logdets = self.all_gather(fwd_logdets).reshape(-1, *fwd_logdets.shape[1:])
-            prior_log_q = self.all_gather(prior_log_q).reshape(-1, *prior_log_q.shape[1:])
-            prior_samples = self.all_gather(prior_samples).reshape(-1, *prior_samples.shape[1:])
-
-        log_q = prior_log_q.flatten() + fwd_logdets.flatten()
-
-        return x_pred, log_q, prior_samples
-
+        return x_pred, proposal_energy, z
 
 if __name__ == "__main__":
     _ = NormalizingFlowLitModule(None, None, None, None)
