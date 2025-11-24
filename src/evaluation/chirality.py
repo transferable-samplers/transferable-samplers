@@ -1,3 +1,6 @@
+import numpy as np
+import torch
+
 
 def create_adjacency_list(distance_matrix, atom_types):
     adjacency_list = []
@@ -121,41 +124,65 @@ def get_symmetry_change(true_samples, pred_samples, topology):
     symmetry_change = check_symmetry_change(true_samples, pred_samples, adj_list, atom_types)
     return symmetry_change
 
-def fix_chirality(true_samples, samples_data, topology):
-
-    temp_proposal_samples = proposal_samples.clone()
+def fix_chirality(true_samples, samples_data, topology, drop_unfixable: bool = False):
+    """
+    Fix chirality issues in predicted samples by comparing to true samples.
+    
+    Args:
+        true_samples: True reference samples (normalized)
+        samples_data: SamplesData object containing predicted samples
+        topology: Topology object for the peptide
+        drop_unfixable: Whether to drop samples that can't be fixed
+        
+    Returns:
+        SamplesData: Fixed samples data
+    """
+    from src.utils.data_types import SamplesData
+    
+    pred_samples = samples_data.x.clone()
+    temp_pred_samples = pred_samples.clone()
 
     first_symmetry_change = get_symmetry_change(
-        self.datamodule.unnormalize(true_samples),
-        self.datamodule.unnormalize(temp_proposal_samples),
-        self.datamodule.topology_dict[sequence],
+        true_samples,
+        temp_pred_samples,
+        topology,
     )
 
     correct_symmetry_rate = 1 - first_symmetry_change.float().mean().item()
 
-    temp_proposal_samples[first_symmetry_change] *= -1
+    temp_pred_samples[first_symmetry_change] *= -1
 
     second_symmetry_change = get_symmetry_change(
-        self.datamodule.unnormalize(true_samples),
-        self.datamodule.unnormalize(temp_proposal_samples),
-        self.datamodule.topology_dict[sequence],
+        true_samples,
+        temp_pred_samples,
+        topology,
     )
 
     uncorrectable_symmetry_rate = second_symmetry_change.float().mean().item()
 
-    if self.hparams.fix_symmetry:
-        proposal_samples[first_symmetry_change] *= -1
+    # Fix the symmetry
+    pred_samples[first_symmetry_change] *= -1
 
-        if self.hparams.drop_unfixable_symmetry:  # only makes sense to drop if symmetry is fixed
-            proposal_samples = proposal_samples[~second_symmetry_change]
-            proposal_log_q = proposal_log_q[~second_symmetry_change]
-            proposal_samples_energy = proposal_samples_energy[~second_symmetry_change]
+    if drop_unfixable:  # only makes sense to drop if symmetry is fixed
+        mask = ~second_symmetry_change
+        pred_samples = pred_samples[mask]
+        if samples_data.proposal_energy is not None:
+            proposal_energy = samples_data.proposal_energy[mask]
+        else:
+            proposal_energy = None
+        target_energy = samples_data.target_energy[mask]
+        if samples_data.importance_logits is not None:
+            importance_logits = samples_data.importance_logits[mask]
+        else:
+            importance_logits = None
+    else:
+        proposal_energy = samples_data.proposal_energy
+        target_energy = samples_data.target_energy
+        importance_logits = samples_data.importance_logits
 
-    metrics.update(
-        {
-            f"{prefix}/proposal/correct_symmetry_rate": correct_symmetry_rate,
-            f"{prefix}/proposal/uncorrectable_symmetry_rate": uncorrectable_symmetry_rate,
-        }
+    return SamplesData(
+        x=pred_samples,
+        proposal_energy=proposal_energy,
+        target_energy=target_energy,
+        importance_logits=importance_logits,
     )
-
-    return samples_data

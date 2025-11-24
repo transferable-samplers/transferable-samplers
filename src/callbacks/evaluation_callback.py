@@ -1,20 +1,46 @@
+import logging
+from collections import defaultdict
+from statistics import mean as stats_mean, median as stats_median
+
 import pytorch_lightning as pl
-from typing import Any, Dict
+import torch
+
+from src.evaluation.ensemble_evaluator import EnsembleEvaluator
+
+logger = logging.getLogger(__name__)
 
 
-    def add_aggregate_metrics(self, metrics: dict[str, torch.Tensor], prefix: str = "val") -> dict[str, torch.Tensor]:
-        # TODO: add per-length metrics
-        """Aggregate metrics across all sequences."""
+def detach_and_cpu(obj):
+    """
+    Recursively detach and move all tensors to CPU within a nested structure.
+    Works with dicts, lists, tuples, and tensors.
+    """
+    if isinstance(obj, torch.Tensor):
+        return obj.detach().cpu()
+    elif isinstance(obj, dict):
+        return {k: detach_and_cpu(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [detach_and_cpu(v) for v in obj]
+    elif isinstance(obj, tuple):
+        return tuple(detach_and_cpu(v) for v in obj)
+    else:
+        return obj  # Leave other data types (int, float, str, etc.) as-is
 
-        mean_dict_list = defaultdict(list)
-        median_dict_list = defaultdict(list)
-        count_dict = defaultdict(int)
 
-        # Parse and aggregate metrics along peptide sequences
-        for key, value in metrics.items():
-            if key.startswith(prefix):  # TODO not sure this is needed here
-                # Extract sequence and metric name
-                parts = key.split("/")
+def add_aggregate_metrics(metrics: dict[str, torch.Tensor], prefix: str = "val") -> dict[str, torch.Tensor]:
+    # TODO: add per-length metrics
+    """Aggregate metrics across all sequences."""
+
+    mean_dict_list = defaultdict(list)
+    median_dict_list = defaultdict(list)
+    count_dict = defaultdict(int)
+
+    # Parse and aggregate metrics along peptide sequences
+    for key, value in metrics.items():
+        if key.startswith(prefix):  # TODO not sure this is needed here
+            # Extract sequence and metric name
+            parts = key.split("/")
+            if len(parts) >= 3:
                 metric_name = "/".join(parts[2:])
 
                 # Add to mean and median dictionaries
@@ -31,40 +57,19 @@ from typing import Any, Dict
                 median_dict_list[median_key].append(value)
                 count_dict[count_key] += 1
 
-        # Compute mean and median for each metric
-        mean_dict = {}
-        median_dict = {}
-        for key, value in mean_dict_list.items():
-            mean_dict[key] = stats.mean(value)
+    # Compute mean and median for each metric
+    mean_dict = {}
+    median_dict = {}
+    for key, value in mean_dict_list.items():
+        mean_dict[key] = stats_mean(value)
 
-        for key, value in median_dict_list.items():
-            median_dict[key] = stats.median(value)
+    for key, value in median_dict_list.items():
+        median_dict[key] = stats_median(value)
 
-        metrics.update(mean_dict)
-        metrics.update(median_dict)
-        metrics.update(count_dict)
-        return metrics
-
-    
-def detach_and_cpu(
-        self, obj
-    ):  # TODO hack to have this here? at all? you could just be more careful to detach / cpu?
-        """
-        Recursively detach and move all tensors to CPU within a nested structure.
-        Works with dicts, lists, tuples, and tensors.
-        """
-        if isinstance(obj, torch.Tensor):
-            return obj.detach().cpu()
-        elif isinstance(obj, dict):
-            return {k: self.detach_and_cpu(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [self.detach_and_cpu(v) for v in obj]
-        elif isinstance(obj, tuple):
-            return tuple(self.detach_and_cpu(v) for v in obj)
-        else:
-            return obj  # Leave other data types (int, float, str, etc.) as-is
-
-
+    metrics.update(mean_dict)
+    metrics.update(median_dict)
+    metrics.update(count_dict)
+    return metrics
 
 
 class EvaluationCallback(pl.Callback):
@@ -76,7 +81,7 @@ class EvaluationCallback(pl.Callback):
 
     def __init__(
         self,
-        evaluator: Evaluator,
+        evaluator: EnsembleEvaluator,
         run_on_validation_epoch_end: bool = True,
         run_on_test_epoch_end: bool = False,
     ):
@@ -95,21 +100,61 @@ class EvaluationCallback(pl.Callback):
 
     def run_evaluation(self, stage: str, trainer: pl.Trainer, pl_module: pl.LightningModule):
         pl_module.eval()
-        with torch.no_grad():
-            sequences = trainer.datamodule.test_sequences if stage == "test" else trainer.datamodule.val_sequences
-            for sequence in sequences:
-                model_inputs, evaluation_inputs, energy_fn = trainer.datamodule.prepare_eval(sequence, stage)
-                samples_data_dict = pl_module.sample_sequence(sequence, cond_inputs)
-                metrics = self.evaluator.evaluate(sequence, samples_data_dict, evaluation_inputs, energy_fn)
+        
+        # Handle EMA if applicable
+        ema_backup_restored = False
+        if hasattr(pl_module.hparams, "ema_decay") and pl_module.hparams.ema_decay > 0:
+            if hasattr(pl_module.net, "backup") and hasattr(pl_module.net, "copy_to_model"):
+                pl_module.net.backup()
+                pl_module.net.copy_to_model()
+                ema_backup_restored = True
 
+        try:
+            with torch.no_grad():
+                sequences = trainer.datamodule.test_sequences if stage == "test" else trainer.datamodule.val_sequences
+                all_metrics = {}
+                all_plots = {}
+                
+                for sequence in sequences:
+                    model_inputs, evaluation_inputs, energy_fn = trainer.datamodule.prepare_eval(sequence, stage)
+                    samples_data_dict = pl_module.sample_sequence(
+                        sequence, 
+                        model_inputs, 
+                        energy_fn, 
+                        prefix=f"{stage}/{sequence}"
+                    )
+                    
+                    metrics, plots = self.evaluator.evaluate(
+                        sequence, 
+                        samples_data_dict, 
+                        evaluation_inputs, 
+                        energy_fn
+                    )
+                    
+                    # Merge metrics and plots
+                    all_metrics.update(metrics)
+                    all_plots.update(plots)
 
+                # Aggregate metrics across sequences
+                aggregated_metrics = add_aggregate_metrics(all_metrics, prefix=stage)
 
+                # Log everything in Lightning
+                for key, value in aggregated_metrics.items():
+                    if isinstance(value, torch.Tensor):
+                        value = value.item() if value.numel() == 1 else value
+                    trainer.log(key, value, sync_dist=True, on_epoch=True)
 
-
-            # TODO do the EMA stuff
-            result_dict = self.evaluator.evaluate()
-
-        # Log everything in Lightning
-        for key, value in result_dict.items():
-            trainer.logger.experiment.add_scalar(f"{stage}/{key}", value, trainer.global_step)
-            trainer.log(f"{stage}/{key}", value)
+                # Log plots if logger supports it
+                if hasattr(trainer.logger, "experiment") and trainer.logger.experiment is not None:
+                    for plot_name, plot_data in all_plots.items():
+                        if isinstance(plot_data, dict):
+                            for subplot_name, plot_obj in plot_data.items():
+                                if hasattr(trainer.logger.experiment, "log_image"):
+                                    trainer.logger.experiment.log_image(
+                                        f"{stage}/{plot_name}/{subplot_name}", 
+                                        plot_obj
+                                    )
+        finally:
+            # Restore EMA backup if we made one
+            if ema_backup_restored and hasattr(pl_module.net, "restore_to_model"):
+                pl_module.net.restore_to_model()

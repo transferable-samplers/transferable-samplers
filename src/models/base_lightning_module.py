@@ -311,24 +311,18 @@ class NormalizingFlowLitModule(BaseLightningModule):
             s, lp, ps = self.generate_samples(
                 num_samples % batch_size, model_inputs=model_inputs
             )
-            proposal_sample_batches.append(proposal_samples)
-            log_q_theta_batches.append(log_q_theta)
-            prior_sample_batches.append(prior_samples)
+            proposal_sample_batches.append(s)
+            log_q_theta_batches.append(lp)
+            prior_sample_batches.append(ps)
         proposal_samples = torch.cat(proposal_sample_batches, dim=0)
         log_q_theta = torch.cat(log_q_theta_batches, dim=0)
         prior_samples = torch.cat(prior_sample_batches, dim=0)
-        return proposal_samples, log_q_thetas, prior_samples
+        return proposal_samples, log_q_theta, prior_samples
 
     def on_eval_epoch_end(self, metrics, prefix: str = "val") -> None:
         self.log_dict(metrics.compute(), sync_dist=True)
         metrics.reset()
-        if self.hparams.ema_decay > 0:
-            self.net.backup()
-            self.net.copy_to_model()
-            self.evaluate(prefix, proposal_generator=self.batched_sample_proposal, sampler=self.sampler)
-            self.net.restore_to_model()
-        else:
-            self.evaluate(prefix, proposal_generator=self.batched_sample_proposal, sampler=self.sampler)
+        # Evaluation is now handled by EvaluationCallback
 
     def batchify_model_input(self, model_inputs: dict[str, torch.Tensor], batch_size: int) -> dict[str, torch.Tensor]:
         return {
@@ -348,66 +342,99 @@ class NormalizingFlowLitModule(BaseLightningModule):
     def sample_sequence(
         self,
         sequence,
-        cond_inputs,
+        model_inputs,
         energy_fn,
         prefix: str = ""
-    ) -> None:
+    ) -> dict:
         """Generates samples from the proposal and runs SMC if enabled.
-        Also computes metrics, through the datamodule function "metrics_and_plots".
+        
+        Args:
+            sequence: Sequence identifier
+            model_inputs: ModelInputs dataclass containing permutations and encodings
+            energy_fn: Function to compute target energy
+            prefix: Prefix for logging
+            
+        Returns:
+            dict: Dictionary mapping sample type names to SamplesData objects
         """
+        import time
+        from src.utils.data_types import SamplesData
+        
+        # Get number of samples from config
+        num_samples = self.hparams.sampling_config.get("num_eval_samples", 10_000)
+        batch_size = self.hparams.sampling_config.get("batch_size", 64)
+        
+        # Prepare model inputs
+        if model_inputs.permutations is not None:
+            permutations = model_inputs.permutations
+        else:
+            permutations = None
+            
+        if model_inputs.encodings is not None:
+            encodings = model_inputs.encodings
+        else:
+            encodings = None
+            
+        cond_inputs = {"permutations": permutations, "encodings": encodings}
 
-        torch.cuda.synchronize()
+        # Generate proposal samples
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
         start_time = time.time()
-        proposal_samples, proposal_log_q, prior_samples = self.sample_proposal(
-            num_samples, cond_inputs
+        
+        proposal_samples, proposal_log_q, prior_samples = self.batched_sample_proposal(
+            num_samples, batch_size, model_inputs=cond_inputs
         )
-        torch.cuda.synchronize()
+        
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
         time_duration = time.time() - start_time
-        metrics.update(
-            {
-                f"{prefix}/samples_walltime": time_duration,
-                f"{prefix}/samples_per_second": len(proposal_samples) / time_duration,
-                f"{prefix}/seconds_per_sample": time_duration / len(proposal_samples),
-            }
-        )
-        samples_dict = {
-            "prior_samples": prior_samples,
-            "proposal_samples": proposal_samples,
-            "proposal_log_q": proposal_log_q,
+        
+        # Compute proposal energy (proposal_samples are normalized)
+        proposal_energy = self.proposal_energy_fn(proposal_samples)
+        # energy_fn expects normalized samples
+        target_energy = energy_fn(proposal_samples)
+        
+        # Log timing metrics
+        self.log(f"{prefix}/samples_walltime", time_duration, sync_dist=True)
+        self.log(f"{prefix}/samples_per_second", len(proposal_samples) / time_duration, sync_dist=True)
+        self.log(f"{prefix}/seconds_per_sample", time_duration / len(proposal_samples), sync_dist=True)
+
+        samples_data_dict = {
+            "proposal": SamplesData(
+                x=self.datamodule.unnormalize(proposal_samples),
+                proposal_energy=proposal_energy,
+                target_energy=target_energy,
+                importance_logits=None,
+            )
         }
-        if self.local_rank == 0:
-            save_samples_dict(samples_dict)
 
-        if self.sampler is not None:
-            coms = proposal_samples.mean(dim=1, keepdim=False)
-            proposal_com_std = coms.std()
-
-            cond_proposal_energy = lambda _x: self.proposal_energy(_x, permutations=permutations, encodings=encodings)
+        # Run sampler if available
+        if hasattr(self, "sampler") and self.sampler is not None:
             if self.hparams.sampling_config.get("use_com_adjustment", False):
                 _proposal_energy_fn = lambda x: self.proposal_energy_fn(x, com_adjustment=True)
             else:
                 _proposal_energy_fn = self.proposal_energy_fn
 
-            # Generate smc samples and record time
-            torch.cuda.synchronize()
+            # Generate sampler samples and record time
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
             start_time = time.time()
-            sampler_samples, sampler_logits = self.sampler.sample(proposal_samples, _proposal_energy_fn, energy_fn)
-            torch.cuda.synchronize()
+            
+            sampler_samples_data = self.sampler.sample(proposal_samples, _proposal_energy_fn, energy_fn)
+            
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
             time_duration = time.time() - start_time
+            
             self.log(f"{prefix}/sampler/samples_walltime", time_duration, sync_dist=True)
-            self.log(f"{prefix}/sampler/samples_per_second", len(sampler_samples) / time_duration, sync_dist=True)
+            self.log(f"{prefix}/sampler/samples_per_second", len(sampler_samples_data.x) / time_duration, sync_dist=True)
 
-        samples_data_dict = {
-            "proposal": SamplesData(
-                self.datamodule.unnormalize(proposal_samples),
-                proposal_samples_energy,
-            )
-
-        if self.sampler is not None:
             samples_data_dict["sampler"] = SamplesData(
-                self.datamodule.unnormalize(sampler_samples),
-                energy_fn(sampler_samples),
-                logits=sampler_logits,
+                x=self.datamodule.unnormalize(sampler_samples_data.x),
+                proposal_energy=sampler_samples_data.proposal_energy,
+                target_energy=sampler_samples_data.target_energy,
+                importance_logits=sampler_samples_data.importance_logits,
             )
 
         return samples_data_dict
