@@ -7,23 +7,57 @@ import torch
 from src.models.transferable_boltzmann_generator_module import TransferableBoltzmannGeneratorLitModule
 
 
-class NormalizingFlowLitModule(TransferableBoltzmannGeneratorLitModule):
+import inspect
+import logging
+import os
+import statistics as stats
+import time
+from collections import defaultdict
+from copy import deepcopy
+from typing import Any, Optional
+
+import matplotlib.pyplot as plt
+import torch
+import torchmetrics
+from lightning import LightningDataModule, LightningModule
+from lightning.pytorch.loggers import WandbLogger
+from torchmetrics import MeanMetric
+from tqdm import tqdm
+
+from src.evaluation.metrics_and_plots import metrics_and_plots
+from src.models.base_lightning_module import BaseLightningModule
+from src.models.neural_networks.ema import EMA
+from src.models.priors import NormalDistribution
+from src.models.samplers.base_sampler import SMCSampler
+from src.models.utils import get_symmetry_change, resample
+from src.utils.data_types import SamplesData
+
+logger = logging.getLogger(__name__)
+
+class NormalizingFlowLitModule(BaseLightningModule):
     def __init__(
         self,
-        energy_kl_weight: float = 0.0,
-        log_invertibility_error: bool = True,
-        *args,
-        **kwargs,
+        net: torch.nn.Module,
+        optimizer: torch.optim.Optimizer,
+        scheduler: torch.optim.lr_scheduler,
+        datamodule: LightningDataModule,
+        evaluator: Evaluator,
+        ema_decay: float,
+        compile: bool,
+        sampler: Sampler,
+        use_com_adjustment: bool = False,
     ) -> None:
-        """Initialize a `NormalizingFlowLitModule`.
-
-        :param net: The model to train.
-        :param optimizer: The optimizer to use for training.
-        :param scheduler: The learning rate scheduler to use for training.
-        """
-        super().__init__(*args, **kwargs)
+        """Initialize a `NormalizingFlowLitModule`."""
+        super().__init__(
+            net=net,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            datamodule=datamodule,
+            evaluator=evaluator,
+            ema_decay=ema_decay,
+            compile=compile,
+        )
         assert not self.hparams.mean_free_prior, "Mean free prior is not supported for normalizing flows"
-
         self.eval_encodings = None
         self.eval_energy = None
 
@@ -87,62 +121,6 @@ class NormalizingFlowLitModule(TransferableBoltzmannGeneratorLitModule):
 
         return loss
 
-    def com_energy_adjustment(self, x: torch.Tensor) -> torch.Tensor:
-        assert self.proposal_com_std is not None, "Center of mass std should be set"
-
-        sigma = self.proposal_com_std
-
-        com = x.mean(dim=1, keepdim=False)
-        com_norm = com.norm(dim=-1)
-        com_energy = com_norm**2 / (2 * sigma**2) - torch.log(
-            com_norm**2 / (math.sqrt(2) * sigma**3 * scipy.special.gamma(3 / 2))
-        )
-
-        return com_energy
-
-    def proposal_energy(self, x: torch.Tensor, permutations, encodings: dict[str, torch.Tensor]) -> torch.Tensor:
-        data_dim = x.shape[1] * self.datamodule.hparams.num_dimensions  # is the product num_atoms * num_dimensions
-        if encodings is not None:
-            _encodings = {}
-            for k, v in encodings.items():
-                # ensure encodings is broadcasted to batch if we pass
-                # in a single peptide
-                if v.ndim == 1 and x.ndim > 2:
-                    v = v[None, ...].repeat(x.shape[0], *([1] * v.ndim))
-
-                _encodings[k] = v.to(x.device)
-        else:
-            _encodings = None
-
-        if permutations is not None:
-            _permutations = {
-                subkey: tensor.unsqueeze(0).repeat(x.shape[0], 1).to(self.device)
-                for subkey, tensor in permutations.items()
-            }
-        else:
-            _permutations = None
-
-        # TODO need to figure out x_pred / recon names - maybe use z going forwards
-        x_pred, fwd_logdets = self.net(x, _permutations, encodings=_encodings)
-
-        fwd_logdets = fwd_logdets.view(-1) * data_dim  # rescale from mean to sum
-        prior_energy = self.prior.energy(x_pred).view(-1) * data_dim  # rescale from mean to sum
-
-        energy = prior_energy - fwd_logdets
-
-        if self.hparams.sampling_config.use_com_adjustment:
-            com_energy = self.com_energy_adjustment(x)
-            energy = energy - com_energy
-
-        return energy
-
-    def batchify_model_input(self, model_inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-        return {
-            key: tensor.unsqueeze(0).repeat(local_batch_size, 1).to(self.device)
-            for key, tensor in model_inputs.items()
-        }
-        return model_inputs
-
     def invertibility_metrics(self, z, z_recon):
 
         metrics = {}
@@ -158,55 +136,89 @@ class NormalizingFlowLitModule(TransferableBoltzmannGeneratorLitModule):
 
         return metrics
 
-    def all_gather_batch_dim(self, tensor: torch.Tensor) -> torch.Tensor:
-        return self.all_gather(tensor).reshape(-1, *tensor.shape[1:])
-
     def sample_proposal(
         self,
         num_samples: int,
-        model_inputs: dict[str, torch.Tensor],
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Sample proposal from the model.
-
-        :param num_samples: The number of samples to generate.
-        :param model_inputs: The model inputs to use for generating samples.
-        :return: A tuple containing the generated samples, the prior samples, and the log
-            probability.
+        cond_inputs: Optional[dict[str, torch.Tensor]] = None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Sample from the proposal distribution q_theta(x).
+    
+        Args:
+            num_samples: Number of samples to generate.
+            cond_inputs: Conditioning inputs passed to the flow.
+    
+        Returns:
+            x: Generated samples in data space.
+            log_q_x: Log proposal density log q(x).
+            z: Latent prior samples used to generate x.
+            invertibility_metrics: Metrics comparing z and z_recon.
         """
+    
+        encodings = cond_inputs.get("encodings")
+        permutations = cond_inputs.get("permutations")
+    
+        if encodings is None:
+            # Handles the non-transferable case
+            num_atoms = self.datamodule.hparams.num_atoms
+        else:
+            num_atoms = encodings["atom_type"].size(0)
+    
+        data_dim = num_atoms * self.datamodule.hparams.num_dimensions
+        local_batch_size = num_samples // self.trainer.world_size
+    
+        z = self.prior.sample(local_batch_size, num_atoms, device=self.device)
+        log_p_z = -self.prior.energy(z) * data_dim # convert mean → sum
+    
+        _permutations = self.batchify_model_input(permutations)
+        _encodings = self.batchify_model_input(encodings)
+    
+        x = self.net.reverse(
+            z,
+            permutations=_permutations,
+            encodings=_encodings,
+        )
+    
+        z_recon, dlogp = self.net.forward(
+            x,
+            permutations=_permutations,
+            encodings=_encodings,
+        )
+        dlogp = dlogp * data_dim  # convert mean → sum
+    
+        log_q_x = log_p_z.view(-1) + dlogp.view(-1)
+    
+        invertibility_metrics = self.invertibility_metrics(z, z_recon)
+    
+        x        = self.all_gather_batch_dim(x)
+        log_q_x  = self.all_gather_batch_dim(log_q_x)
+        z        = self.all_gather_batch_dim(z)
+
+        return x, log_q_x, z, invertibility_metrics
+
+    def proposal_energy_fn(self, x: torch.Tensor, model_inputs: dict[str, torch.Tensor]) -> torch.Tensor:
 
         encodings = model_inputs.get("encodings")
         permutations = model_inputs.get("permutations")
 
-        if encodings is None:
-            num_atoms = self.datamodule.hparams.num_atoms
-        else:
-            num_atoms = encodings["atom_type"].size(0)
+        data_dim = x.shape[1] * self.datamodule.hparams.num_dimensions  # is the product num_atoms * num_dimensions
+        _encodings = self.batchify_model_input(encodings, x.shape[0]) if encodings is not None else None
+        _permutations = self.batchify_model_input(permutations, x.shape[0]) if permutations is not None else None
 
-        data_dim = num_atoms * self.datamodule.hparams.num_dimensions
+        z_recon, dlogp = self.net.forward(x, _permutations, encodings=_encodings)
 
-        local_batch_size = num_samples // self.trainer.world_size
-        prior_samples = self.prior.sample(local_batch_size, num_atoms, device=self.device)
+        dlogp = dlogp.view(-1) * data_dim  # rescale from mean to sum
+        log_p_z = -self.prior.energy(z_recon).view(-1) * data_dim  # rescale from mean to sum
 
-        # need to rescale to the "sum" of the log p (the prior returns the position-wise mean)
-        prior_samples_energy = -self.prior.energy(prior_samples_energy) * data_dim
+        log_q_x = log_p_z + dlogp
 
-        _permutations = self.batchify_model_input(permutations)
-        _encodings = self.batchify_model_input(encodings)
+        proposal_energy = - log_q_x
 
-        proposal_samples = self.net.reverse(prior_samples, _permutations, encodings=_encodings)
-        z_recon, logdets = self.net(proposal_samples, _permutations, encodings=_encodings)
-        logdets = logdets * data_dim  # rescale from mean to sum
+        return proposal_energy
 
-        invertibility_metrics = self.invertibility_metrics(z, z_recon)
-
-        x_pred = self.all_gather_batch_dim(x_pred)
-        logdets = self.all_gather_batch_dim(logdets)
-        z_energy = self.all_gather_batch_dim(z_energy)
-        prior_samples = self.all_gather_batch_dim(prior_samples)
-
-        proposal_energy = - (z_energy.flatten() + logdets.flatten())
-
-        return x_pred, proposal_energy, z
-
-if __name__ == "__main__":
-    _ = NormalizingFlowLitModule(None, None, None, None)
+    def com_energy_adjustment_fn(self, x: torch.Tensor, sigma: float) -> torch.Tensor:
+        com = x.mean(dim=1, keepdim=False)
+        com_norm = com.norm(dim=-1)
+        com_energy = com_norm**2 / (2 * sigma**2) - torch.log(
+            com_norm**2 / (math.sqrt(2) * sigma**3 * scipy.special.gamma(3 / 2))
+        )
+        return com_energy

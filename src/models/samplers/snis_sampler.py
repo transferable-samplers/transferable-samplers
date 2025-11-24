@@ -4,7 +4,6 @@ import numpy as np
 import torch
 
 class SNISSampler(BaseSampler):
-
     def sample(self, proposal_samples, proposal_energy_fn, target_energy_fn):
         """
         NOTE: In theory the samplers could share values for x_proposal_energy and x_target_energy,

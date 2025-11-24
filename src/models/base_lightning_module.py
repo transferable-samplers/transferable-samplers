@@ -1,4 +1,5 @@
 import logging
+from re import I
 
 import torch
 from lightning import LightningModule
@@ -13,6 +14,60 @@ class BaseLightningModule(LightningModule):
     Base Lightning module with common functionality for gradient monitoring,
     EMA handling, and state dict filtering.
     """
+
+class NormalizingFlowLitModule(BaseLightningModule):
+    def __init__(
+        self,
+        net: torch.nn.Module,
+        optimizer: torch.optim.Optimizer,
+        scheduler: torch.optim.lr_scheduler,
+        datamodule: LightningDataModule,
+        evaluator: Evaluator,
+        ema_decay: float,
+        compile: bool,
+    ) -> None:
+        """Initialize a `FlowMatchLitModule`.
+
+        :param net: The model to train.
+        :param optimizer: The optimizer to use for training.
+        :param scheduler: The learning rate scheduler to use for training.
+        """
+        super().__init__()
+        # this line allows to access init params with 'self.hparams' attribute
+        # also ensures init params will be stored in ckpt
+        self.save_hyperparameters(logger=False, ignore=("datamodule"))
+        if args or kwargs:
+            logger.warning(f"Unexpected arguments: {args}, {kwargs}")
+        assert not self.hparams.mean_free_prior, "Mean free prior is not supported for normalizing flows"
+
+        self.net = net
+        if self.hparams.ema_decay > 0:
+            self.net = EMA(net, decay=self.hparams.ema_decay)
+
+        self.datamodule = datamodule
+
+        self.smc_sampler = smc_sampler
+        if self.smc_sampler is not None:
+            self.smc_sampler.log_image_fn = self.log_image
+
+        # loss function
+        self.criterion = torch.nn.MSELoss(reduction="mean")
+
+        # metric objects for calculating and averaging accuracy across batches
+        self.train_metrics = torchmetrics.MetricCollection({"loss": MeanMetric()}, prefix="train/")
+        self.val_metrics = self.train_metrics.clone(prefix="val/")
+        self.test_metrics = self.train_metrics.clone(prefix="test/")
+
+        self.prior = NormalDistribution(
+            self.datamodule.hparams.num_dimensions,  # for transferable this will be the dim of the largest peptide
+            mean_free=self.hparams.mean_free_prior,
+        )
+
+        self.output_dir = output_dir
+
+        self.eval_encodings = None
+        self.eval_energy = None
+
 
     def log_image(self, img: torch.Tensor, title: str = None) -> None:
         """Log an image to the logger.
@@ -270,14 +325,95 @@ class BaseLightningModule(LightningModule):
         if self.hparams.ema_decay > 0:
             self.net.backup()
             self.net.copy_to_model()
-            self.evaluator.evaluate(prefix)
+            self.evaluate(prefix, proposal_generator=self.batched_sample_proposal, sampler=self.sampler)
             self.net.restore_to_model()
         else:
-            self.evaluator.evaluate(prefix)
-        plt.close("all")
+            self.evaluate(prefix, proposal_generator=self.batched_sample_proposal, sampler=self.sampler)
+
+    def batchify_model_input(self, model_inputs: dict[str, torch.Tensor], batch_size: int) -> dict[str, torch.Tensor]:
+        return {
+            key: tensor.unsqueeze(0).repeat(local_batch_size, 1).to(self.device)
+            for key, tensor in model_inputs.items()
+        }
+
+    def all_gather_batch_dim(self, tensor: torch.Tensor) -> torch.Tensor:
+        return self.all_gather(tensor).reshape(-1, *tensor.shape[1:])
+
+    def save_samples_dict(self, samples_dict, prefix):
+        if self.local_rank == 0:
+            os.makedirs(f"{self.output_dir}/{prefix}", exist_ok=True)
+            torch.save(samples_dict, f"{self.output_dir}/{prefix}/samples.pt")
+            logging.info(f"Saving samples to {self.output_dir}/{prefix}/samples.pt")
+
+    def sample_sequence(
+        self,
+        sequence,
+        cond_inputs,
+        energy_fn,
+        prefix: str = ""
+    ) -> None:
+        """Generates samples from the proposal and runs SMC if enabled.
+        Also computes metrics, through the datamodule function "metrics_and_plots".
+        """
+
+        torch.cuda.synchronize()
+        start_time = time.time()
+        proposal_samples, proposal_log_q, prior_samples = self.sample_proposal(
+            num_samples, cond_inputs
+        )
+        torch.cuda.synchronize()
+        time_duration = time.time() - start_time
+        metrics.update(
+            {
+                f"{prefix}/samples_walltime": time_duration,
+                f"{prefix}/samples_per_second": len(proposal_samples) / time_duration,
+                f"{prefix}/seconds_per_sample": time_duration / len(proposal_samples),
+            }
+        )
+        samples_dict = {
+            "prior_samples": prior_samples,
+            "proposal_samples": proposal_samples,
+            "proposal_log_q": proposal_log_q,
+        }
+        if self.local_rank == 0:
+            save_samples_dict(samples_dict)
+
+        if self.sampler is not None:
+            coms = proposal_samples.mean(dim=1, keepdim=False)
+            proposal_com_std = coms.std()
+
+            cond_proposal_energy = lambda _x: self.proposal_energy(_x, permutations=permutations, encodings=encodings)
+            if self.hparams.sampling_config.get("use_com_adjustment", False):
+                _proposal_energy_fn = lambda x: self.proposal_energy_fn(x, com_adjustment=True)
+            else:
+                _proposal_energy_fn = self.proposal_energy_fn
+
+            # Generate smc samples and record time
+            torch.cuda.synchronize()
+            start_time = time.time()
+            sampler_samples, sampler_logits = self.sampler.sample(proposal_samples, _proposal_energy_fn, energy_fn)
+            torch.cuda.synchronize()
+            time_duration = time.time() - start_time
+            self.log(f"{prefix}/sampler/samples_walltime", time_duration, sync_dist=True)
+            self.log(f"{prefix}/sampler/samples_per_second", len(sampler_samples) / time_duration, sync_dist=True)
+
+        samples_data_dict = {
+            "proposal": SamplesData(
+                self.datamodule.unnormalize(proposal_samples),
+                proposal_samples_energy,
+            )
+
+        if self.sampler is not None:
+            samples_data_dict["sampler"] = SamplesData(
+                self.datamodule.unnormalize(sampler_samples),
+                energy_fn(sampler_samples),
+                logits=sampler_logits,
+            )
+
+        return samples_data_dict
 
 
-    def generate_samples(
+    def sample_proposal(
         self, batch_size: int, model_inputs: Optional[dict[str, torch.Tensor]] = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Generate samples from the model.

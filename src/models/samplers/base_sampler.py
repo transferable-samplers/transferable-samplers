@@ -1,4 +1,4 @@
-class BaseSampler(ABC):
+class Sampler(ABC):
     def __init__(self, num_samples: int, logit_clip_filter_pct: float = 0.0):
         self.num_samples = num_samples
         self.logit_clip_filter_pct = logit_clip_filter # Applied to the initial proposal samples
