@@ -51,6 +51,8 @@ def metrics_and_plots(
     if len(prefix) > 0 and prefix[-1] != "/":
         prefix += "/"
 
+            metrics.update({f"proposal/com_std": proposal_com_std})
+
     metrics = {}
     if do_plots:
         plot_ramachandran(

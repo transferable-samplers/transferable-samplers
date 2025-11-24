@@ -368,55 +368,6 @@ class TransferableBoltzmannGeneratorLitModule(BaseLightningModule):
         else:
             num_proposal_samples = self.hparams.sampling_config.num_proposal_samples
 
-        if self.hparams.sampling_config.get("load_samples_path", None) is None:
-            # Generate samples and record time
-            torch.cuda.synchronize()
-            start_time = time.time()
-            proposal_samples, proposal_log_q, prior_samples = proposal_generator(
-                num_proposal_samples, model_inputs.permutations, model_inputs.encodings
-            )
-            torch.cuda.synchronize()
-            time_duration = time.time() - start_time
-
-            metrics.update(
-                {
-                    f"{prefix}/samples_walltime": time_duration,
-                    f"{prefix}/samples_per_second": len(proposal_samples) / time_duration,
-                    f"{prefix}/seconds_per_sample": time_duration / len(proposal_samples),
-                }
-            )
-
-            # Save samples to disk
-            samples_dict = {
-                "prior_samples": prior_samples,
-                "proposal_samples": proposal_samples,
-                "proposal_log_q": proposal_log_q,
-            }
-            if self.local_rank == 0:
-                os.makedirs(f"{self.output_dir}/{prefix}", exist_ok=True)
-                if self.hparams.sampling_config.get("subset_idx") is not None:
-                    torch.save(
-                        samples_dict, f"{self.output_dir}/{prefix}/samples_{self.hparams.sampling_config.subset_idx}.pt"
-                    )
-                    logging.info(
-                        f"Saving {len(proposal_samples)} samples to {self.output_dir} "
-                        "/{prefix}/samples_{self.hparams.sampling_config.subset_idx}.pt"
-                    )
-                    return {}  # early return if subset_idx is set - need to post-process these samples in notebook
-                else:
-                    torch.save(samples_dict, f"{self.output_dir}/{prefix}/samples.pt")
-                    logging.info(f"Saving {len(proposal_samples)} samples to {self.output_dir}/{prefix}/samples.pt")
-        else:
-            # Load samples from disk
-            samples_path = self.hparams.sampling_config.load_samples_path
-            logging.info(f"Loading proposal samples from {samples_path}")
-            samples_dict = torch.load(samples_path, map_location=self.device)
-            proposal_samples = samples_dict["proposal_samples"]
-            proposal_log_q = samples_dict["proposal_log_q"]
-            prior_samples = samples_dict["prior_samples"]
-            logging.info(f"Loaded {len(proposal_samples)} samples")
-
-        # Compute energy
         proposal_samples_energy = energy_fn(proposal_samples)
 
         # Datatype for easier metrics and plotting
@@ -434,68 +385,12 @@ class TransferableBoltzmannGeneratorLitModule(BaseLightningModule):
         logging.info(f"Proposal CoM std: {proposal_com_std}")
         self.log(f"{prefix}/proposal_com_std", proposal_com_std, sync_dist=True)
 
-        temp_proposal_samples = proposal_samples.clone()
-
-        first_symmetry_change = get_symmetry_change(
-            self.datamodule.unnormalize(true_samples),
-            self.datamodule.unnormalize(temp_proposal_samples),
-            self.datamodule.topology_dict[sequence],
-        )
-
-        correct_symmetry_rate = 1 - first_symmetry_change.float().mean().item()
-
-        temp_proposal_samples[first_symmetry_change] *= -1
-
-        second_symmetry_change = get_symmetry_change(
-            self.datamodule.unnormalize(true_samples),
-            self.datamodule.unnormalize(temp_proposal_samples),
-            self.datamodule.topology_dict[sequence],
-        )
-
-        uncorrectable_symmetry_rate = second_symmetry_change.float().mean().item()
-
-        if self.hparams.fix_symmetry:
-            proposal_samples[first_symmetry_change] *= -1
-
-            if self.hparams.drop_unfixable_symmetry:  # only makes sense to drop if symmetry is fixed
-                proposal_samples = proposal_samples[~second_symmetry_change]
-                proposal_log_q = proposal_log_q[~second_symmetry_change]
-                proposal_samples_energy = proposal_samples_energy[~second_symmetry_change]
-
-        metrics.update(
-            {
-                f"{prefix}/proposal/correct_symmetry_rate": correct_symmetry_rate,
-                f"{prefix}/proposal/uncorrectable_symmetry_rate": uncorrectable_symmetry_rate,
-            }
-        )
-
         # Datatype for easier metrics and plotting
         proposal_data = SamplesData(
             self.datamodule.unnormalize(proposal_samples),
             proposal_samples_energy,
         )
 
-        # Apply CoM adjustment to energy, this must be done here for compatibility with CNFs
-        if self.hparams.sampling_config.get("use_com_adjustment", False):
-            logging.info("Applying center of mass energy adjustment")
-            proposal_log_q = proposal_log_q + self.com_energy_adjustment(proposal_samples)
-
-        # Compute resampling index
-        # proposal_log_p - proposal_log_q
-        resampling_logits = -proposal_samples_energy - proposal_log_q
-
-        # Filter samples based on logit clipping - this affects both IS and SMC
-        if self.hparams.sampling_config.clip_reweighting_logits:
-            clipped_logits_mask = resampling_logits > torch.quantile(
-                resampling_logits,
-                1 - float(self.hparams.sampling_config.clip_reweighting_logits),
-            )
-            proposal_samples = proposal_samples[~clipped_logits_mask]
-            proposal_samples_energy = proposal_samples_energy[~clipped_logits_mask]
-            resampling_logits = resampling_logits[~clipped_logits_mask]
-            logging.info("Clipped logits for resampling")
-
-        _, resampling_index = resample(proposal_samples, resampling_logits, return_index=True)
 
         reweighted_data = SamplesData(
             self.datamodule.unnormalize(proposal_samples[resampling_index]),

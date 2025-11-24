@@ -227,41 +227,41 @@ class NormalizingFlowLitModule(TransferableBoltzmannGeneratorLitModule):
 
             # TODO refector these all into a metrics
             if log_invert_error:
-                self.log("invert/mse", torch.mean((prior_samples - x_recon) ** 2), sync_dist=True)
+                self.log(f"{prefix}/invert/mse", torch.mean((prior_samples - x_recon) ** 2), sync_dist=True)
                 self.log(
-                    "invert/max_abs",
+                    f"{prefix}/invert/max_abs",
                     torch.max(abs(prior_samples - x_recon)),
                     sync_dist=True,
                 )
                 self.log(
-                    "invert/mean_abs",
+                    f"{prefix}/invert/mean_abs",
                     torch.mean(abs(prior_samples - x_recon)),
                     sync_dist=True,
                 )
                 self.log(
-                    "invert/median_abs",
+                    f"{prefix}/invert/median_abs",
                     torch.median(abs(prior_samples - x_recon)),
                     sync_dist=True,
                 )
                 cutoff = 0.01
                 self.log(
-                    f"invert/fail_count_{cutoff}",
+                    f"{prefix}/invert/fail_count_{cutoff}",
                     torch.sum(abs(prior_samples - x_recon) > cutoff).sum().float(),
                     sync_dist=True,
                 )
                 self.log(
-                    f"invert/fail_count_sample_{cutoff}",
+                    f"{prefix}/invert/fail_count_sample_{cutoff}",
                     (torch.sum(abs(prior_samples - x_recon) > cutoff, dim=1) > 0).sum().float(),
                     sync_dist=True,
                 )
                 cutoff = 0.001
                 self.log(
-                    f"invert/fail_count_{cutoff}",
+                    f"{prefix}/invert/fail_count_{cutoff}",
                     torch.sum(abs(prior_samples - x_recon) > cutoff).sum().float(),
                     sync_dist=True,
                 )
                 self.log(
-                    f"invert/fail_count_sample_{cutoff}",
+                    f"{prefix}/invert/fail_count_sample_{cutoff}",
                     (torch.sum(abs(prior_samples - x_recon) > cutoff, dim=1) > 0).sum().float(),
                     sync_dist=True,
                 )

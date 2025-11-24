@@ -1,155 +1,3 @@
-from statistics import median
-
-import numpy as np
-import torch
-
-
-def resample(samples, logits, return_index=False):
-    """
-    Resample samples with given logits.
-    Args:
-        samples: Samples to resample
-        logits: Logits for resampling
-    Returns:
-        Resampled samples
-    """
-    probs = torch.softmax(logits, dim=-1)
-    resampled_samples = torch.multinomial(probs, samples.size(0), replacement=True)
-    return samples[resampled_samples], resampled_samples
-
-
-class RunningMedian:
-    def __init__(self, window_size):
-        self.window_size = window_size
-        self.values = []
-
-    def update(self, value):
-        if len(self.values) == self.window_size:
-            self.values.pop(0)
-        self.values.append(value)
-
-    def compute(self):
-        if not self.values:
-            return 0.0
-        return median(self.values)
-
-
-def sum_except_batch(x):
-    return x.reshape(x.size(0), -1).sum(dim=-1)
-
-
-def remove_mean(x):
-    mean = torch.mean(x, dim=1, keepdim=True)
-    x = x - mean
-    return x
-
-
-def remove_mean_with_mask(x, node_mask):
-    assert (x * (1 - node_mask)).abs().sum().item() < 1e-8
-    N = node_mask.sum(1, keepdims=True)
-
-    mean = torch.sum(x, dim=1, keepdim=True) / N
-    x = x - mean * node_mask
-    return x
-
-
-def assert_mean_zero(x):
-    mean = torch.mean(x, dim=1, keepdim=True)
-    assert mean.abs().max().item() < 1e-4
-
-
-def assert_mean_zero_with_mask(x, node_mask):
-    assert_correctly_masked(x, node_mask)
-    assert torch.sum(x, dim=1, keepdim=True).abs().max().item() < 1e-4, "Mean is not zero"
-
-
-def assert_correctly_masked(variable, node_mask):
-    assert (variable * (1 - node_mask)).abs().max().item() < 1e-4, "Variables not masked properly."
-
-
-def center_gravity_zero_gaussian_log_likelihood(x):
-    assert len(x.size()) == 3
-    B, N, D = x.size()
-    assert_mean_zero(x)
-
-    # r is invariant to a basis change in the relevant hyperplane.
-    r2 = sum_except_batch(x.pow(2))
-
-    # The relevant hyperplane is (N-1) * D dimensional.
-    degrees_of_freedom = (N - 1) * D
-
-    # Normalizing constant and logpx are computed:
-    log_normalizing_constant = -0.5 * degrees_of_freedom * np.log(2 * np.pi)
-    log_px = -0.5 * r2 + log_normalizing_constant
-
-    return log_px
-
-
-def sample_center_gravity_zero_gaussian(size, device):
-    assert len(size) == 3
-    x = torch.randn(size, device=device)
-
-    # This projection only works because Gaussian is rotation invariant around
-    # zero and samples are independent!
-    x_projected = remove_mean(x)
-    return x_projected
-
-
-def center_gravity_zero_gaussian_log_likelihood_with_mask(x, node_mask):
-    assert len(x.size()) == 3
-    B, N_embedded, D = x.size()
-    assert_mean_zero_with_mask(x, node_mask)
-
-    # r is invariant to a basis change in the relevant hyperplane, the masked
-    # out values will have zero contribution.
-    r2 = sum_except_batch(x.pow(2))
-
-    # The relevant hyperplane is (N-1) * D dimensional.
-    N = node_mask.squeeze(2).sum(1)  # N has shape [B]
-    degrees_of_freedom = (N - 1) * D
-
-    # Normalizing constant and logpx are computed:
-    log_normalizing_constant = -0.5 * degrees_of_freedom * np.log(2 * np.pi)
-    log_px = -0.5 * r2 + log_normalizing_constant
-
-    return log_px
-
-
-def sample_center_gravity_zero_gaussian_with_mask(size, device, node_mask):
-    assert len(size) == 3
-    x = torch.randn(size, device=device)
-
-    x_masked = x * node_mask
-
-    # This projection only works because Gaussian is rotation invariant around
-    # zero and samples are independent!
-    x_projected = remove_mean_with_mask(x_masked, node_mask)
-    return x_projected
-
-
-def standard_gaussian_log_likelihood(x):
-    # Normalizing constant and logpx are computed:
-    log_px = sum_except_batch(-0.5 * x * x - 0.5 * np.log(2 * np.pi))
-    return log_px
-
-
-def sample_gaussian(size, device):
-    x = torch.randn(size, device=device)
-    return x
-
-
-def standard_gaussian_log_likelihood_with_mask(x, node_mask):
-    # Normalizing constant and logpx are computed:
-    log_px_elementwise = -0.5 * x * x - 0.5 * np.log(2 * np.pi)
-    log_px = sum_except_batch(log_px_elementwise * node_mask)
-    return log_px
-
-
-def sample_gaussian_with_mask(size, device, node_mask):
-    x = torch.randn(size, device=device)
-    x_masked = x * node_mask
-    return x_masked
-
 
 def create_adjacency_list(distance_matrix, atom_types):
     adjacency_list = []
@@ -272,3 +120,40 @@ def get_symmetry_change(true_samples, pred_samples, topology):
 
     symmetry_change = check_symmetry_change(true_samples, pred_samples, adj_list, atom_types)
     return symmetry_change
+
+
+
+        temp_proposal_samples = proposal_samples.clone()
+
+        first_symmetry_change = get_symmetry_change(
+            self.datamodule.unnormalize(true_samples),
+            self.datamodule.unnormalize(temp_proposal_samples),
+            self.datamodule.topology_dict[sequence],
+        )
+
+        correct_symmetry_rate = 1 - first_symmetry_change.float().mean().item()
+
+        temp_proposal_samples[first_symmetry_change] *= -1
+
+        second_symmetry_change = get_symmetry_change(
+            self.datamodule.unnormalize(true_samples),
+            self.datamodule.unnormalize(temp_proposal_samples),
+            self.datamodule.topology_dict[sequence],
+        )
+
+        uncorrectable_symmetry_rate = second_symmetry_change.float().mean().item()
+
+        if self.hparams.fix_symmetry:
+            proposal_samples[first_symmetry_change] *= -1
+
+            if self.hparams.drop_unfixable_symmetry:  # only makes sense to drop if symmetry is fixed
+                proposal_samples = proposal_samples[~second_symmetry_change]
+                proposal_log_q = proposal_log_q[~second_symmetry_change]
+                proposal_samples_energy = proposal_samples_energy[~second_symmetry_change]
+
+        metrics.update(
+            {
+                f"{prefix}/proposal/correct_symmetry_rate": correct_symmetry_rate,
+                f"{prefix}/proposal/uncorrectable_symmetry_rate": uncorrectable_symmetry_rate,
+            }
+        )
