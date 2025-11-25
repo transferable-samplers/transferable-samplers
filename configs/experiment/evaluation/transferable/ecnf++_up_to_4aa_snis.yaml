@@ -8,11 +8,6 @@ defaults:
 state_dict_hf_path: transferable/ecnf++_up_to_4aa.pth
 
 model:
-  sampling_config:
-    batch_size: 4
-    num_test_proposal_samples: 10_000
-    clip_reweighting_logits: 0.002
-    subset_idx: ${seed}
   net:
     channels: 256
     num_layers: 9

@@ -103,7 +103,7 @@ class FlowMatchLitModule(TransferableBoltzmannGeneratorLitModule):
         return loss
 
     def test_integrators(self) -> torch.Tensor:
-        x = self.prior.sample(self.hparams.sampling_config.batch_size, device=self.device)
+        x = self.prior.sample(self.hparams.proposal_config.batch_size, device=self.device)
         integrators = [
             "exact",
             "exact_no_functional",
@@ -260,7 +260,7 @@ class FlowMatchLitModule(TransferableBoltzmannGeneratorLitModule):
         true_samples,
         permutations,
         encodings,
-        energy_fn,
+        target_energy_fn,
         tica_model,
         prefix: str = "val",
         proposal_generator=None,
@@ -275,7 +275,7 @@ class FlowMatchLitModule(TransferableBoltzmannGeneratorLitModule):
             true_samples,
             permutations,
             encodings,
-            energy_fn,
+            target_energy_fn,
             tica_model,
             prefix,
             proposal_generator,

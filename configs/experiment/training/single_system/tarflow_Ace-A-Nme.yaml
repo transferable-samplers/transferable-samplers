@@ -16,10 +16,6 @@ model:
     lr: 1e-4
     weight_decay: 4e-4
 
-  sampling_config:
-    num_proposal_samples: 10_000
-    num_test_proposal_samples: 10_000
-
 data:
   batch_size: 512
   com_augmentation: True

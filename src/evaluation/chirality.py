@@ -137,7 +137,7 @@ def fix_chirality(true_samples, samples_data, topology, drop_unfixable: bool = F
     Returns:
         SamplesData: Fixed samples data
     """
-    from src.utils.data_types import SamplesData
+    from src.utils.dataclasses import SamplesData
     
     pred_samples = samples_data.x.clone()
     temp_pred_samples = pred_samples.clone()

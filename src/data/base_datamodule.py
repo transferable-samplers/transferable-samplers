@@ -6,7 +6,7 @@ from lightning import LightningDataModule
 from torch.utils.data import DataLoader, IterableDataset
 
 from src.data.preprocessing.tica import TicaModel
-from src.utils.data_types import SamplesData
+from src.utils.dataclasses import SamplesData
 
 
 class BaseDataModule(LightningDataModule):

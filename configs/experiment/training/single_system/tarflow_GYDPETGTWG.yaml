@@ -13,10 +13,6 @@ model:
     num_blocks: 8
     layers_per_block: 8
 
-  sampling_config:
-    num_proposal_samples: 10_000
-    num_test_proposal_samples: 10_000
-
 data:
   batch_size: 512
   com_augmentation: True

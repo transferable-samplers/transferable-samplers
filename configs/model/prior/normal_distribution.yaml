@@ -1,0 +1,6 @@
+_target_: src.models.priors.normal_distribution.NormalDistribution
+num_dimensions: ${data.num_dimensions}
+mean: 0.0
+std: 1.0
+mean_free: false
+

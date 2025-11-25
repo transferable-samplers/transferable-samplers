@@ -15,13 +15,7 @@ model:
     num_blocks: 8
     layers_per_block: 8
 
-  sampling_config:
-    batch_size: 10_000
-    num_test_proposal_samples: 10_000
-    num_smc_samples: 10_000 
-    clip_reweighting_logits: 0.002
-
-  smc_sampler:
+  sampler:
     _target_: src.models.samplers.ula_sampler.SMCSamplerULA
     enabled: True
     langevin_eps: 2e-8

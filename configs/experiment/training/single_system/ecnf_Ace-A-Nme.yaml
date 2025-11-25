@@ -10,10 +10,6 @@ model:
   net:
     channels: 64
     num_layers: 5
-  sampling_config:
-    batch_size: 64
-    num_proposal_samples: 0
-    num_test_proposal_samples: 10_000
 
 data:
   batch_size: 512

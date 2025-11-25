@@ -11,11 +11,3 @@ trainer:
   limit_val_batches: 2
   limit_test_batches: 2
   accelerator: gpu
-
-model:
-  sampling_config:
-    num_proposal_samples: 100
-    num_test_proposal_samples: 100
-    num_smc_samples: 10
-    num_eval_samples: 100
-    batch_size: 100

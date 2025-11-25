@@ -1,12 +1,5 @@
 import math
-from typing import Optional
-
-import scipy
-import torch
-
-from src.models.transferable_boltzmann_generator_module import TransferableBoltzmannGeneratorLitModule
-
-
+from typing import Optional, Any
 import inspect
 import logging
 import os
@@ -14,9 +7,9 @@ import statistics as stats
 import time
 from collections import defaultdict
 from copy import deepcopy
-from typing import Any, Optional
 
 import matplotlib.pyplot as plt
+import scipy
 import torch
 import torchmetrics
 from lightning import LightningDataModule, LightningModule
@@ -24,13 +17,11 @@ from lightning.pytorch.loggers import WandbLogger
 from torchmetrics import MeanMetric
 from tqdm import tqdm
 
-from src.evaluation.metrics_and_plots import metrics_and_plots
 from src.models.base_lightning_module import BaseLightningModule
 from src.models.neural_networks.ema import EMA
-from src.models.priors import NormalDistribution
-from src.models.samplers.base_sampler import SMCSampler
-from src.models.utils import get_symmetry_change, resample
-from src.utils.data_types import SamplesData
+from src.models.priors.prior import Prior
+from src.models.samplers.sampler import Sampler
+from src.utils.dataclasses import SamplesData
 
 logger = logging.getLogger(__name__)
 
@@ -41,11 +32,15 @@ class NormalizingFlowLitModule(BaseLightningModule):
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
         datamodule: LightningDataModule,
-        evaluator: Evaluator,
+        prior: Prior,
+        sampler: Sampler,
         ema_decay: float,
         compile: bool,
-        sampler: Sampler,
-        use_com_adjustment: bool = False,
+        use_distill_loss: bool = False,
+        distill_weight: float = 0.0,
+        energy_kl_weight: float = 0.0,
+        energy_kl_batch_size: int = 1000,
+        self_improve: bool = False,
     ) -> None:
         """Initialize a `NormalizingFlowLitModule`."""
         super().__init__(
@@ -53,13 +48,11 @@ class NormalizingFlowLitModule(BaseLightningModule):
             optimizer=optimizer,
             scheduler=scheduler,
             datamodule=datamodule,
-            evaluator=evaluator,
+            prior=prior,
+            sampler=sampler,
             ema_decay=ema_decay,
             compile=compile,
         )
-        assert not self.hparams.mean_free_prior, "Mean free prior is not supported for normalizing flows"
-        self.eval_encodings = None
-        self.eval_energy = None
 
     def model_step(self, batch: torch.Tensor, log: bool = True) -> torch.Tensor:
         x1 = batch["x"]
@@ -92,8 +85,8 @@ class NormalizingFlowLitModule(BaseLightningModule):
 
             if self.eval_encodings is None:
                 # on first step, we need to prepare the eval encodings
-                model_inputs, _, self.eval_energy = self.datamodule.prepare_eval(self.hparams.eval_sequence)
-                self.eval_encodings = model_inputs.encodings
+                system_cond, _, self.eval_energy = self.datamodule.prepare_eval(self.hparams.eval_sequence)
+                self.eval_encodings = system_cond.encodings
 
             samples, log_q_theta, _ = self.generate_samples(
                 self.hparams.energy_kl_batch_size,
@@ -139,13 +132,13 @@ class NormalizingFlowLitModule(BaseLightningModule):
     def sample_proposal(
         self,
         num_samples: int,
-        cond_inputs: Optional[dict[str, torch.Tensor]] = None,
+        system_cond: Optional[dict[str, torch.Tensor]] = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Sample from the proposal distribution q_theta(x).
     
         Args:
             num_samples: Number of samples to generate.
-            cond_inputs: Conditioning inputs passed to the flow.
+            system_cond: Conditioning inputs passed to the flow.
     
         Returns:
             x: Generated samples in data space.
@@ -154,8 +147,8 @@ class NormalizingFlowLitModule(BaseLightningModule):
             invertibility_metrics: Metrics comparing z and z_recon.
         """
     
-        encodings = cond_inputs.get("encodings")
-        permutations = cond_inputs.get("permutations")
+        encodings = system_cond.get("encodings")
+        permutations = system_cond.get("permutations")
     
         if encodings is None:
             # Handles the non-transferable case
@@ -195,10 +188,10 @@ class NormalizingFlowLitModule(BaseLightningModule):
 
         return x, log_q_x, z, invertibility_metrics
 
-    def proposal_energy_fn(self, x: torch.Tensor, model_inputs: dict[str, torch.Tensor]) -> torch.Tensor:
+    def proposal_energy_fn(self, x: torch.Tensor, system_cond: dict[str, torch.Tensor]) -> torch.Tensor:
 
-        encodings = model_inputs.get("encodings")
-        permutations = model_inputs.get("permutations")
+        encodings = system_cond.get("encodings")
+        permutations = system_cond.get("permutations")
 
         data_dim = x.shape[1] * self.datamodule.hparams.num_dimensions  # is the product num_atoms * num_dimensions
         _encodings = self.batchify_model_input(encodings, x.shape[0]) if encodings is not None else None
@@ -214,11 +207,3 @@ class NormalizingFlowLitModule(BaseLightningModule):
         proposal_energy = - log_q_x
 
         return proposal_energy
-
-    def com_energy_adjustment_fn(self, x: torch.Tensor, sigma: float) -> torch.Tensor:
-        com = x.mean(dim=1, keepdim=False)
-        com_norm = com.norm(dim=-1)
-        com_energy = com_norm**2 / (2 * sigma**2) - torch.log(
-            com_norm**2 / (math.sqrt(2) * sigma**3 * scipy.special.gamma(3 / 2))
-        )
-        return com_energy

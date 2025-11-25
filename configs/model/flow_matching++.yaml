@@ -20,6 +20,3 @@ optimizer:
     - 0.999
   weight_decay: 1e-4
 ema_decay: 0.999
-
-sampling_config:
-  use_com_adjustment: False

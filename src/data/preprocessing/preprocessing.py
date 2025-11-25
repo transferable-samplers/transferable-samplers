@@ -63,7 +63,6 @@ def prepare_preprocessing_cache(
         "encodings_dict": encodings_dict,
         "permutations_dict": permutations_dict,
     }
-    
     with open(cache_path, "wb") as f:
         pickle.dump(cache, f)
     

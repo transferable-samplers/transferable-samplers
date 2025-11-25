@@ -17,7 +17,7 @@ from src.data.preprocessing.tica import get_tica_model, TicaModel
 from src.data.transforms.center_of_mass import CenterOfMassTransform
 from src.data.transforms.rotation import Random3DRotationTransform
 from src.data.transforms.standardize import StandardizeTransform
-from src.data.transferable_peptide_datamodule import EvaluationInputs, ModelInputs
+from src.data.transferable_peptide_datamodule import EvaluationInputs, SystemConditioning
 
 
 class SinglePeptideDataModule(BaseDataModule):
@@ -191,7 +191,7 @@ class SinglePeptideDataModule(BaseDataModule):
 
         return potential
 
-    def prepare_eval(self, sequence: str, prefix: str) -> tuple[ModelInputs, EvaluationInputs, Callable]:
+    def prepare_eval(self, sequence: str, prefix: str) -> tuple[SystemConditioning, EvaluationInputs, Callable]:
         """
         Prepare evaluation data and energy function for validation or test trajectories.
 
@@ -206,9 +206,9 @@ class SinglePeptideDataModule(BaseDataModule):
 
         Returns:
             tuple: A 3-tuple containing:
-                - model_inputs (ModelInputs): Permutations and encodings (None for single peptide).
+                - system_cond (SystemConditioning): Permutations and encodings (None for single peptide).
                 - evaluation_inputs (EvaluationInputs): True samples and TICA model for evaluation.
-                - energy_fn (Callable): Function mapping positions → energy values.
+                - target_energy_fn (Callable): Function mapping positions → energy values.
         """
         if prefix == "test":
             true_samples = self.data_test.data
@@ -224,9 +224,9 @@ class SinglePeptideDataModule(BaseDataModule):
         true_samples = self.normalize(true_samples)
 
         potential = self.setup_potential()
-        energy_fn = lambda x: potential.energy(self.unnormalize(x)).flatten()
+        target_energy_fn = lambda x: potential.energy(self.unnormalize(x)).flatten()
 
-        model_inputs = ModelInputs(permutations=None, encodings=None)
+        system_cond = SystemConditioning(permutations=None, encodings=None)
         evaluation_inputs = EvaluationInputs(
             true_samples=true_samples,
             tica_model=tica_model,
@@ -235,4 +235,4 @@ class SinglePeptideDataModule(BaseDataModule):
             do_plots=self.hparams.get("do_plots", True),
         )
 
-        return model_inputs, evaluation_inputs, energy_fn
+        return system_cond, evaluation_inputs, target_energy_fn

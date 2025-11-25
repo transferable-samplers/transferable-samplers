@@ -2,10 +2,11 @@ import logging
 from collections import defaultdict
 from statistics import mean as stats_mean, median as stats_median
 
-import pytorch_lightning as pl
 import torch
+from lightning.pytorch import Callback, LightningModule, Trainer
 
-from src.evaluation.ensemble_evaluator import EnsembleEvaluator
+from src.evaluation.evaluator import Evaluator
+from src.utils.timing_utils import timed_block, timing_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ def add_aggregate_metrics(metrics: dict[str, torch.Tensor], prefix: str = "val")
     return metrics
 
 
-class EvaluationCallback(pl.Callback):
+class SamplingEvaluationCallback(Callback):
     """
     A flexible evaluation callback that runs custom evaluation logic
     at the end of training, validation, or test epochs.
@@ -81,7 +82,7 @@ class EvaluationCallback(pl.Callback):
 
     def __init__(
         self,
-        evaluator: EnsembleEvaluator,
+        evaluator: Evaluator,
         run_on_validation_epoch_end: bool = True,
         run_on_test_epoch_end: bool = False,
     ):
@@ -90,71 +91,61 @@ class EvaluationCallback(pl.Callback):
         self.run_on_val = run_on_validation_epoch_end
         self.run_on_test = run_on_test_epoch_end
 
-    def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule):
+    def on_validation_epoch_end(self, trainer: Trainer, pl_module: LightningModule):
         if self.run_on_val:
             self.run_evaluation(stage="val", trainer=trainer, pl_module=pl_module)
 
-    def on_test_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule):
+    def on_test_epoch_end(self, trainer: Trainer, pl_module: LightningModule):
         if self.run_on_test:
             self.run_evaluation(stage="test", trainer=trainer, pl_module=pl_module)
 
-    def run_evaluation(self, stage: str, trainer: pl.Trainer, pl_module: pl.LightningModule):
-        pl_module.eval()
-        
-        # Handle EMA if applicable
-        ema_backup_restored = False
-        if hasattr(pl_module.hparams, "ema_decay") and pl_module.hparams.ema_decay > 0:
-            if hasattr(pl_module.net, "backup") and hasattr(pl_module.net, "copy_to_model"):
-                pl_module.net.backup()
-                pl_module.net.copy_to_model()
-                ema_backup_restored = True
+    def run_evaluation(self, stage: str, trainer: Trainer, pl_module: LightningModule):
 
-        try:
-            with torch.no_grad():
-                sequences = trainer.datamodule.test_sequences if stage == "test" else trainer.datamodule.val_sequences
-                all_metrics = {}
-                all_plots = {}
-                
-                for sequence in sequences:
-                    model_inputs, evaluation_inputs, energy_fn = trainer.datamodule.prepare_eval(sequence, stage)
-                    samples_data_dict = pl_module.sample_sequence(
-                        sequence, 
-                        model_inputs, 
-                        energy_fn, 
-                        prefix=f"{stage}/{sequence}"
-                    )
-                    
+        with torch.no_grad():
+            sequences = trainer.datamodule.test_sequences if stage == "test" else trainer.datamodule.val_sequences
+
+            all_metrics = {}
+            all_plots = {}
+            
+            for sequence in sequences:
+                logging.info(f"Evaluating {sequence} on {stage}")
+
+                # Prepare system conditioning and evaluation inputs
+                system_cond, evaluation_inputs, target_energy_fn = trainer.datamodule.prepare_eval(sequence, stage)
+
+                # Sample sequences from the model
+                samples_data_dict = pl_module.sample_sequence(sequence, system_cond, target_energy_fn)
+
+                if trainer.is_global_zero:
+                    # Evaluate the samples
                     metrics, plots = self.evaluator.evaluate(
                         sequence, 
                         samples_data_dict, 
                         evaluation_inputs, 
-                        energy_fn
+                        target_energy_fn
                     )
-                    
+
+                    for key, value in metrics.items():
+                        trainer.log(key, value, sync_dist=True, on_epoch=True)
+
                     # Merge metrics and plots
                     all_metrics.update(metrics)
                     all_plots.update(plots)
 
-                # Aggregate metrics across sequences
-                aggregated_metrics = add_aggregate_metrics(all_metrics, prefix=stage)
+            # Aggregate metrics across sequences
+            aggregated_metrics = add_aggregate_metrics(all_metrics, prefix=stage)
 
-                # Log everything in Lightning
-                for key, value in aggregated_metrics.items():
-                    if isinstance(value, torch.Tensor):
-                        value = value.item() if value.numel() == 1 else value
-                    trainer.log(key, value, sync_dist=True, on_epoch=True)
+            # Log everything in Lightning
+            for key, value in aggregated_metrics.items():
+                trainer.log(key, value, sync_dist=True, on_epoch=True)
 
-                # Log plots if logger supports it
-                if hasattr(trainer.logger, "experiment") and trainer.logger.experiment is not None:
-                    for plot_name, plot_data in all_plots.items():
-                        if isinstance(plot_data, dict):
-                            for subplot_name, plot_obj in plot_data.items():
-                                if hasattr(trainer.logger.experiment, "log_image"):
-                                    trainer.logger.experiment.log_image(
-                                        f"{stage}/{plot_name}/{subplot_name}", 
-                                        plot_obj
-                                    )
-        finally:
-            # Restore EMA backup if we made one
-            if ema_backup_restored and hasattr(pl_module.net, "restore_to_model"):
-                pl_module.net.restore_to_model()
+            # Log plots if logger supports it
+            if hasattr(trainer.logger, "experiment") and trainer.logger.experiment is not None:
+                for plot_name, plot_data in all_plots.items():
+                    if isinstance(plot_data, dict):
+                        for subplot_name, plot_obj in plot_data.items():
+                            if hasattr(trainer.logger.experiment, "log_image"):
+                                trainer.logger.experiment.log_image(
+                                    f"{stage}/{plot_name}/{subplot_name}", 
+                                    plot_obj
+                                )

@@ -7,8 +7,6 @@ defaults:
   - override /trainer: gpu
 
 model:
-  sampling_config:
-    num_proposal_samples: 5_000
 
 data:
   batch_size: 512

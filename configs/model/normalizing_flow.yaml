@@ -4,7 +4,13 @@ defaults:
   - scheduler: cosine
 
 _target_: src.models.normalizing_flow_module.NormalizingFlowLitModule
-mean_free_prior: False
+
+prior:
+  _target_: src.models.priors.normal_distribution.NormalDistribution
+  num_dimensions: ${data.num_dimensions}
+  mean: 0.0
+  std: 1.0
+  mean_free: false
 
 optimizer:
   lr: 1e-4
@@ -13,6 +19,3 @@ optimizer:
     - 0.95
   weight_decay: 4e-4
 ema_decay: 0.999
-
-sampling_config:
-  use_com_adjustment: True

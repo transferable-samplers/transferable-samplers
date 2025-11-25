@@ -73,7 +73,7 @@ def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, t
         cfg.paths.output_dir = str(tmp_path)
         cfg.paths.log_dir = str(tmp_path)
         cfg.paths.work_dir = os.getcwd()
-        cfg.model.sampling_config.num_test_proposal_samples = 25
+        cfg.model.proposal_config.num_test_proposal_samples = 25
         if "ula" in experiment_name:
             # we disable SMC here for testing - we are mostly concerned with weights being correctly setup
             if cfg.model.get("smc_sampler") is not None:

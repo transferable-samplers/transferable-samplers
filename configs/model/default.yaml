@@ -1,16 +1,7 @@
 defaults:
   - optimizer: adam_w
 
-smc_sampler: null
-
-sampling_config:
-  num_proposal_samples: 10_000
-  num_test_proposal_samples: 10_000
-  num_smc_samples: 10_000
-  batch_size: 10_000
-  clip_reweighting_logits: null
+sampler: null
 
 # compile model for faster training with pytorch 2.0
 compile: false
-
-output_dir: ${paths.output_dir}

@@ -12,12 +12,12 @@ from src.evaluation.plots.plot_com_norms import plot_com_norms
 from src.evaluation.plots.plot_energies import plot_energies
 from src.evaluation.plots.plot_ramachandran import plot_ramachandran
 from src.evaluation.plots.plot_tica import plot_tica
-from src.utils.data_types import SamplesData
+from src.utils.dataclasses import SamplesData
 
 logger = logging.getLogger(__name__)
 
 
-class EnsembleEvaluator:
+class Evaluator:
     def __init__(self, fix_symmetry: bool = True, drop_unfixable_symmetry: bool = False, num_eval_samples: int = 10_000):
         self.fix_symmetry = fix_symmetry
         self.drop_unfixable_symmetry = drop_unfixable_symmetry
@@ -82,7 +82,7 @@ class EnsembleEvaluator:
         return metrics
 
 
-    def evaluate(self, sequence, samples_data_dict, evaluation_inputs, energy_fn):
+    def evaluate(self, sequence, samples_data_dict, evaluation_inputs, target_energy_fn):
         """
         Compute evaluation metrics and log diagnostic plots for a single peptide sequence.
 
@@ -95,7 +95,7 @@ class EnsembleEvaluator:
             sequence (str): Peptide sequence identifier.
             samples_data_dict (dict): Dictionary mapping sample type names to SamplesData objects.
             evaluation_inputs: EvaluationInputs dataclass containing true_samples, topology, tica_model, etc.
-            energy_fn (Callable): Function to compute energy for samples.
+            target_energy_fn (Callable): Function to compute energy for samples.
 
         Returns:
             tuple: (metrics_dict, plots_dict) containing computed metrics and plots.
@@ -111,7 +111,7 @@ class EnsembleEvaluator:
         true_data = SamplesData(
             x=true_samples,
             proposal_energy=None,
-            target_energy=energy_fn(true_samples),
+            target_energy=target_energy_fn(true_samples),
             importance_logits=None,
         )
 

@@ -28,21 +28,7 @@ from src.data.transforms.standardize import StandardizeTransform
 from src.utils.huggingface import download_and_extract_pdb_tarfiles, download_evaluation_data
 
 
-@dataclass
-class ModelInputs:
-    """Inputs needed for model inference."""
-    permutations: dict
-    encodings: dict
-
-
-@dataclass
-class EvaluationInputs:
-    """Inputs needed for evaluation metrics."""
-    true_samples: torch.Tensor
-    tica_model: TicaModel
-    topology: object  # mdtraj.Topology
-    num_eval_samples: int
-    do_plots: bool = True
+from src.utils.dataclasses import SystemConditioning, EvaluationInputs
 
 
 class TransferablePeptideDataModule(BaseDataModule):
@@ -67,6 +53,7 @@ class TransferablePeptideDataModule(BaseDataModule):
         batch_size: int = 64,
         num_workers: int = 0,
         pin_memory: bool = False,
+        task_name: str = None,
     ):
         super().__init__(batch_size=batch_size, num_workers=num_workers, pin_memory=pin_memory)
 
@@ -105,6 +92,9 @@ class TransferablePeptideDataModule(BaseDataModule):
         # Precomputed std for standardization
         self.std = torch.tensor(self.hparams.precomputed_std)
 
+        # Even with the cache the training cache is quite slow to load, so we avoid this for eval tasks
+        self.requires_setup_train = task_name is not None and task_name != "eval"
+
     def prepare_data(self) -> None:
         """Download + preprocessing data. Lightning ensures that `self.prepare_data()` is called only
         within a single process on CPU, so you can safely add your downloading logic within. In
@@ -117,8 +107,9 @@ class TransferablePeptideDataModule(BaseDataModule):
         os.makedirs(self.wds_cache_dir, exist_ok=True)
         os.makedirs(self.preproc_cache_dir, exist_ok=True)
 
+        # TODO - uncomment this once merged the new downloads
         # download_and_extract_pdb_tarfiles(self.hparams.data_dir)
-        # download_evaluation_data(self.hparams.data_dir)
+        download_evaluation_data(self.hparams.data_dir)
 
         # Discover PDB files for each subset
         train_pdb_paths = glob.glob(os.path.join(self.pdb_dir, "train", "*.pdb"))
@@ -269,7 +260,10 @@ class TransferablePeptideDataModule(BaseDataModule):
             self.batch_size_per_device = self.hparams.batch_size // self.trainer.world_size
 
         # Setup train, val, and test data
-        self.setup_train()
+        if self.requires_setup_train:
+            self.setup_train()
+        else:
+            self.data_train = None
         self.setup_eval("val")
         self.setup_eval("test")
 
@@ -317,7 +311,7 @@ class TransferablePeptideDataModule(BaseDataModule):
 
         return potential
 
-    def prepare_eval(self, sequence: str, prefix: str = None) -> tuple[ModelInputs, EvaluationInputs, Callable]:
+    def prepare_eval(self, sequence: str, prefix: str = None) -> tuple[SystemConditioning, EvaluationInputs, Callable]:
         """
         Prepare evaluation data and energy function for a given peptide sequence.
 
@@ -332,9 +326,9 @@ class TransferablePeptideDataModule(BaseDataModule):
 
         Returns:
             tuple: A 3-tuple containing:
-                - model_inputs (ModelInputs): Permutations and encodings for model.
+                - system_cond (SystemConditioning): Permutations and encodings for model.
                 - evaluation_inputs (EvaluationInputs): True samples and TICA model for evaluation.
-                - energy_fn (Callable): Function mapping positions → energy values.
+                - target_energy_fn (Callable): Function mapping positions → energy values.
         """
         subsampled_trajectory_npz = np.load(
             os.path.join(self.val_data_path, f"{len(sequence)}AA", f"{sequence}_subsampled.npz")
@@ -362,15 +356,14 @@ class TransferablePeptideDataModule(BaseDataModule):
             topology = self.test_topology_dict[sequence]
         
         potential = self.setup_potential(sequence)
-        energy_fn = lambda x: potential.energy(self.unnormalize(x)).flatten()
+        target_energy_fn = lambda x: potential.energy(self.unnormalize(x)).flatten()
 
-        model_inputs = ModelInputs(permutations=permutations, encodings=encodings)
+        system_cond = SystemConditioning(permutations=permutations, encodings=encodings)
         evaluation_inputs = EvaluationInputs(
             true_samples=true_samples,
             tica_model=tica_model,
             topology=topology,
             num_eval_samples=self.hparams.num_eval_samples,
-            do_plots=self.hparams.get("do_plots", True),
         )
 
-        return model_inputs, evaluation_inputs, energy_fn
+        return system_cond, evaluation_inputs, target_energy_fn

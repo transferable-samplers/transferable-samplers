@@ -12,9 +12,6 @@ model:
   net:
     channels: 256
     num_layers: 5
-  sampling_config:
-    batch_size: 8
-    num_test_proposal_samples: 10_000
   ema_decay: 0.0
 
 data:

@@ -1,54 +1,64 @@
+import inspect
 import logging
-from re import I
+import os
+from copy import deepcopy
+from typing import Any, Optional
 
 import torch
-from lightning import LightningModule
+import torchmetrics
+from lightning import LightningDataModule, LightningModule
+from lightning.pytorch.loggers import WandbLogger
+from torchmetrics import MeanMetric
+from tqdm import tqdm
 
 from src.models.neural_networks.ema import EMA
+from src.models.samplers.sampler import Sampler
+from src.models.priors.prior import Prior
+from src.utils.dataclasses import ProposalModel, SamplesData
+
 
 logger = logging.getLogger(__name__)
 
 
 class BaseLightningModule(LightningModule):
-    """
-    Base Lightning module with common functionality for gradient monitoring,
-    EMA handling, and state dict filtering.
-    """
-
-class NormalizingFlowLitModule(BaseLightningModule):
     def __init__(
         self,
         net: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
         datamodule: LightningDataModule,
-        evaluator: Evaluator,
+        prior: Prior,
+        sampler: Sampler,
         ema_decay: float,
         compile: bool,
     ) -> None:
-        """Initialize a `FlowMatchLitModule`.
-
+        """
+        Initialize a `BaseLightningModule`.
         :param net: The model to train.
         :param optimizer: The optimizer to use for training.
         :param scheduler: The learning rate scheduler to use for training.
+        :param datamodule: The data module to use for training.
+        :param sampler: The sampler to use for sampling.
+        :param ema_decay: The decay rate for the EMA.
+        :param compile: Whether to compile the model.
         """
         super().__init__()
         # this line allows to access init params with 'self.hparams' attribute
         # also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=False, ignore=("datamodule"))
-        if args or kwargs:
-            logger.warning(f"Unexpected arguments: {args}, {kwargs}")
-        assert not self.hparams.mean_free_prior, "Mean free prior is not supported for normalizing flows"
 
         self.net = net
+        # TODO - I think it's safer to just always use EMA model but with zero decay
         if self.hparams.ema_decay > 0:
             self.net = EMA(net, decay=self.hparams.ema_decay)
 
         self.datamodule = datamodule
 
-        self.smc_sampler = smc_sampler
-        if self.smc_sampler is not None:
-            self.smc_sampler.log_image_fn = self.log_image
+        self.prior = prior
+
+        self.sampler = sampler
+        if self.sampler is not None:
+            self.sampler.log_image_fn = self.log_image_fn
 
         # loss function
         self.criterion = torch.nn.MSELoss(reduction="mean")
@@ -58,18 +68,10 @@ class NormalizingFlowLitModule(BaseLightningModule):
         self.val_metrics = self.train_metrics.clone(prefix="val/")
         self.test_metrics = self.train_metrics.clone(prefix="test/")
 
-        self.prior = NormalDistribution(
-            self.datamodule.hparams.num_dimensions,  # for transferable this will be the dim of the largest peptide
-            mean_free=self.hparams.mean_free_prior,
-        )
-
-        self.output_dir = output_dir
-
         self.eval_encodings = None
         self.eval_energy = None
 
-
-    def log_image(self, img: torch.Tensor, title: str = None) -> None:
+    def log_image_fn(self, img: torch.Tensor, title: str = None) -> None:
         """Log an image to the logger.
 
         :param img: The image to log.
@@ -208,7 +210,7 @@ class NormalizingFlowLitModule(BaseLightningModule):
         # at start of every epoch to finetune the model
         if self.hparams.get("self_improve", False):
             logging.info(
-                f"Generating {self.hparams.sampling_config.num_self_improve_proposal_samples} Samples"
+                f"Generating {self.hparams.proposal_config.num_self_improve_proposal_samples} Samples"
                 " for self-consumption"
             )
             self.net.eval()
@@ -219,7 +221,7 @@ class NormalizingFlowLitModule(BaseLightningModule):
 
                 with torch.no_grad():
                     samples = self.generate_and_resample(
-                        num_proposal_samples=self.hparams.sampling_config.num_self_improve_proposal_samples,
+                        num_proposal_samples=self.hparams.proposal_config.num_self_improve_proposal_samples,
                     )
 
                 self.net.restore_to_model()
@@ -227,7 +229,7 @@ class NormalizingFlowLitModule(BaseLightningModule):
             else:
                 with torch.no_grad():
                     samples = self.generate_and_resample(
-                        num_proposal_samples=self.hparams.sampling_config.num_self_improve_proposal_samples,
+                        num_proposal_samples=self.hparams.proposal_config.num_self_improve_proposal_samples,
                     )
 
             self.net.train()
@@ -295,21 +297,21 @@ class NormalizingFlowLitModule(BaseLightningModule):
         self,
         num_samples: int,
         batch_size: int,
-        model_inputs: Optional[dict[str, torch.Tensor]] = None,
+        system_cond: Optional[dict[str, torch.Tensor]] = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         proposal_sample_batches = []
         log_q_theta_batches = []
         prior_sample_batches = []
         for _ in tqdm(range(num_samples // batch_size)):
             proposal_samples, log_q_theta, prior_samples = self.generate_samples(
-                batch_size, model_inputs=model_inputs
+                batch_size, system_cond=system_cond
             )
             proposal_sample_batches.append(proposal_samples)
             log_q_theta_batches.append(log_q_theta)
             prior_sample_batches.append(prior_samples)
         if num_samples % batch_size > 0:
             s, lp, ps = self.generate_samples(
-                num_samples % batch_size, model_inputs=model_inputs
+                num_samples % batch_size, system_cond=system_cond
             )
             proposal_sample_batches.append(s)
             log_q_theta_batches.append(lp)
@@ -324,124 +326,14 @@ class NormalizingFlowLitModule(BaseLightningModule):
         metrics.reset()
         # Evaluation is now handled by EvaluationCallback
 
-    def batchify_model_input(self, model_inputs: dict[str, torch.Tensor], batch_size: int) -> dict[str, torch.Tensor]:
-        return {
-            key: tensor.unsqueeze(0).repeat(local_batch_size, 1).to(self.device)
-            for key, tensor in model_inputs.items()
-        }
-
-    def all_gather_batch_dim(self, tensor: torch.Tensor) -> torch.Tensor:
-        return self.all_gather(tensor).reshape(-1, *tensor.shape[1:])
-
-    def save_samples_dict(self, samples_dict, prefix):
-        if self.local_rank == 0:
-            os.makedirs(f"{self.output_dir}/{prefix}", exist_ok=True)
-            torch.save(samples_dict, f"{self.output_dir}/{prefix}/samples.pt")
-            logging.info(f"Saving samples to {self.output_dir}/{prefix}/samples.pt")
-
-    def sample_sequence(
-        self,
-        sequence,
-        model_inputs,
-        energy_fn,
-        prefix: str = ""
-    ) -> dict:
-        """Generates samples from the proposal and runs SMC if enabled.
-        
-        Args:
-            sequence: Sequence identifier
-            model_inputs: ModelInputs dataclass containing permutations and encodings
-            energy_fn: Function to compute target energy
-            prefix: Prefix for logging
-            
-        Returns:
-            dict: Dictionary mapping sample type names to SamplesData objects
-        """
-        import time
-        from src.utils.data_types import SamplesData
-        
-        # Get number of samples from config
-        num_samples = self.hparams.sampling_config.get("num_eval_samples", 10_000)
-        batch_size = self.hparams.sampling_config.get("batch_size", 64)
-        
-        # Prepare model inputs
-        if model_inputs.permutations is not None:
-            permutations = model_inputs.permutations
-        else:
-            permutations = None
-            
-        if model_inputs.encodings is not None:
-            encodings = model_inputs.encodings
-        else:
-            encodings = None
-            
-        cond_inputs = {"permutations": permutations, "encodings": encodings}
-
-        # Generate proposal samples
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-        start_time = time.time()
-        
-        proposal_samples, proposal_log_q, prior_samples = self.batched_sample_proposal(
-            num_samples, batch_size, model_inputs=cond_inputs
+    def get_proposal_model(self) -> ProposalModel:
+        return ProposalModel(
+            sample_fn=self.sample_proposal,
+            energy_fn=self.proposal_energy_fn,
         )
-        
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-        time_duration = time.time() - start_time
-        
-        # Compute proposal energy (proposal_samples are normalized)
-        proposal_energy = self.proposal_energy_fn(proposal_samples)
-        # energy_fn expects normalized samples
-        target_energy = energy_fn(proposal_samples)
-        
-        # Log timing metrics
-        self.log(f"{prefix}/samples_walltime", time_duration, sync_dist=True)
-        self.log(f"{prefix}/samples_per_second", len(proposal_samples) / time_duration, sync_dist=True)
-        self.log(f"{prefix}/seconds_per_sample", time_duration / len(proposal_samples), sync_dist=True)
-
-        samples_data_dict = {
-            "proposal": SamplesData(
-                x=self.datamodule.unnormalize(proposal_samples),
-                proposal_energy=proposal_energy,
-                target_energy=target_energy,
-                importance_logits=None,
-            )
-        }
-
-        # Run sampler if available
-        if hasattr(self, "sampler") and self.sampler is not None:
-            if self.hparams.sampling_config.get("use_com_adjustment", False):
-                _proposal_energy_fn = lambda x: self.proposal_energy_fn(x, com_adjustment=True)
-            else:
-                _proposal_energy_fn = self.proposal_energy_fn
-
-            # Generate sampler samples and record time
-            if torch.cuda.is_available():
-                torch.cuda.synchronize()
-            start_time = time.time()
-            
-            sampler_samples_data = self.sampler.sample(proposal_samples, _proposal_energy_fn, energy_fn)
-            
-            if torch.cuda.is_available():
-                torch.cuda.synchronize()
-            time_duration = time.time() - start_time
-            
-            self.log(f"{prefix}/sampler/samples_walltime", time_duration, sync_dist=True)
-            self.log(f"{prefix}/sampler/samples_per_second", len(sampler_samples_data.x) / time_duration, sync_dist=True)
-
-            samples_data_dict["sampler"] = SamplesData(
-                x=self.datamodule.unnormalize(sampler_samples_data.x),
-                proposal_energy=sampler_samples_data.proposal_energy,
-                target_energy=sampler_samples_data.target_energy,
-                importance_logits=sampler_samples_data.importance_logits,
-            )
-
-        return samples_data_dict
-
 
     def sample_proposal(
-        self, batch_size: int, model_inputs: Optional[dict[str, torch.Tensor]] = None,
+        self, batch_size: int, system_cond: Optional[dict[str, torch.Tensor]] = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Generate samples from the model.
 

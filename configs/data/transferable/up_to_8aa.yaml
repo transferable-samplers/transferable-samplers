@@ -8,6 +8,7 @@ precomputed_std: 0.35 # Standardization factor for normalization
 batch_size: 512 # Needs to be divisible by the number of devices (e.g., if in a distributed setup)
 num_workers: 2
 pin_memory: False
+task_name: ${task_name}
 val_sequences:
 - AL
 - EC

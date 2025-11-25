@@ -55,8 +55,8 @@ def cfg_test_self_improve_mwe(request: pytest.FixtureRequest, trainer_name_param
         cfg.trainer.num_sanity_val_steps = 0  # disable val sanity checks
         cfg.trainer.max_epochs = 1
         cfg.trainer.limit_train_batches = 1
-        cfg.model.sampling_config.num_proposal_samples = 32
-        cfg.model.sampling_config.num_self_improve_proposal_samples = 32
+        cfg.model.proposal_config.num_proposal_samples = 32
+        cfg.model.proposal_config.num_self_improve_proposal_samples = 32
         cfg.data.num_workers = 0  # avoid multiprocessing issues in tests
         cfg.data.batch_size = 32
         cfg.data.test_sequences = "AA"

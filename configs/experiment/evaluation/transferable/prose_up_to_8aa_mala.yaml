@@ -9,14 +9,7 @@ defaults:
 state_dict_hf_path: transferable/prose_up_to_8aa.pth
 
 model:
-  sampling_config:
-    use_com_adjustment: True
-    batch_size: 2_500
-    num_test_proposal_samples: 10_000
-    num_smc_samples: 10_000
-    clip_reweighting_logits: 0.002 # it was working well on AC without - lets try avoid
-    
-  smc_sampler:
+  sampler:
     _target_: src.models.samplers.mala_sampler.SMCSamplerMALA
     enabled: True
     langevin_eps: 1e-5

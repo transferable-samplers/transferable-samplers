@@ -1,6 +1,5 @@
 # this does cosine annealing from max_lr to max_lr / div_factor / final_div_factor
 # if pct_start != 0.0 you warmup from max_lr / div_factor to max_lr too
-# normally you use this per-step but I've just got it per-epoch
 _target_: torch.optim.lr_scheduler.OneCycleLR
 _partial_: true
 max_lr: ${model.optimizer.lr}
