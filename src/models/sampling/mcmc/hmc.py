@@ -1,10 +1,12 @@
 import torch
 
+
 def leapfrog(grad_e_t_fn, t, x, v, dt):
     v = v - 0.5 * dt * grad_e_t_fn(t, x)
     x = x + dt * v
     v = v - 0.5 * dt * grad_e_t_fn(t, x)
     return x, v
+
 
 def hmc(e_t_fn, grad_e_t_fn, t, x, logw, dt, eps):
     norm = lambda _v: torch.sum(_v**2, dim=-1)

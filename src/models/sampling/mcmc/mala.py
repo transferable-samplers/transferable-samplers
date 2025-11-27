@@ -2,8 +2,8 @@ import math
 
 import torch
 
-def mala(e_t_fn, grad_e_t_fn, t, x, logw, dt, eps):
 
+def mala(e_t_fn, grad_e_t_fn, t, x, logw, dt, eps):
     energy_grad_x = grad_e_t_fn(t, x)
     dx = -eps * energy_grad_x + math.sqrt(2 * eps) * torch.randn_like(x)
     x_proposal = x + dx
