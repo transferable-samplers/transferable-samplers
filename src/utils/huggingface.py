@@ -85,6 +85,11 @@ def download_evaluation_data(data_dir: str):
 
     logging.info(f"Downloading evaluation data to {data_dir}")
 
+    logging.warning(
+        "The TICA models for 8AA sequences originally uploaded to Hugging Face were not correct. "
+        "On DATE, we merged revision REVISION_NUMBER to the Hugging Face repo to fix this. "
+        "Due to the behavior of snapshot_download, this will automatically redownload the relevant files. "
+    )
     # Snapshot download automatically avoids re-downloading if already present
     snapshot_download(
         repo_id=REPO_ID,

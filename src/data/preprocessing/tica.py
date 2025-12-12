@@ -32,6 +32,10 @@ def wrap(array):
 
 
 def tica_features(trajectory, use_dihedrals=True, use_distances=True, selection=SELECTION):
+    if trajectory.topology.n_residues == 8:
+        logging.warning(
+            "The 8AA TICA models no longer use the CA-only selection, aligning with the 2AA / 4AA models. "
+        )
     trajectory = trajectory.atom_slice(trajectory.top.select(selection))
     if use_dihedrals:
         _, phi = md.compute_phi(trajectory)
