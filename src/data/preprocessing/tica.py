@@ -33,9 +33,7 @@ def wrap(array):
 
 def tica_features(trajectory, use_dihedrals=True, use_distances=True, selection=SELECTION):
     if trajectory.topology.n_residues == 8:
-        logging.warning(
-            "The 8AA TICA models no longer use the CA-only selection, aligning with the 2AA / 4AA models. "
-        )
+        logging.warning("The 8AA TICA models no longer use the CA-only selection, aligning with the 2AA / 4AA models.")
     trajectory = trajectory.atom_slice(trajectory.top.select(selection))
     if use_dihedrals:
         _, phi = md.compute_phi(trajectory)
@@ -54,7 +52,7 @@ def tica_features(trajectory, use_dihedrals=True, use_distances=True, selection=
         return []
 
 
-def run_tica_heavy(trajectory, lagtime=100, dim=2):
+def run_tica_cns(trajectory, lagtime=100, dim=2):
     ca_features = tica_features(trajectory)
     tica = dt.decomposition.TICA(dim=dim, lagtime=lagtime)
     koopman_estimator = dt.covariance.KoopmanWeightingEstimator(lagtime=lagtime)
@@ -89,8 +87,8 @@ def run_tica_ca(trajectory, topology, lagtime=500, dim=2):
 def get_tica_model(data, topology):
     traj_samples = md.Trajectory(data, topology=topology)
 
-    tica_model = run_tica_heavy(traj_samples, lagtime=100, dim=2)
-    logging.info("Using all heavy atoms for TICA")
+    tica_model = run_tica_cns(traj_samples, lagtime=100, dim=2)
+    logging.info("Using all C,N,S atoms for TICA")
 
     return tica_model
 

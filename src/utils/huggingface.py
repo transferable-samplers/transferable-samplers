@@ -78,17 +78,21 @@ def download_evaluation_data(data_dir: str):
     Args:
         data_dir (str): The top-level data dir in which to build the evaluation data subdirectories
     """
+
+    logging.warning("Critical Update")
     logging.warning(
-        "Critical Update \n"
-        "The original 8AA TICA models within subsampled_trajectories/*/8AA/*.npz employed a CA-only atom selection. "
-        "These models are not valid for comparison to results in our paper.\n"
-        "Updated files (uploaded [DATE]) now contain corrected models. "
-        "If you previously downloaded this dataset, please re-download to ensure accurate results.\n"
-        "Note: Codebase references to tica_features_ca must now be replaced with tica_features. "
-        "This was resolved in our codebase by PR #N\n"
-        "Note: Snapshot download will automatically redownload the relevant files when it detects a change.\n"
-        "We sincerely apologize for any inconvenience this may have caused."
+        "The original 8AA TICA models within `subsampled_trajectories/*/8AA/*.npz` employed a CA-only atom selection."
     )
+    logging.warning("These models are not valid for comparison to results in our paper.")
+    logging.warning("Updated files (uploaded [DATE])** now contain corrected models.")
+    logging.warning("If you previously downloaded this dataset, please re-download to ensure accurate results.")
+    logging.warning("Note: Codebase references to `tica_features_ca` must now be replaced with `tica_features`.")
+    logging.warning("This was resolved in our codebase by PR #N.")
+    logging.warning(
+        "Note: Unguarded `snapshot_download` calls will automatically redownload the relevant files "
+        "when it detects a change in the repo."
+    )
+    logging.warning("We sincerely apologize for any inconvenience this may have caused.")
     if not os.path.exists(os.path.join(data_dir, "trajectories_subsampled")):
         logging.info(f"Downloading evaluation data to {data_dir}")
         # Snapshot download automatically avoids re-downloading if already present
@@ -96,6 +100,7 @@ def download_evaluation_data(data_dir: str):
             repo_id=REPO_ID,
             repo_type="dataset",
             local_dir=data_dir,
+            revision="fixing-tica",  # TODO once HF merge complete
             allow_patterns=["trajectories_subsampled/*"],
             use_auth_token=True,
         )
