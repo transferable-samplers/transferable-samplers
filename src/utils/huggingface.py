@@ -5,6 +5,7 @@ import tarfile
 from huggingface_hub import hf_hub_download, snapshot_download
 
 # TODO repos currently hardcoded - slightly hard to remove hardcode from data as assumes repo structure
+REPO_ID = "transferable-samplers/many-peptides-md"
 
 
 def download_weights(destination_dir: str, hf_filepath: str) -> str:
@@ -52,25 +53,22 @@ def download_and_extract_pdb_tarfiles(data_dir: str):
     Args:
         data_dir (str): The top-level data dir in which to build the pdb file subdirectories
     """
-
-    REPO_ID = "transferable-samplers/many-peptides-md"
-
-    logging.info(f"Downloading and extracting PDB tarfiles to {data_dir}")
-
-    # Snapshot download automatically avoids re-downloading if already present
-    local_path = snapshot_download(
-        repo_id=REPO_ID,
-        repo_type="dataset",
-        local_dir=data_dir,
-        allow_patterns=["pdb_tarfiles/*"],
-        use_auth_token=True,
-    )
-
-    for subset in ["train", "val", "test"]:
-        tar_filepath = local_path + f"/pdb_tarfiles/{subset}.tar"
-        if not os.path.exists(tar_filepath):
-            continue
-        safe_extract_tar(tar_filepath, os.path.join(data_dir, "pdbs"))
+    if not os.path.exists(os.path.join(data_dir, "pdb_tarfiles")):
+        logging.info(f"Downloading PDB tarfiles to {data_dir}")
+        # Snapshot download automatically avoids re-downloading if already present
+        local_path = snapshot_download(
+            repo_id=REPO_ID,
+            repo_type="dataset",
+            local_dir=data_dir,
+            allow_patterns=["pdb_tarfiles/*"],
+            use_auth_token=True,
+        )
+        logging.info(f"Extracting PDB tarfiles to {data_dir}")
+        for subset in ["train", "val", "test"]:
+            tar_filepath = local_path + f"/pdb_tarfiles/{subset}.tar"
+            safe_extract_tar(tar_filepath, os.path.join(data_dir, "pdbs"))
+    else:
+        logging.info(f"PDB tarfiles already present in {data_dir}")
 
 
 def download_evaluation_data(data_dir: str):
@@ -80,21 +78,26 @@ def download_evaluation_data(data_dir: str):
     Args:
         data_dir (str): The top-level data dir in which to build the evaluation data subdirectories
     """
-
-    REPO_ID = "transferable-samplers/many-peptides-md"
-
-    logging.info(f"Downloading evaluation data to {data_dir}")
-
     logging.warning(
-        "The TICA models for 8AA sequences originally uploaded to Hugging Face were not correct. "
-        "On DATE, we merged revision REVISION_NUMBER to the Hugging Face repo to fix this. "
-        "Due to the behavior of snapshot_download, this will automatically redownload the relevant files. "
+        "Critical Update \n"
+        "The original 8AA TICA models within subsampled_trajectories/*/8AA/*.npz employed a CA-only atom selection. "
+        "These models are not valid for comparison to results in our paper.\n"
+        "Updated files (uploaded [DATE]) now contain corrected models. "
+        "If you previously downloaded this dataset, please re-download to ensure accurate results.\n"
+        "Note: Codebase references to tica_features_ca must now be replaced with tica_features. "
+        "This was resolved in our codebase by PR #N\n"
+        "Note: Snapshot download will automatically redownload the relevant files when it detects a change.\n"
+        "We sincerely apologize for any inconvenience this may have caused."
     )
-    # Snapshot download automatically avoids re-downloading if already present
-    snapshot_download(
-        repo_id=REPO_ID,
-        repo_type="dataset",
-        local_dir=data_dir,
-        allow_patterns=["trajectories_subsampled/*"],
-        use_auth_token=True,
-    )
+    if not os.path.exists(os.path.join(data_dir, "trajectories_subsampled")):
+        logging.info(f"Downloading evaluation data to {data_dir}")
+        # Snapshot download automatically avoids re-downloading if already present
+        snapshot_download(
+            repo_id=REPO_ID,
+            repo_type="dataset",
+            local_dir=data_dir,
+            allow_patterns=["trajectories_subsampled/*"],
+            use_auth_token=True,
+        )
+    else:
+        logging.info(f"Evaluation data already present in {data_dir}")
