@@ -16,6 +16,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "deeptime>=0.4.5",
     "einops>=0.8.1",
     "huggingface-hub>=1.2.3",
     "hydra-colorlog==1.2.0",
@@ -29,7 +30,8 @@ dependencies = [
     "networkx>=3.6.1",
     "nglview>=4.0",
     "numpy>=2.2.6",
-    "openmm-cuda-12>=8.4.0.post2",
+    "openmm>=8.4.0.post2",
+    "openmm-cuda-13>=8.4.0.post2",
     "pot>=0.9.6.post1",
     "pre-commit>=4.5.0",
     "pytest>=9.0.2",
