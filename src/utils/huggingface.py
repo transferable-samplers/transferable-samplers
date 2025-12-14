@@ -85,5 +85,5 @@ def download_evaluation_data(data_dir: str):
         repo_type="dataset",
         local_dir=data_dir,
         allow_patterns=["trajectories_subsampled/*"],
-        use_auth_token=True,
+        token=True,
     )
