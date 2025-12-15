@@ -2,10 +2,138 @@ import logging
 import os
 import tarfile
 
+import numpy as np
 from huggingface_hub import hf_hub_download, snapshot_download
 
 # TODO repos currently hardcoded - slightly hard to remove hardcode from data as assumes repo structure
 REPO_ID = "transferable-samplers/many-peptides-md"
+
+TICA_MEAN_SHAPES = {
+    "test": {
+        "AA": 34,
+        "CE": 61,
+        "CL": 72,
+        "DG": 34,
+        "DI": 72,
+        "FK": 159,
+        "HL": 126,
+        "HM": 126,
+        "IK": 111,
+        "IM": 97,
+        "KG": 61,
+        "LE": 84,
+        "MQ": 97,
+        "NA": 51,
+        "NC": 61,
+        "PG": 42,
+        "PY": 126,
+        "QR": 142,
+        "RL": 142,
+        "RT": 111,
+        "SS": 34,
+        "TD": 51,
+        "VF": 126,
+        "VS": 51,
+        "WA": 142,
+        "WH": 237,
+        "WQ": 196,
+        "WS": 142,
+        "YC": 111,
+        "YQ": 142,
+        "ARIP": 369,
+        "CCVH": 318,
+        "CIPQ": 318,
+        "DEMT": 271,
+        "DMTL": 294,
+        "EHQW": 613,
+        "FESD": 318,
+        "FYYY": 798,
+        "GCDE": 189,
+        "GDTI": 208,
+        "GGRS": 208,
+        "HEAV": 318,
+        "HQVS": 343,
+        "HYGW": 613,
+        "ITYL": 424,
+        "KKAP": 343,
+        "KLLR": 514,
+        "KRWN": 684,
+        "NCFG": 294,
+        "NEVI": 318,
+        "PQIF": 453,
+        "QAKR": 424,
+        "QWNL": 546,
+        "RLMM": 483,
+        "SHKS": 318,
+        "SVND": 228,
+        "TAPF": 318,
+        "TMWC": 453,
+        "VPFY": 514,
+        "WNMA": 453,
+        "ANKSMIEA": 1077,
+        "CGSWHKQR": 1753,
+        "CLCCGQWN": 1317,
+        "DDRDTEQT": 1170,
+        "DGVAHALS": 903,
+        "EKYYWMQT": 2187,
+        "FWRVDHDM": 2122,
+        "GNDLVTVI": 1032,
+        "HWHSLICK": 1933,
+        "IDHRQLKW": 2187,
+        "IFGWVYTG": 1638,
+        "ISKCKNGE": 1123,
+        "KRRGFFLE": 2058,
+        "MAPQTIAT": 1032,
+        "MRDPVLFA": 1527,
+        "MWNSTEMI": 1527,
+        "MYGRNCYM": 1695,
+        "NHQYGSDP": 1267,
+        "NKEKFFQH": 2058,
+        "NPCLCYML": 1420,
+        "PGESTAES": 745,
+        "PLFHVMYV": 1872,
+        "PPWRECNN": 1695,
+        "PYIRNCVE": 1582,
+        "SPHKMRLC": 1582,
+        "SQQKVAFE": 1368,
+        "VWIPVIDT": 1527,
+        "WDLIQFRQ": 2187,
+        "WTYAFAHS": 1753,
+        "YFPHAGYT": 1638,
+    },
+    "val": {
+        "AL": 61,
+        "EC": 61,
+        "FT": 111,
+        "GQ": 51,
+        "HV": 111,
+        "ND": 61,
+        "PF": 126,
+        "RS": 97,
+        "WI": 196,
+        "WY": 259,
+        "CAVQ": 249,
+        "CVNR": 369,
+        "EDWY": 579,
+        "GNFL": 343,
+        "ISDT": 228,
+        "KHAP": 369,
+        "KHGM": 369,
+        "LFTE": 396,
+        "PMWS": 453,
+        "YRIQ": 579,
+        "AHKILWHG": 1812,
+        "AMYNLMIR": 1695,
+        "DQNVCCME": 1123,
+        "IVTVAYFP": 1473,
+        "PYTQVRPC": 1527,
+        "QDFKRNIR": 1995,
+        "QTHSSDEF": 1267,
+        "SMFNWLKY": 2122,
+        "TGEAGKSH": 903,
+        "WCEPGLDW": 1695,
+    },
+}
 
 
 def download_weights(destination_dir: str, hf_filepath: str) -> str:
@@ -106,3 +234,28 @@ def download_evaluation_data(data_dir: str):
         )
     else:
         logging.info(f"Evaluation data already present in {data_dir}")
+
+    # Check TICA shapes for all downloaded files
+    logging.info("Checking TICA model shapes...")
+
+    for subset_key in TICA_MEAN_SHAPES.keys():
+        for sequence in TICA_MEAN_SHAPES[subset_key].keys():
+            # Construct file path from dict keys
+            file_path = os.path.join(
+                data_dir, "trajectories_subsampled", subset_key, f"{len(sequence)}AA", f"{sequence}_subsampled.npz"
+            )
+            data = np.load(file_path)
+            tica_mean = data["tica_mean"]
+            tica_mean_shape = tica_mean.shape[0]
+            expected_shape = TICA_MEAN_SHAPES[subset_key][sequence]
+
+            error_message = (
+                f"TICA mean shape for {sequence} is {tica_mean_shape}, but expected {expected_shape}\n"
+                f"File: {file_path}\n"
+                "This is likely due to the change in the TICA model implementation.\n"
+                "See https://huggingface.co/datasets/transferable-samplers/many-peptides-md for further details."
+            )
+
+            assert tica_mean_shape == expected_shape, error_message
+
+    logging.info("TICA model shape checks completed successfully.")
