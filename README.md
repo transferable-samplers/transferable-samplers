@@ -1,7 +1,7 @@
 > [!IMPORTANT]
 > **Critical Dataset Update**
 > 
-> The original 8AA TICA models within `transferable-samplers/many-peptides-md/subsampled_trajectories/*/8AA/*.npz` employed a CA-only atom selection. **These models are not valid for comparison to results in our paper.**
+> The original 8AA TICA models within `https://huggingface.co/datasets/transferable-samplers/many-peptides-md/subsampled_trajectories/*/8AA/*.npz` employed a CA-only atom selection. **These models are not valid for comparison to results in our paper.**
 > 
 > **Updated files (uploaded 15/12/2025)** now contain corrected models. If you previously downloaded this dataset, please re-download to ensure accurate results.
 >
