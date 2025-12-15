@@ -7,7 +7,7 @@ import mdtraj as md
 import torch
 from matplotlib.colors import LogNorm
 
-from src.data.preprocessing.tica import tica_features, tica_features_ca
+from src.data.preprocessing.tica import tica_features
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
@@ -33,11 +33,7 @@ def plot_tica(log_image_fn, samples, topology, tica_model=None, tica_model_path=
 
     pred_traj_samples = md.Trajectory(samples.cpu().numpy(), topology=topology)
 
-    if topology.n_residues > 4:
-        ca_list = [atom.index for atom in topology.atoms if atom.name == "CA"]
-        features = tica_features_ca(pred_traj_samples, ca_list=ca_list)
-    else:
-        features = tica_features(pred_traj_samples)
+    features = tica_features(pred_traj_samples)
 
     tics = tica_model.transform(features)
     if isinstance(tics, torch.Tensor):
