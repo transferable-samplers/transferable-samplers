@@ -228,7 +228,6 @@ def download_evaluation_data(data_dir: str):
             repo_id=REPO_ID,
             repo_type="dataset",
             local_dir=data_dir,
-            revision="fixing-tica",  # TODO once HF merge complete
             allow_patterns=["trajectories_subsampled/*"],
             use_auth_token=True,
         )
