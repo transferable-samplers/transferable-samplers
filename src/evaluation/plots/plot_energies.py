@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
+from src.evaluation.plots.plot_utils import plot_histogram_comparison
+
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
 
@@ -56,49 +58,17 @@ def plot_energies(
 
     bin_edges = np.linspace(x_min, x_max, 100)
 
-    ax.hist(
-        energy_cropper(test_samples_energy.cpu()),
-        bins=bin_edges,
-        density=True,
-        alpha=0.4,
-        color="g",
-        histtype="step",
-        linewidth=3,
-        label="True data",
-    )
-    if proposal_samples_energy is not None:
-        ax.hist(
-            energy_cropper(proposal_samples_energy.cpu()),
-            bins=bin_edges,
-            density=True,
-            alpha=0.4,
-            color="r",
-            histtype="step",
-            linewidth=3,
-            label="Proposal",
-        )
-    if resampled_samples_energy is not None:
-        ax.hist(
-            energy_cropper(resampled_samples_energy.cpu()),
-            bins=bin_edges,
-            density=True,
-            alpha=0.4,
-            histtype="step",
-            linewidth=3,
-            color="b",
-            label="Proposal (reweighted)",
-        )
-    if smc_samples_energy is not None:
-        ax.hist(
-            energy_cropper(smc_samples_energy.cpu()),
-            bins=bin_edges,
-            density=True,
-            alpha=0.4,
-            histtype="step",
-            linewidth=3,
-            color="orange",
-            label="SMC",
-        )
+    # Prepare data for plotting
+    data_dict = {
+        "true": energy_cropper(test_samples_energy.cpu()),
+        "proposal": energy_cropper(proposal_samples_energy.cpu()) if proposal_samples_energy is not None else None,
+        "resampled": energy_cropper(resampled_samples_energy.cpu())
+        if resampled_samples_energy is not None
+        else None,
+        "smc": energy_cropper(smc_samples_energy.cpu()) if smc_samples_energy is not None else None,
+    }
+
+    plot_histogram_comparison(ax, data_dict, bin_edges)
 
     xticks = list(ax.get_xticks())
     xticks = xticks[1:-1]
