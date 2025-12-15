@@ -1,3 +1,16 @@
+> [!IMPORTANT]
+> **Critical Dataset Update**
+> 
+> The original 8AA TICA models within `subsampled_trajectories/*/8AA/*.npz` employed a CA-only atom selection. **These models are not valid for comparison to results in our paper.**
+> 
+> **Updated files (uploaded 15/12/2025)** now contain corrected models. If you previously downloaded this dataset, please re-download to ensure accurate results.
+>
+> Note: Codebase references to `tica_features_ca` must now be replaced with `tica_features`. **This was resolved in our codebase by [PR #26](https://github.com/transferable-samplers/transferable-samplers/pull/26).**
+>
+> Note: Unguarded `snapshot_download` calls will automatically redownload the relevant files when it detects a change in the repo.
+> 
+> We sincerely apologize for any inconvenience this may have caused.
+
 # Transferable Samplers
 
 Welcome to the official codebase for the following works:
