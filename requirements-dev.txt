@@ -1,5 +1,3 @@
--r requirements.txt          # <-- include all runtime deps
-
 # --- Pre-commit hooks ---
 pre-commit>=3.6
 
