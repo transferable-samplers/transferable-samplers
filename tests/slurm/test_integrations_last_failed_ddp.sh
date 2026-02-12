@@ -8,7 +8,8 @@
 #SBATCH -c 8
 #SBATCH --get-user-env
 
-# Note: no SLURM array as we only get a single short-unkillable job.
+source .env
+source ${UV_ENV_PATH}
 
 export PYTEST_REPORT_DIR="tests/reports"
 export PYTEST_TRAINER="ddp"
