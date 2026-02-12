@@ -5,6 +5,8 @@ defaults:
   - model_checkpoint_resampled_energy_w2
   - model_checkpoint_time
   - model_checkpoint_loss
+  - model_checkpoint_last
+  - ema_weight_averaging
 
 model_summary:
   max_depth: 2

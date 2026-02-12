@@ -17,7 +17,6 @@ model:
     clip_reweighting_logits: 0.002 # it was working well on AC without - lets try avoid
 
   smc_sampler: null
-  ema_decay: 0.0
 
 data:
   batch_size: 128
@@ -26,3 +25,5 @@ data:
 trainer:
   limit_test_batches: 1
   limit_val_batches: 1
+
+

@@ -15,7 +15,6 @@ model:
   sampling_config:
     batch_size: 8
     num_test_proposal_samples: 10_000
-  ema_decay: 0.0
 
 data:
   batch_size: 128
@@ -24,3 +23,4 @@ data:
 trainer:
   limit_test_batches: 1
   limit_val_batches: 1
+

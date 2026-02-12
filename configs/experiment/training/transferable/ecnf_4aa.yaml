@@ -17,6 +17,10 @@ data:
   num_eval_samples: 5_000
   com_augmentation: False
 
+callbacks:
+  ema:
+    decay: 0.0
+
 trainer:
   check_val_every_n_epoch: 50
   limit_train_batches: 1000

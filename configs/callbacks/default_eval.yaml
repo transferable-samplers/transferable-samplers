@@ -1,0 +1,6 @@
+defaults:
+  - model_summary
+  - _self_
+
+model_summary:
+  max_depth: 2

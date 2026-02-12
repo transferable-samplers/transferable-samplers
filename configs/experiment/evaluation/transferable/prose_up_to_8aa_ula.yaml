@@ -29,8 +29,6 @@ model:
     do_energy_plots: True
     log_freq: 1
 
-  ema_decay: 0.0
-
 data:
   batch_size: 128
   num_eval_samples: 10_000
@@ -38,3 +36,4 @@ data:
 trainer:
   limit_test_batches: 1
   limit_val_batches: 1
+

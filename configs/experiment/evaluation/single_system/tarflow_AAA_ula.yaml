@@ -30,8 +30,6 @@ model:
     input_energy_cutoff: -120.0
     do_energy_plots: True
     log_freq: 1
-    
-  ema_decay: 0.0
 
 data:
   batch_size: 10_000
@@ -42,3 +40,4 @@ trainer:
   limit_val_batches: 1
 
 state_dict_hf_path: single_system/tarflow_AAA_0.pth
+

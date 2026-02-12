@@ -15,7 +15,6 @@ from lightning.pytorch.loggers import WandbLogger
 from torchmetrics import MeanMetric
 from tqdm import tqdm
 
-from src.models.neural_networks.ema import EMA
 from src.models.priors import NormalDistribution
 from src.models.samplers.base_sampler import SMCSampler
 from src.models.utils import get_symmetry_change, resample
@@ -33,7 +32,6 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         datamodule: LightningDataModule,
         smc_sampler: SMCSampler,
         sampling_config: dict,
-        ema_decay: float,
         compile: bool,
         use_com_adjustment: bool = False,
         fix_symmetry: bool = True,
@@ -58,8 +56,6 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
             logger.warning(f"Unexpected arguments: {args}, {kwargs}")
 
         self.net = net
-        if self.hparams.ema_decay > 0:
-            self.net = EMA(net, decay=self.hparams.ema_decay)
 
         self.datamodule = datamodule
 
@@ -233,13 +229,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
     def on_eval_epoch_end(self, metrics, prefix: str = "val") -> None:
         self.log_dict(metrics.compute(), sync_dist=True)
         metrics.reset()
-        if self.hparams.ema_decay > 0:
-            self.net.backup()
-            self.net.copy_to_model()
-            self.evaluate_all(prefix)
-            self.net.restore_to_model()
-        else:
-            self.evaluate_all(prefix)
+        self.evaluate_all(prefix)
         plt.close("all")
 
     def add_aggregate_metrics(self, metrics: dict[str, torch.Tensor], prefix: str = "val") -> dict[str, torch.Tensor]:
@@ -624,6 +614,15 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         reweighted_samples = self.datamodule.unnormalize(proposal_samples[resampling_index])
         return reweighted_samples
 
+    def _build_ema_net_copy(self):
+        """Build a copy of the net with EMA averaged weights if available, otherwise copy current net."""
+        from src.callbacks.ema_weight_averaging import EMAWeightAveraging
+
+        for cb in self.trainer.callbacks:
+            if isinstance(cb, EMAWeightAveraging) and cb._average_model is not None:
+                return deepcopy(cb._average_model.module.net)
+        return deepcopy(self.net)
+
     def on_fit_start(self) -> None:
         """
         Called at the very beginning of the fit loop, after setup() has been called.
@@ -632,12 +631,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         """
 
         if self.hparams.use_distill_loss and self.hparams.self_improve:
-            self.teacher = deepcopy(self.net)
-
-            # ema params as teacher model if available
-            if self.hparams.ema_decay > 0:
-                self.teacher.backup()
-                self.teacher.copy_to_model()
+            self.teacher = self._build_ema_net_copy()
 
             # Freeze the teacher network's parameters
             for param in self.teacher.parameters():
@@ -653,25 +647,16 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
                 f"Generating {self.hparams.sampling_config.num_self_improve_proposal_samples} Samples"
                 " for self-consumption"
             )
+            original_net = self.net
+            self.net = self._build_ema_net_copy()
             self.net.eval()
 
-            if self.hparams.ema_decay > 0:
-                self.net.backup()
-                self.net.copy_to_model()
+            with torch.no_grad():
+                samples = self.generate_and_resample(
+                    num_proposal_samples=self.hparams.sampling_config.num_self_improve_proposal_samples,
+                )
 
-                with torch.no_grad():
-                    samples = self.generate_and_resample(
-                        num_proposal_samples=self.hparams.sampling_config.num_self_improve_proposal_samples,
-                    )
-
-                self.net.restore_to_model()
-
-            else:
-                with torch.no_grad():
-                    samples = self.generate_and_resample(
-                        num_proposal_samples=self.hparams.sampling_config.num_self_improve_proposal_samples,
-                    )
-
+            self.net = original_net
             self.net.train()
 
             # add the IS samples into the buffer
@@ -728,11 +713,6 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
                 total_norm += param_norm.item() ** 2
         total_norm = total_norm ** (1.0 / 2)
         self.log_dict({"train/grad_norm": total_norm}, prog_bar=True)
-
-    def optimizer_step(self, *args, **kwargs):
-        super().optimizer_step(*args, **kwargs)
-        if isinstance(self.net, EMA):
-            self.net.update_ema()
 
     def proposal_energy(self, x: torch.Tensor) -> torch.Tensor:
         # x is considered to be a sample from the proposal distribution
