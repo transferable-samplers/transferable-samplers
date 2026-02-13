@@ -24,8 +24,7 @@ class NormalizingFlowLitModule(TransferableBoltzmannGeneratorLitModule):
         super().__init__(*args, **kwargs)
         assert not self.hparams.mean_free_prior, "Mean free prior is not supported for normalizing flows"
 
-        self.eval_encodings = None
-        self.eval_energy = None
+        self.eval_ctx = None
 
     def model_step(self, batch: torch.Tensor, log: bool = True) -> torch.Tensor:
         x1 = batch["x"]
@@ -56,17 +55,20 @@ class NormalizingFlowLitModule(TransferableBoltzmannGeneratorLitModule):
         if self.hparams.energy_kl_weight:
             assert self.hparams.eval_sequence is not None, "Eval sequence name should be set"
 
-            if self.eval_encodings is None:
-                # on first step, we need to prepare the eval encodings
-                _, self.eval_encodings, self.eval_energy = self.datamodule.prepare_eval(self.hparams.eval_sequence)
+            if self.eval_ctx is None:
+                # on first step, we need to prepare the eval context
+                self.eval_ctx = self.datamodule.prepare_eval(self.hparams.eval_sequence)
+
+            eval_encodings = self.eval_ctx.proposal_cond.encodings
+            eval_permutations = self.eval_ctx.proposal_cond.permutations
 
             samples, log_q_theta, _ = self.generate_samples(
                 self.hparams.energy_kl_batch_size,
-                encodings=self.eval_encodings,
-                permutations=self.eval_permutations,
+                encodings=eval_encodings,
+                permutations=eval_permutations,
             )
 
-            log_p = -self.eval_energy(samples)
+            log_p = -self.eval_ctx.target_energy_fn(samples)
 
             if log:
                 self.log("train/log_p_mean", log_p.mean(), prog_bar=True, sync_dist=True)
@@ -75,7 +77,7 @@ class NormalizingFlowLitModule(TransferableBoltzmannGeneratorLitModule):
                 self.log("train/log_q_theta_mean", log_q_theta.mean(), prog_bar=True, sync_dist=True)
                 self.log("train/log_q_theta_median", log_q_theta.median(), prog_bar=True, sync_dist=True)
 
-            num_atoms = self.eval_encodings["atom_type"].size(0)
+            num_atoms = eval_encodings["atom_type"].size(0)
             data_dim = num_atoms * self.datamodule.hparams.num_dimensions
             energy_loss = (log_q_theta - log_p).mean() / data_dim
 

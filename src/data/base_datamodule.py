@@ -12,7 +12,7 @@ from src.evaluation.plots.plot_com_norms import plot_com_norms
 from src.evaluation.plots.plot_energies import plot_energies
 from src.evaluation.plots.plot_ramachandran import plot_ramachandran
 from src.evaluation.plots.plot_tica import plot_tica
-from src.utils.data_types import SamplesData
+from src.utils.dataclasses import SamplesData
 
 
 class BaseDataModule(LightningDataModule):

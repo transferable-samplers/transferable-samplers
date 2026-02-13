@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Callable, Optional
 
 import torch
 
@@ -23,3 +24,18 @@ class SamplesData:
             self.energy[index],
             self.logits[index] if self.logits is not None else None,
         )
+
+
+@dataclass
+class ProposalCond:
+    permutations: Optional[dict] = None
+    encodings: Optional[dict] = None
+
+
+@dataclass
+class EvalContext:
+    true_samples: torch.Tensor
+    target_energy_fn: Callable
+    proposal_cond: Optional[ProposalCond]
+    tica_model: Optional[object] = None
+    topology: Optional[object] = None

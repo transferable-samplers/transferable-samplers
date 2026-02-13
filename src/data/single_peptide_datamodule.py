@@ -17,6 +17,7 @@ from src.data.preprocessing.tica import get_tica_model
 from src.data.transforms.center_of_mass import CenterOfMassTransform
 from src.data.transforms.rotation import Random3DRotationTransform
 from src.data.transforms.standardize import StandardizeTransform
+from src.utils.dataclasses import EvalContext
 
 
 class SinglePeptideDataModule(BaseDataModule):
@@ -191,33 +192,23 @@ class SinglePeptideDataModule(BaseDataModule):
 
         return potential
 
-    def prepare_eval(self, sequence: str, prefix: str):
+    def prepare_eval(self, sequence: str, stage: str) -> EvalContext:
         """
         Prepare evaluation data and energy function for validation or test trajectories.
 
-        Selects trajectory data based on the provided prefix, constructs a TICA model,
-        subsamples the trajectory, applies normalization, and sets up a potential energy
-        function. Returns all components required for evaluation.
-
         Args:
-            sequence (str): Unused compatibility argument for integration with
-                TransferablePeptideDatamodule.
-            prefix (str): Dataset split to evaluate on. Must be either "val" or "test".
+            sequence (str): Peptide sequence (always self.hparams.sequence for single peptide).
+            stage (str): Dataset split to evaluate on. Must be either "val" or "test".
 
         Returns:
-            tuple: A 5-tuple containing:
-                - true_samples (torch.Tensor): Normalized and subsampled trajectory samples.
-                - permutations (None): Placeholder for compatibility, not used here.
-                - encodings (None): Placeholder for compatibility, not used here.
-                - energy_fn (Callable): Function mapping positions → energy values.
-                - tica_model: Model with TICA projection parameters computed from the trajectory.
+            EvalContext with all components required for evaluation.
         """
-        if prefix == "test":
+        if stage == "test":
             true_samples = self.data_test.data
-        elif prefix == "val":
+        elif stage == "val":
             true_samples = self.data_val.data
         else:
-            raise ValueError(f"Unknown prefix: {prefix}. Use 'val' or 'test'.")
+            raise ValueError(f"Unknown stage: {stage}. Use 'val' or 'test'.")
 
         tica_model = get_tica_model(true_samples, self.topology)
 
@@ -225,9 +216,13 @@ class SinglePeptideDataModule(BaseDataModule):
         true_samples = true_samples[:: len(true_samples) // self.hparams.num_eval_samples]
         true_samples = self.normalize(true_samples)
 
-        permutations = None
-        encodings = None
         potential = self.setup_potential()
         energy_fn = lambda x: potential.energy(self.unnormalize(x)).flatten()
 
-        return true_samples, permutations, encodings, energy_fn, tica_model
+        return EvalContext(
+            true_samples=true_samples,
+            target_energy_fn=energy_fn,
+            proposal_cond=None,
+            tica_model=tica_model,
+            topology=self.topology,
+        )

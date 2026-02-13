@@ -18,8 +18,9 @@ from tqdm import tqdm
 from src.models.neural_networks.ema import EMA
 from src.models.priors import NormalDistribution
 from src.models.samplers.base_sampler import SMCSampler
-from src.models.utils import get_symmetry_change, resample
-from src.utils.data_types import SamplesData
+from src.utils.chirality import get_symmetry_change
+from src.utils.dataclasses import SamplesData
+from src.utils.resampling import resample_multinomial
 
 logger = logging.getLogger(__name__)
 
@@ -306,19 +307,16 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
         metrics = {}
         eval_sequences = self.datamodule.val_sequences if prefix.startswith("val") else self.datamodule.test_sequences
         for sequence in eval_sequences:
-            # TODO: single peptides expects prefix as input while transferable expects sequence as input
-            true_samples, permutations, encodings, energy_fn, tica_model = self.datamodule.prepare_eval(
-                prefix=prefix, sequence=sequence
-            )
+            eval_ctx = self.datamodule.prepare_eval(sequence=sequence, stage=prefix)
             logging.info(f"Evaluating {sequence} samples")
             metrics.update(
                 self.evaluate(
                     sequence,
-                    true_samples,
-                    permutations,
-                    encodings,
-                    energy_fn,
-                    tica_model,
+                    eval_ctx.true_samples,
+                    eval_ctx.proposal_cond.permutations if eval_ctx.proposal_cond else None,
+                    eval_ctx.proposal_cond.encodings if eval_ctx.proposal_cond else None,
+                    eval_ctx.target_energy_fn,
+                    eval_ctx.tica_model,
                     prefix=f"{prefix}/{sequence}",
                     proposal_generator=self.batched_generate_samples,
                 )
@@ -499,7 +497,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
             resampling_logits = resampling_logits[~clipped_logits_mask]
             logging.info("Clipped logits for resampling")
 
-        _, resampling_index = resample(proposal_samples, resampling_logits, return_index=True)
+        _, resampling_index = resample_multinomial(proposal_samples, resampling_logits)
 
         reweighted_data = SamplesData(
             self.datamodule.unnormalize(proposal_samples[resampling_index]),
@@ -590,10 +588,13 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
             num_proposal_samples = self.hparams.sampling_config.num_proposal_samples
 
         # on first step, we need to prepare the eval encoding
-        _, permutations, eval_encoding, energy_fn, _ = self.datamodule.prepare_eval(self.datamodule.test_sequences[0])
+        eval_ctx = self.datamodule.prepare_eval(self.datamodule.test_sequences[0], stage="test")
+        permutations = eval_ctx.proposal_cond.permutations if eval_ctx.proposal_cond else None
+        encodings = eval_ctx.proposal_cond.encodings if eval_ctx.proposal_cond else None
+        energy_fn = eval_ctx.target_energy_fn
 
         proposal_samples, proposal_log_p, _ = self.batched_generate_samples(
-            num_proposal_samples, permutations=permutations, encodings=eval_encoding, log_invert_error=False
+            num_proposal_samples, permutations=permutations, encodings=encodings, log_invert_error=False
         )
 
         # Compute energy
@@ -624,7 +625,7 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
             resampling_logits = resampling_logits[~clipped_logits_mask]
             logging.info("Clipped logits for resampling")
 
-        _, resampling_index = resample(proposal_samples, resampling_logits, return_index=True)
+        _, resampling_index = resample_multinomial(proposal_samples, resampling_logits)
         reweighted_samples = self.datamodule.unnormalize(proposal_samples[resampling_index])
         return reweighted_samples
 

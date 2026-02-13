@@ -29,6 +29,7 @@ from src.data.transforms.center_of_mass import CenterOfMassTransform
 from src.data.transforms.padding import PaddingTransform
 from src.data.transforms.rotation import Random3DRotationTransform
 from src.data.transforms.standardize import StandardizeTransform
+from src.utils.dataclasses import EvalContext, ProposalCond
 from src.utils.huggingface import download_and_extract_pdb_tarfiles, download_evaluation_data
 
 
@@ -256,30 +257,24 @@ class TransferablePeptideDataModule(BaseDataModule):
 
         return potential
 
-    def prepare_eval(self, sequence: str, prefix: str = None):
+    def prepare_eval(self, sequence: str, stage: str = None) -> EvalContext:
         """
         Prepare evaluation data and energy function for a given peptide sequence.
 
-        Loads the subsampled trajectory data (positions and TICA projection) from disk,
-        applies normalization, retrieves permutations and encodings, and constructs
-        the potential energy function. Returns all components required for evaluation.
-
-        Args: sequence (str): Peptide sequence identifier to prepare evaluation data for.
-            prefix (str): Unused compatibility argument for integration with
-                SinglePeptideDatamodule.
+        Args:
+            sequence (str): Peptide sequence identifier to prepare evaluation data for.
+            stage (str): Dataset split ("val" or "test"). Used to select data path.
 
         Returns:
-            tuple: A 5-tuple containing:
-                - true_samples (torch.Tensor): Normalized trajectory samples.
-                - permutations (Any): Permutations associated with the sequence.
-                - encodings (Any): Encodings associated with the sequence.
-                - energy_fn (Callable): Function mapping positions → energy values.
-                - tica_model (TicaModel): Model with TICA projection parameters.
+            EvalContext with all components required for evaluation.
         """
+        is_val = sequence in self.val_sequences
+        is_test = sequence in self.test_sequences
+        assert is_val or is_test, f"Sequence {sequence} not found in val or test sequences."
+        assert stage == ("val" if is_val else "test"), f"Stage '{stage}' does not match sequence '{sequence}' (found in {'val' if is_val else 'test'})."
+        data_path = self.val_data_path if is_val else self.test_data_path
         subsampled_trajectory_npz = np.load(
-            os.path.join(self.val_data_path, f"{len(sequence)}AA", f"{sequence}_subsampled.npz")
-            if sequence in self.val_sequences
-            else os.path.join(self.test_data_path, f"{len(sequence)}AA", f"{sequence}_subsampled.npz"),
+            os.path.join(data_path, f"{len(sequence)}AA", f"{sequence}_subsampled.npz"),
         )
 
         true_samples = torch.from_numpy(subsampled_trajectory_npz["positions"])
@@ -290,12 +285,19 @@ class TransferablePeptideDataModule(BaseDataModule):
         )
 
         true_samples = self.normalize(true_samples)
-        permutations = self.permutations_dict[sequence]
-        encodings = self.encodings_dict[sequence]
         potential = self.setup_potential(sequence)
         energy_fn = lambda x: potential.energy(self.unnormalize(x)).flatten()
 
-        return true_samples, permutations, encodings, energy_fn, tica_model
+        return EvalContext(
+            true_samples=true_samples,
+            proposal_cond=ProposalCond(
+                permutations=self.permutations_dict[sequence],
+                encodings=self.encodings_dict[sequence],
+            ),
+            target_energy_fn=energy_fn,
+            tica_model=tica_model,
+            topology=self.topology_dict[sequence],
+        )
 
     def save_buffer(self):
         """

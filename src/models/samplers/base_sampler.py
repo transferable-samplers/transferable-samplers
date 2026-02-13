@@ -7,6 +7,7 @@ from matplotlib.colors import LogNorm
 from tqdm import tqdm
 
 from src.evaluation.metrics.ess import sampling_efficiency
+from src.utils.resampling import resample_multinomial, resample_systematic
 
 
 class SMCSampler(torch.nn.Module):
@@ -211,19 +212,9 @@ class SMCSampler(torch.nn.Module):
     @torch.no_grad()
     def resample(self, x, logw):
         if self.systematic_resampling:
-            # systematic resampling
-            N = len(logw)
-            w = torch.softmax(logw, dim=-1)
-            c = torch.cumsum(w, dim=0)
-            u = torch.rand(1, device=x.device) / N
-            indexes = torch.searchsorted(c, u + torch.arange(N, device=x.device) / N)
+            return resample_systematic(x, logw)
         else:
-            # smc weights
-            w = torch.softmax(logw, dim=-1)
-            # multinomial resampling
-            indexes = torch.multinomial(w, len(x), replacement=True)
-
-        return x[indexes], indexes
+            return resample_multinomial(x, logw)
 
     @torch.no_grad()
     def sample(self, proposal_samples, source_energy, target_energy):
