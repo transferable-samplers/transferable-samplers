@@ -1,6 +1,6 @@
 # ruff: noqa: E402, I001
 
-import pickle
+import os
 from typing import Any, Optional
 
 import hydra
@@ -32,6 +32,7 @@ load_dotenv(override=True)
 # more info: https://github.com/ashleve/rootutils
 # ------------------------------------------------------------------------------------ #
 
+from src.utils.huggingface import download_weights
 from src.utils.instantiators import instantiate_callbacks, instantiate_loggers
 from src.utils.logging_utils import log_hyperparameters
 from src.utils.pylogger import RankedLogger
@@ -92,28 +93,27 @@ def self_improve(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
 
     assert not cfg.trainer.num_sanity_val_steps, "num_sanity_val_steps should be 0 for finetuning!"
 
-    ckpt_path = cfg.get("ckpt_path")
-    initial_ckpt_path = cfg.get("initial_ckpt_path")
+    state_dict_hf_path = cfg.get("state_dict_hf_path")
+    assert state_dict_hf_path is not None, "Need state_dict_hf_path to give initial proposal"
+    assert not cfg.model.ema_decay, (
+        "Setting ema decay will cause silent errors in self-improvement when using huggingface weights"
+    )
 
-    assert initial_ckpt_path is not None, "Need pre-trained ckpt to give initial proposal"
-    log.info(f"Loading weights from {initial_ckpt_path}")
+    log.info("Downloading weights from huggingface...")
+    dst_dir = os.path.join(cfg.paths.scratch_dir, "model-weights")
+    state_dict_path = download_weights(hf_filepath=state_dict_hf_path, destination_dir=dst_dir)
 
-    try:
-        state_dict = torch.load(initial_ckpt_path, map_location="cpu", weights_only=True)
-        model.load_state_dict(state_dict)
-    except pickle.UnpicklingError:
-        log.info(f"Ensure checkpoint path {initial_ckpt_path} contains weights only.")
+    state_dict = torch.load(state_dict_path, map_location="cpu")
+    model.load_state_dict(state_dict)
 
     log.info("Starting self-refinement training!")
-    trainer.fit(model=model, datamodule=datamodule, ckpt_path=ckpt_path)
+    trainer.fit(model=model, datamodule=datamodule)
 
     train_metrics = trainer.callback_metrics
 
     if cfg.get("test"):
         log.info("Starting testing!")
-        ckpt_path = cfg.get("ckpt_path")
-        trainer.test(model=model, datamodule=datamodule, ckpt_path=ckpt_path)
-        log.info(f"Best ckpt path: {ckpt_path}")
+        trainer.test(model=model, datamodule=datamodule)
 
     test_metrics = trainer.callback_metrics
 

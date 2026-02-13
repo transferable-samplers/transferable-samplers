@@ -58,6 +58,11 @@ class SinglePeptideDataModule(BaseDataModule):
 
         Do not use it to assign state (self.x = y).
         """
+        required_files = [self.train_data_path, self.val_data_path, self.test_data_path, self.pdb_path]
+        if all(os.path.exists(f) for f in required_files):
+            logging.info(f"All required files already exist for {self.trajectory_name}, skipping download.")
+            return
+
         os.makedirs(f"{self.hparams.data_dir}/{self.repo_name}", exist_ok=True)
 
         local_dir = snapshot_download(
@@ -162,7 +167,8 @@ class SinglePeptideDataModule(BaseDataModule):
                 else 1.0 / openmm.unit.picosecond,
                 1.0 * openmm.unit.femtosecond,
             )
-            potential = OpenMMEnergy(bridge=OpenMMBridge(system, integrator, platform_name="CUDA"))
+            platform_name = "CUDA" if torch.cuda.is_available() else "CPU"
+            potential = OpenMMEnergy(bridge=OpenMMBridge(system, integrator, platform_name=platform_name))
         else:
             forcefield = openmm.app.ForceField("amber14-all.xml", "implicit/obc1.xml")
             temperature = 310
@@ -180,7 +186,8 @@ class SinglePeptideDataModule(BaseDataModule):
             )
 
             # Initialize potential
-            potential = OpenMMEnergy(bridge=OpenMMBridge(system, integrator, platform_name="CUDA"))
+            platform_name = "CUDA" if torch.cuda.is_available() else "CPU"
+            potential = OpenMMEnergy(bridge=OpenMMBridge(system, integrator, platform_name=platform_name))
 
         return potential
 

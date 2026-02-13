@@ -63,6 +63,7 @@ def cfg_test_smc_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tm
         cfg.data.num_workers = 0  # avoid multiprocessing issues in tests
         if "transferable" in experiment_name:
             cfg.data.test_sequences = "AA"
+        cfg.data.batch_size = 4
         cfg.tags = ["pytest", "test_smc_mwe"]
 
     yield cfg

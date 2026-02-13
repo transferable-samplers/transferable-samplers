@@ -81,6 +81,7 @@ def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, t
         if "transferable" in experiment_name:
             cfg.data.test_sequences = "AA"
         cfg.data.num_workers = 0  # avoid multiprocessing issues in tests
+        cfg.data.batch_size = 4
         cfg.tags = ["pytest", f"test_snis_mwe_{trainer_name_param}"]
 
     yield cfg

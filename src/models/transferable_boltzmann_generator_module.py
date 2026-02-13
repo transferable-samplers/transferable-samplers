@@ -372,12 +372,14 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
 
         if self.hparams.sampling_config.get("load_samples_path", None) is None:
             # Generate samples and record time
-            torch.cuda.synchronize()
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
             start_time = time.time()
             proposal_samples, proposal_log_q, prior_samples = proposal_generator(
                 num_proposal_samples, permutations, encodings
             )
-            torch.cuda.synchronize()
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
             time_duration = time.time() - start_time
 
             metrics.update(
@@ -526,7 +528,8 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
             num_smc_samples = min(self.hparams.sampling_config.num_smc_samples, len(proposal_samples))
 
             # Generate smc samples and record time
-            torch.cuda.synchronize()
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
             start_time = time.time()
 
             # TODO: Make conditional proposal energy
@@ -534,7 +537,8 @@ class TransferableBoltzmannGeneratorLitModule(LightningModule):
             smc_samples, smc_logits = self.smc_sampler.sample(
                 proposal_samples[:num_smc_samples], cond_proposal_energy, energy_fn
             )  # already returned resampled
-            torch.cuda.synchronize()
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
             time_duration = time.time() - start_time
             self.log(f"{prefix}/smc/samples_walltime", time_duration, sync_dist=True)
             self.log(f"{prefix}/smc/samples_per_second", len(smc_samples) / time_duration, sync_dist=True)
