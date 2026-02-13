@@ -16,7 +16,7 @@ from torchmetrics import MeanMetric
 from tqdm import tqdm
 
 from src.models.neural_networks.ema import EMA
-from src.models.priors import NormalDistribution
+from src.models.priors.normal_distribution import NormalDistribution
 from src.models.samplers.base_sampler import SMCSampler
 from src.utils.chirality import get_symmetry_change
 from src.utils.dataclasses import SamplesData
