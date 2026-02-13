@@ -7,12 +7,16 @@ from matplotlib.colors import LogNorm
 from tqdm import tqdm
 
 from src.evaluation.metrics.ess import sampling_efficiency
+from src.models.samplers.mcmc import mala_kernel, ula_kernel
 from src.utils.resampling import resample_multinomial, resample_systematic
+
+KERNEL_FNS = {"ula": ula_kernel, "mala": mala_kernel}
 
 
 class SMCSampler(torch.nn.Module):
     def __init__(
         self,
+        kernel_type: str = "ula",
         log_image_fn: callable = None,
         batch_size: int = 128,
         langevin_eps: float = 1e-7,
@@ -28,6 +32,11 @@ class SMCSampler(torch.nn.Module):
     ):
         super().__init__()
 
+        if kernel_type not in KERNEL_FNS:
+            raise ValueError(f"Unknown kernel_type '{kernel_type}', expected one of {list(KERNEL_FNS)}")
+        self.kernel_type = kernel_type
+        self.kernel_fn = KERNEL_FNS[kernel_type]
+
         self.log_image_fn = log_image_fn
         self.batch_size = batch_size
         self.langevin_eps = langevin_eps
@@ -42,7 +51,10 @@ class SMCSampler(torch.nn.Module):
         self.adaptive_step_size = adaptive_step_size
 
     def mcmc_kernel(self, source_energy, target_energy, t, x, logw, dt):
-        raise NotImplementedError
+        eps = self.langevin_eps_fn(t)
+        energy_fn = lambda _t, _x: self.linear_energy_interpolation(source_energy, target_energy, _t, _x)
+        grad_fn = lambda _t, _x: self.linear_energy_interpolation_gradients(source_energy, target_energy, _t, _x)
+        return self.kernel_fn(energy_fn, grad_fn, t, x, logw, dt, eps)
 
     def init_timesteps(self):
         return torch.linspace(0, 1, self.num_timesteps + 1)
@@ -69,6 +81,7 @@ class SMCSampler(torch.nn.Module):
         return energy
 
     def linear_energy_interpolation_gradients(self, source_energy, target_energy, t, x):
+        """Compute gradient of interpolated energy w.r.t. both x and t."""
         t = t.repeat(x.shape[0]).to(x)
 
         with torch.set_grad_enabled(True):
@@ -77,19 +90,19 @@ class SMCSampler(torch.nn.Module):
 
             et = self.linear_energy_interpolation(source_energy, target_energy, t, x)
 
-            # assert et.requires_grad, "et should require grad - check the energy function for no_grad"
-
             # this is a bit hacky but is fine as long as
             # the energy function is defined properly and
             # doesn't mix batch items
 
-            x_grad = torch.autograd.grad(et.sum(), x)[0]
+            t_grad, x_grad = torch.autograd.grad(et.sum(), (t, x))
 
             assert x_grad.shape == x.shape, "x_grad should have the same shape as x"
+            assert t_grad.shape == t.shape, "t_grad should have the same shape as t"
 
         assert x_grad is not None, "x_grad should not be None"
+        assert t_grad is not None, "t_grad should not be None"
 
-        return x_grad.detach()
+        return x_grad.detach(), t_grad.detach()
 
     def plot_stepwise_energy(self, target_energy_list, interpolation_energy_list, t_list):
         stepwise_target_energy_np = np.stack(target_energy_list)

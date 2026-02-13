@@ -22,7 +22,8 @@ model:
     clip_reweighting_logits: 0.002
 
   smc_sampler:
-    _target_: src.models.samplers.ula_sampler.SMCSamplerULA
+    _target_: src.models.samplers.base_sampler.SMCSampler
+    kernel_type: ula
     enabled: True
     langevin_eps: 2e-8
     num_timesteps: 500

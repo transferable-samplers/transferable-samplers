@@ -17,7 +17,8 @@ model:
     clip_reweighting_logits: 0.002 # it was working well on AC without - lets try avoid
 
   smc_sampler:
-    _target_: src.models.samplers.ula_sampler.SMCSamplerULA
+    _target_: src.models.samplers.base_sampler.SMCSampler
+    kernel_type: ula
     enabled: True
     langevin_eps: 1e-7
     num_timesteps: 100
