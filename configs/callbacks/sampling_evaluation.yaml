@@ -1,0 +1,8 @@
+sampling_evaluation:
+  _target_: src.callbacks.sampling_evaluation.SamplingEvaluationCallback
+  evaluator:
+    _target_: src.evaluation.evaluator.Evaluator
+    fix_symmetry: true
+    drop_unfixable_symmetry: false
+    num_eval_samples: 10_000
+    do_plots: true
