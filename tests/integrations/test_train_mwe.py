@@ -17,8 +17,8 @@ from tests.helpers.utils import compose_config, get_config_stem
 EXPERIMENT_NAMES = [
     f"training/{cfg_path}"
     for cfg_path in [
-        "single_system/ecnf++_Ace-A-Nme.yaml",  # single system ecnf
-        "single_system/tarflow_Ace-A-Nme.yaml",  # single system nf
+        "single_system/ecnf++_AAA.yaml",  # single system ecnf
+        "single_system/tarflow_AAA.yaml",  # single system nf
         "transferable/ecnf++_up_to_4aa.yaml",  # transferable ecnf
         "transferable/prose_up_to_8aa.yaml",  # transferable nf
     ]
@@ -57,7 +57,7 @@ def cfg_test_train_mwe(request: pytest.FixtureRequest, trainer_name_param: str, 
         cfg.trainer.max_epochs = 1
         cfg.trainer.limit_train_batches = 1
         cfg.data.num_workers = 0  # avoid multiprocessing issues in tests
-        cfg.data.batch_size = 32
+        cfg.data.batch_size = 4
         cfg.tags = ["pytest", f"test_train_mwe_{trainer_name_param}"]
 
     yield cfg
