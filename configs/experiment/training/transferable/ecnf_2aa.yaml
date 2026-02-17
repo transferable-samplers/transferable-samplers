@@ -8,9 +8,6 @@ defaults:
 model:
   net:
     channels: 128
-  sampling_config:
-    batch_size: 256
-    num_proposal_samples: 0
 
 data:
   batch_size: 512

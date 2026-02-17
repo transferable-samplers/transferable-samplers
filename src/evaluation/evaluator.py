@@ -2,6 +2,7 @@ import logging
 
 import torch
 
+from src.data.normalization import unnormalize
 from src.evaluation.metrics.evaluate_peptide_data import evaluate_peptide_data
 from src.evaluation.plots.plot_atom_distances import plot_atom_distances
 from src.evaluation.plots.plot_com_norms import plot_com_norms
@@ -18,8 +19,6 @@ class Evaluator:
     """Evaluates generated samples against reference data.
 
     Handles chirality fixing, metric computation, and plot generation.
-    Extracted from TransferableBoltzmannGeneratorLitModule.evaluate()
-    and BaseDataModule.metrics_and_plots().
     """
 
     def __init__(
@@ -42,6 +41,7 @@ class Evaluator:
         eval_context: EvalContext,
         log_image_fn=None,
         prefix: str = "",
+        normalization_std: torch.Tensor = None,
     ) -> dict[str, float]:
         """Evaluate generated samples against reference data.
 
@@ -53,6 +53,8 @@ class Evaluator:
             eval_context: EvalContext from datamodule.prepare_eval().
             log_image_fn: Optional image logging callable (img, title) -> None.
             prefix: String prefix for metric keys.
+            normalization_std: Normalization std tensor used to unnormalize
+                true_samples from eval_context for chirality checks and metrics.
 
         Returns:
             Dict mapping metric names to computed values.
@@ -66,7 +68,7 @@ class Evaluator:
 
         # Compute true data energy (eval_context.true_samples are normalized)
         true_data = SamplesData(
-            eval_context.true_samples,  # already unnormalized in EvalContext? No.
+            unnormalize(eval_context.true_samples, normalization_std),
             eval_context.target_energy_fn(eval_context.true_samples),
         )
 

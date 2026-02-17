@@ -11,6 +11,11 @@ div_estimator: "exact"
 logp_tol_scale: 1.0
 n_eps: 1
 
+prior:
+  _target_: src.models.priors.normal_distribution.NormalDistribution
+  num_dimensions: ${data.num_dimensions}
+  mean_free: true
+
 sigma: 0.0
 optimizer:
   _partial_: true
@@ -20,6 +25,3 @@ optimizer:
     - 0.999
   weight_decay: 1e-4
 ema_decay: 0.999
-
-sampling_config:
-  use_com_adjustment: False

@@ -12,6 +12,7 @@ import torchvision
 from omegaconf import ListConfig, OmegaConf
 
 from src.data.base_datamodule import BaseDataModule
+from src.data.normalization import normalize, unnormalize
 from src.data.datasets.buffer import ReplayBuffer
 from src.data.datasets.peptides_dataset import PeptidesDatasetWithBuffer, build_peptides_dataset
 from src.data.datasets.webdataset import build_webdataset
@@ -284,9 +285,9 @@ class TransferablePeptideDataModule(BaseDataModule):
             dim=subsampled_trajectory_npz["tica_dim"],
         )
 
-        true_samples = self.normalize(true_samples)
+        true_samples = normalize(true_samples, self.std)
         potential = self.setup_potential(sequence)
-        energy_fn = lambda x: potential.energy(self.unnormalize(x)).flatten()
+        energy_fn = lambda x: potential.energy(unnormalize(x, self.std)).flatten()
 
         return EvalContext(
             true_samples=true_samples,

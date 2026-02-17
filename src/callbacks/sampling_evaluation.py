@@ -63,9 +63,6 @@ def add_aggregate_metrics(metrics: dict, prefix: str = "val") -> dict:
 class SamplingEvaluationCallback(Callback):
     """Lightning callback that orchestrates sample generation + evaluation.
 
-    Replaces the evaluate_all / evaluate / on_eval_epoch_end logic that
-    previously lived in TransferableBoltzmannGeneratorLitModule.
-
     On validation/test epoch end:
     1. Swaps to EMA weights if applicable
     2. Loops over sequences, generating samples via model.sampler
@@ -80,15 +77,14 @@ class SamplingEvaluationCallback(Callback):
         self.evaluator = evaluator
 
     def on_validation_epoch_end(self, trainer, pl_module):
-        self._evaluate_epoch(trainer, pl_module, "val")
+        self.evaluate(trainer, pl_module, "val")
         logger.info("Validation evaluation complete")
 
     def on_test_epoch_end(self, trainer, pl_module):
-        self._evaluate_epoch(trainer, pl_module, "test")
+        self.evaluate(trainer, pl_module, "test")
         logger.info("Test evaluation complete")
 
-    def _evaluate_epoch(self, trainer, pl_module, prefix):
-        """Run evaluation for all sequences in a given stage."""
+    def evaluate(self, trainer, pl_module, prefix):
         if pl_module.sampler is None:
             return
 
@@ -97,17 +93,13 @@ class SamplingEvaluationCallback(Callback):
             pl_module.net.backup()
             pl_module.net.copy_to_model()
 
-        try:
-            self._evaluate_all(trainer, pl_module, prefix)
-        finally:
-            if use_ema:
-                pl_module.net.restore_to_model()
-            plt.close("all")
-
-    def _evaluate_all(self, trainer, pl_module, prefix):
-        """Loop over sequences, generate samples, evaluate, aggregate, and log."""
         datamodule = trainer.datamodule
         eval_sequences = datamodule.val_sequences if prefix == "val" else datamodule.test_sequences
+        log_image_fn = self._make_log_image_fn(pl_module)
+
+        # Set log_image_fn on SMCSampler if applicable
+        if hasattr(pl_module.sampler, 'log_image_fn'):
+            pl_module.sampler.log_image_fn = log_image_fn
 
         metrics = {}
         for sequence in eval_sequences:
@@ -121,10 +113,6 @@ class SamplingEvaluationCallback(Callback):
                 eval_ctx.target_energy_fn,
                 prefix=f"{prefix}/{sequence}",
             )
-
-            # Build log_image_fn from the model's loggers
-            log_image_fn = self._make_log_image_fn(pl_module)
-
             # Evaluate: chirality fixing, metrics, plots
             seq_metrics = self.evaluator.evaluate(
                 sequence,
@@ -132,9 +120,14 @@ class SamplingEvaluationCallback(Callback):
                 eval_ctx,
                 log_image_fn=log_image_fn,
                 prefix=f"{prefix}/{sequence}",
+                normalization_std=datamodule.std,
             )
 
             metrics.update(seq_metrics)
+
+        if use_ema:
+            pl_module.net.restore_to_model()
+        plt.close("all")
 
         # Aggregate metrics across all sequences
         if pl_module.local_rank == 0:

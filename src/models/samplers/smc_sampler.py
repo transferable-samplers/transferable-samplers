@@ -7,8 +7,9 @@ import torch
 from matplotlib.colors import LogNorm
 from tqdm import tqdm
 
+from src.data.normalization import unnormalize
 from src.evaluation.metrics.ess import sampling_efficiency
-from src.models.samplers.base_sampling_strategy import BaseSampler
+from src.models.samplers.base_sampler_class import BaseSampler
 from src.models.samplers.mcmc import mala_kernel, ula_kernel
 from src.utils.dataclasses import ProposalCond, SamplesData
 from src.utils.resampling import (
@@ -45,10 +46,10 @@ class SMCSampler(BaseSampler):
         adaptive_step_size: bool = False,
         warmup: float = 0.0,
         gradient_batch_size: int = 128,
-        input_energy_cutoff: Optional[float] = None,
+        input_energy_filter_cutoff: Optional[float] = None,
         # SNIS params for initial proposal
         use_com_adjustment: bool = False,
-        logit_clip_filter_pct: Optional[float] = None,
+        logit_clip_filter: Optional[float] = None,
         # Plotting
         log_image_fn: Optional[Callable] = None,
         do_energy_plots: bool = False,
@@ -68,9 +69,9 @@ class SMCSampler(BaseSampler):
         self.adaptive_step_size = adaptive_step_size
         self.warmup = warmup
         self.gradient_batch_size = gradient_batch_size
-        self.input_energy_cutoff = input_energy_cutoff
+        self.input_energy_filter_cutoff = input_energy_filter_cutoff
         self.use_com_adjustment = use_com_adjustment
-        self.logit_clip_filter_pct = logit_clip_filter_pct
+        self.logit_clip_filter = logit_clip_filter
         self.log_image_fn = log_image_fn
         self.do_energy_plots = do_energy_plots
         self.log_freq = log_freq
@@ -86,8 +87,8 @@ class SMCSampler(BaseSampler):
         samples, log_q = self.sample_proposal_in_batches(model, self.num_samples, proposal_cond)
         target_energy = target_energy_fn(samples)
 
-        unnorm = model.trainer.datamodule.unnormalize
-        proposal_data = SamplesData(unnorm(samples), target_energy)
+        std = model.trainer.datamodule.std
+        proposal_data = SamplesData(unnormalize(samples, std), target_energy)
 
         # 2. SNIS resampling
         adjusted_log_q = log_q
@@ -99,8 +100,8 @@ class SMCSampler(BaseSampler):
 
         logits = -target_energy - adjusted_log_q
 
-        if self.logit_clip_filter_pct:
-            clipped_mask = logits > torch.quantile(logits, 1 - self.logit_clip_filter_pct)
+        if self.logit_clip_filter:
+            clipped_mask = logits > torch.quantile(logits, 1 - self.logit_clip_filter)
             samples = samples[~clipped_mask]
             target_energy = target_energy[~clipped_mask]
             logits = logits[~clipped_mask]
@@ -108,13 +109,16 @@ class SMCSampler(BaseSampler):
 
         _, resampling_index = resample_multinomial(samples, logits)
         resampled_data = SamplesData(
-            unnorm(samples[resampling_index]),
+            unnormalize(samples[resampling_index], std),
             target_energy[resampling_index],
             logits=logits,
         )
 
-        # 3. Build source energy function
-        source_energy_fn = lambda x: model.proposal_energy(x, proposal_cond)
+        # 3. Build source energy function (with COM adjustment if enabled)
+        if self.use_com_adjustment:
+            source_energy_fn = lambda x: model.proposal_energy(x, proposal_cond) - com_energy_adjustment(x, com_std)
+        else:
+            source_energy_fn = lambda x: model.proposal_energy(x, proposal_cond)
 
         # 4. Run SMC loop on the (possibly clipped) proposal samples
         smc_samples, smc_logits = self._smc_loop(
@@ -122,7 +126,7 @@ class SMCSampler(BaseSampler):
         )
 
         smc_energy = target_energy_fn(smc_samples)
-        smc_data = SamplesData(unnorm(smc_samples), smc_energy, logits=smc_logits)
+        smc_data = SamplesData(unnormalize(smc_samples, std), smc_energy, logits=smc_logits)
 
         return {"proposal": proposal_data, "resampled": resampled_data, "smc": smc_data}
 
@@ -189,9 +193,9 @@ class SMCSampler(BaseSampler):
         world_size = model.trainer.world_size if model.trainer else 1
 
         # Filter by energy cutoff
-        if self.input_energy_cutoff is not None:
+        if self.input_energy_filter_cutoff is not None:
             energies = target_energy_fn(proposal_samples)
-            proposal_samples = proposal_samples[energies < self.input_energy_cutoff]
+            proposal_samples = proposal_samples[energies < self.input_energy_filter_cutoff]
             logger.info("Clipping energies")
 
         num_timesteps = self.num_timesteps

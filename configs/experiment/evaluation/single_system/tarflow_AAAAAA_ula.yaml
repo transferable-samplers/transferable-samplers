@@ -13,26 +13,23 @@ model:
     num_blocks: 6
     layers_per_block: 6
 
-  sampling_config:
-    batch_size: 10_000
-    num_test_proposal_samples: 10_000
-    num_smc_samples: 10_000 
-    clip_reweighting_logits: 0.002
-
-  smc_sampler:
-    _target_: src.models.samplers.base_sampler.SMCSampler
+  sampler:
+    _target_: src.models.samplers.smc_sampler.SMCSampler
+    num_samples: 10_000
+    proposal_batch_size: 10_000
     kernel_type: ula
-    enabled: True
     langevin_eps: 1e-8
     num_timesteps: 100
     ess_threshold: 0.5
-    systematic_resampling: False
+    systematic_resampling: false
     warmup: 0.0
-    batch_size: 128
-    input_energy_cutoff: -20.0
-    do_energy_plots: True
+    gradient_batch_size: 128
+    input_energy_filter_cutoff: -20.0
+    use_com_adjustment: true
+    logit_clip_filter: 0.002
+    do_energy_plots: true
     log_freq: 1
-    
+
   ema_decay: 0.0
 
 data:

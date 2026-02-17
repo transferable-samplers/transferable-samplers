@@ -6,8 +6,6 @@ defaults:
   - override /data: single_system/GYDPETGTWG
   - override /trainer: gpu
 
-state_dict_hf_path: single_system/tarflow_GYDPETGTWG_0.pth
-
 model:
   net:
     channels: 384
@@ -15,26 +13,23 @@ model:
     num_blocks: 8
     layers_per_block: 8
 
-  sampling_config:
-    batch_size: 10_000
-    num_test_proposal_samples: 10_000
-    num_smc_samples: 10_000 
-    clip_reweighting_logits: 0.002
-
-  smc_sampler:
-    _target_: src.models.samplers.base_sampler.SMCSampler
+  sampler:
+    _target_: src.models.samplers.smc_sampler.SMCSampler
+    num_samples: 10_000
+    proposal_batch_size: 10_000
     kernel_type: ula
-    enabled: True
     langevin_eps: 2e-8
     num_timesteps: 500
     ess_threshold: 0.5
-    systematic_resampling: False
+    systematic_resampling: false
     warmup: 0.0
-    batch_size: 128
-    input_energy_cutoff: -300
-    do_energy_plots: True
+    gradient_batch_size: 128
+    input_energy_filter_cutoff: -300
+    use_com_adjustment: true
+    logit_clip_filter: 0.002
+    do_energy_plots: true
     log_freq: 1
-    
+
   ema_decay: 0.0
 
 data:
@@ -44,3 +39,5 @@ data:
 trainer:
   limit_test_batches: 1
   limit_val_batches: 1
+
+state_dict_hf_path: single_system/tarflow_GYDPETGTWG_0.pth

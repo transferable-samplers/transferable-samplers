@@ -12,16 +12,14 @@ model:
   self_improve: True
   use_distill_loss: True
   distill_weight: 0.5
-  sampling_config:
-    use_com_adjustment: True
-    batch_size: 2_500
-    num_self_improve_proposal_samples: 200_000
-    num_proposal_samples: 10_000
-    num_test_proposal_samples: 200_000
-    clip_reweighting_logits: 0.002
+  num_self_improve_proposal_samples: 200_000
+  sampler:
+    _target_: src.models.samplers.snis_sampler.SNISSampler
+    num_samples: 10_000
+    proposal_batch_size: 2_500
+    use_com_adjustment: true
+    logit_clip_filter: 0.002
 
-  smc_sampler: null
-  
   optimizer:
     lr: 5.e-6
   ema_decay: 0.0

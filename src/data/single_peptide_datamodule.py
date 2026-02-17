@@ -11,6 +11,7 @@ import torchvision
 from huggingface_hub import snapshot_download
 
 from src.data.base_datamodule import BaseDataModule
+from src.data.normalization import normalize, unnormalize
 from src.data.datasets.tensor_dataset import TensorDataset
 from src.data.energy.openmm import OpenMMBridge, OpenMMEnergy
 from src.data.preprocessing.tica import get_tica_model
@@ -214,10 +215,10 @@ class SinglePeptideDataModule(BaseDataModule):
 
         # Subsample the true trajectory
         true_samples = true_samples[:: len(true_samples) // self.hparams.num_eval_samples]
-        true_samples = self.normalize(true_samples)
+        true_samples = normalize(true_samples, self.std)
 
         potential = self.setup_potential()
-        energy_fn = lambda x: potential.energy(self.unnormalize(x)).flatten()
+        energy_fn = lambda x: potential.energy(unnormalize(x, self.std)).flatten()
 
         return EvalContext(
             true_samples=true_samples,

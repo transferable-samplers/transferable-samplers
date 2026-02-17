@@ -13,9 +13,11 @@ model:
     num_blocks: 6
     layers_per_block: 6
 
-  sampling_config:
-    num_proposal_samples: 10_000
-    num_test_proposal_samples: 10_000
+  sampler:
+    _target_: src.models.samplers.snis_sampler.SNISSampler
+    num_samples: 10_000
+    proposal_batch_size: 10_000
+    use_com_adjustment: true
 
 data:
   batch_size: 512

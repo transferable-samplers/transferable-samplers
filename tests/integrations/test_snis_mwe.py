@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 from hydra.core.global_hydra import GlobalHydra
-from omegaconf import DictConfig, open_dict
+from omegaconf import DictConfig, OmegaConf, open_dict
 
 from src.eval import eval
 from tests.helpers.utils import compose_config, extract_test_sequence, get_config_stem
@@ -73,11 +73,15 @@ def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, t
         cfg.paths.output_dir = str(tmp_path)
         cfg.paths.log_dir = str(tmp_path)
         cfg.paths.work_dir = os.getcwd()
-        cfg.model.sampling_config.num_test_proposal_samples = 25
-        if "ula" in experiment_name:
-            # we disable SMC here for testing - we are mostly concerned with weights being correctly setup
-            if cfg.model.get("smc_sampler") is not None:
-                cfg.model.smc_sampler.enabled = False
+        cfg.model.sampler.num_samples = 25
+        if "ula" in experiment_name or "mala" in experiment_name:
+            # Replace SMC sampler with SNIS for this test — we only test weight loading here.
+            # TODO probably indicative that the tests should be refactored.
+            cfg.model.sampler = OmegaConf.create({
+                "_target_": "src.models.samplers.snis_sampler.SNISSampler",
+                "num_samples": 25,
+                "proposal_batch_size": 25,
+            })
         if "transferable" in experiment_name:
             cfg.data.test_sequences = "AA"
         cfg.data.num_workers = 0  # avoid multiprocessing issues in tests

@@ -3,7 +3,8 @@ from typing import TYPE_CHECKING, Optional
 
 import torch
 
-from src.models.samplers.base_sampling_strategy import BaseSampler
+from src.data.normalization import unnormalize
+from src.models.samplers.base_sampler_class import BaseSampler
 from src.utils.dataclasses import ProposalCond, SamplesData
 from src.utils.resampling import com_energy_adjustment, resample_multinomial
 
@@ -25,11 +26,11 @@ class SNISSampler(BaseSampler):
         num_samples: int,
         proposal_batch_size: int,
         use_com_adjustment: bool = False,
-        logit_clip_filter_pct: Optional[float] = None,
+        logit_clip_filter: Optional[float] = None,
     ):
         super().__init__(num_samples, proposal_batch_size)
         self.use_com_adjustment = use_com_adjustment
-        self.logit_clip_filter_pct = logit_clip_filter_pct
+        self.logit_clip_filter = logit_clip_filter
 
     @torch.no_grad()
     def sample(
@@ -42,8 +43,8 @@ class SNISSampler(BaseSampler):
         samples, log_q = self.sample_proposal_in_batches(model, self.num_samples, proposal_cond)
         target_energy = target_energy_fn(samples)
 
-        unnorm = model.trainer.datamodule.unnormalize
-        proposal_data = SamplesData(unnorm(samples), target_energy)
+        std = model.trainer.datamodule.std
+        proposal_data = SamplesData(unnormalize(samples, std), target_energy)
 
         # CoM adjustment
         if self.use_com_adjustment:
@@ -56,8 +57,8 @@ class SNISSampler(BaseSampler):
         logits = -target_energy - log_q
 
         # Clip logits
-        if self.logit_clip_filter_pct:
-            clipped_mask = logits > torch.quantile(logits, 1 - self.logit_clip_filter_pct)
+        if self.logit_clip_filter:
+            clipped_mask = logits > torch.quantile(logits, 1 - self.logit_clip_filter)
             samples = samples[~clipped_mask]
             target_energy = target_energy[~clipped_mask]
             logits = logits[~clipped_mask]
@@ -67,7 +68,7 @@ class SNISSampler(BaseSampler):
         _, resampling_index = resample_multinomial(samples, logits)
 
         resampled_data = SamplesData(
-            unnorm(samples[resampling_index]),
+            unnormalize(samples[resampling_index], std),
             target_energy[resampling_index],
             logits=logits,
         )
