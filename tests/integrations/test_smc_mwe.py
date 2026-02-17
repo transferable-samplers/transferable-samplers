@@ -57,8 +57,8 @@ def cfg_test_smc_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tm
         cfg.paths.output_dir = str(tmp_path)
         cfg.paths.log_dir = str(tmp_path)
         cfg.paths.work_dir = os.getcwd()
-        cfg.model.sampler.num_samples = 32
-        cfg.model.sampler.num_timesteps = 10
+        cfg.callbacks.sampling_evaluation.sampler.num_samples = 32
+        cfg.callbacks.sampling_evaluation.sampler.num_annealing_steps = 10
         cfg.data.num_workers = 0  # avoid multiprocessing issues in tests
         if "transferable" in experiment_name:
             cfg.data.test_sequences = "AA"

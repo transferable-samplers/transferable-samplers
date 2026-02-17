@@ -73,11 +73,11 @@ def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, t
         cfg.paths.output_dir = str(tmp_path)
         cfg.paths.log_dir = str(tmp_path)
         cfg.paths.work_dir = os.getcwd()
-        cfg.model.sampler.num_samples = 25
+        cfg.callbacks.sampling_evaluation.sampler.num_samples = 25
         if "ula" in experiment_name or "mala" in experiment_name:
             # Replace SMC sampler with SNIS for this test — we only test weight loading here.
             # TODO probably indicative that the tests should be refactored.
-            cfg.model.sampler = OmegaConf.create({
+            cfg.callbacks.sampling_evaluation.sampler = OmegaConf.create({
                 "_target_": "src.models.samplers.snis_sampler.SNISSampler",
                 "num_samples": 25,
                 "proposal_batch_size": 25,

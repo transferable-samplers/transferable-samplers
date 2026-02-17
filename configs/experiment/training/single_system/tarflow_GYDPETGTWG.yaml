@@ -13,11 +13,13 @@ model:
     num_blocks: 8
     layers_per_block: 8
 
-  sampler:
-    _target_: src.models.samplers.snis_sampler.SNISSampler
-    num_samples: 10_000
-    proposal_batch_size: 10_000
-    use_com_adjustment: true
+callbacks:
+  sampling_evaluation:
+    sampler:
+      _target_: src.models.samplers.snis_sampler.SNISSampler
+      num_samples: 10_000
+      proposal_batch_size: 10_000
+      use_com_adjustment: true
 
 data:
   batch_size: 512

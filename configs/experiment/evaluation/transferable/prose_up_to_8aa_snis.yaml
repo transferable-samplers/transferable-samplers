@@ -9,13 +9,16 @@ defaults:
 state_dict_hf_path: transferable/prose_up_to_8aa.pth
 
 model:
-  sampler:
-    _target_: src.models.samplers.snis_sampler.SNISSampler
-    num_samples: 1_000_000
-    proposal_batch_size: 5_000
-    use_com_adjustment: true
-    logit_clip_filter: 0.002
   ema_decay: 0.0
+
+callbacks:
+  sampling_evaluation:
+    sampler:
+      _target_: src.models.samplers.snis_sampler.SNISSampler
+      num_samples: 1_000_000
+      proposal_batch_size: 5_000
+      use_com_adjustment: true
+      logit_clip_filter: 0.002
 
 data:
   batch_size: 128

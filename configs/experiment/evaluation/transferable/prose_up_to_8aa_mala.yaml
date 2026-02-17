@@ -9,25 +9,27 @@ defaults:
 state_dict_hf_path: transferable/prose_up_to_8aa.pth
 
 model:
-  sampler:
-    _target_: src.models.samplers.smc_sampler.SMCSampler
-    num_samples: 10_000
-    proposal_batch_size: 2_500
-    kernel_type: mala
-    langevin_eps: 1e-5
-    num_timesteps: 50
-    ess_threshold: 1.0
-    adaptive_step_size: true
-    systematic_resampling: true
-    warmup: 0.0
-    gradient_batch_size: 32
-    input_energy_filter_cutoff: 100
-    use_com_adjustment: true
-    logit_clip_filter: 0.002
-    do_energy_plots: true
-    log_freq: 1
-
   ema_decay: 0.0
+
+callbacks:
+  sampling_evaluation:
+    sampler:
+      _target_: src.models.samplers.smc_sampler.SMCSampler
+      num_samples: 10_000
+      proposal_batch_size: 2_500
+      kernel_type: mala
+      langevin_eps: 1e-5
+      num_annealing_steps: 50
+      ess_threshold: 1.0
+      adaptive_step_size: true
+      systematic_resampling: true
+      warmup: 0.0
+      gradient_batch_size: 32
+      input_energy_filter_cutoff: 100
+      use_com_adjustment: true
+      logit_clip_filter: 0.002
+      do_energy_plots: true
+      log_freq: 1
 
 data:
   batch_size: 128

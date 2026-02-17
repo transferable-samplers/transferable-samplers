@@ -10,7 +10,6 @@ from lightning import LightningModule
 from torchmetrics import MeanMetric
 
 from src.models.neural_networks.ema import EMA
-from src.models.samplers.base_sampler_class import BaseSampler
 from src.utils.dataclasses import ProposalCond
 
 logger = logging.getLogger(__name__)
@@ -23,7 +22,6 @@ class BaseLightningModule(LightningModule):
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
         prior,
-        sampler: Optional[BaseSampler] = None,
         ema_decay: float = 0.0,
         compile: bool = False,
         fix_symmetry: bool = True,
@@ -44,7 +42,6 @@ class BaseLightningModule(LightningModule):
             self.net = EMA(net, decay=self.hparams.ema_decay)
 
         self.prior = prior
-        self.sampler = sampler
 
         # loss function
         self.criterion = torch.nn.MSELoss(reduction="mean")
@@ -132,7 +129,7 @@ class BaseLightningModule(LightningModule):
         self.eval_step(batch, batch_idx, prefix="test")
 
     def on_fit_start(self) -> None:
-        if self.hparams.use_distill_loss and self.hparams.get("self_improve", False):
+        if self.hparams.use_distill_loss:
             self.teacher = deepcopy(self.net)
 
             if self.hparams.ema_decay > 0:
@@ -144,46 +141,6 @@ class BaseLightningModule(LightningModule):
 
     def on_train_epoch_start(self) -> None:
         logging.info("Train epoch start")
-
-        if self.hparams.get("self_improve", False):
-            num_self_improve_samples = self.hparams.num_self_improve_proposal_samples
-            logging.info(
-                f"Generating {num_self_improve_samples} Samples for self-consumption"
-            )
-            self.net.eval()
-
-            datamodule = self.trainer.datamodule
-            assert datamodule.test_sequences is not None, "Eval sequence name should be set"
-            assert len(datamodule.test_sequences) == 1, "Can only self-refine on 1 test sequence at a time."
-            assert datamodule.buffer is not None, "Need to have buffer instantiated in datamodule for self-consumption"
-
-            eval_ctx = datamodule.prepare_eval(datamodule.test_sequences[0], stage="test")
-
-            # Temporarily override num_samples for self-improvement
-            old_num_samples = self.sampler.num_samples
-            self.sampler.num_samples = num_self_improve_samples
-
-            if self.hparams.ema_decay > 0:
-                self.net.backup()
-                self.net.copy_to_model()
-
-                with torch.no_grad():
-                    result = self.sampler.sample(self, eval_ctx.proposal_cond, eval_ctx.target_energy_fn)
-
-                self.net.restore_to_model()
-            else:
-                with torch.no_grad():
-                    result = self.sampler.sample(self, eval_ctx.proposal_cond, eval_ctx.target_energy_fn)
-
-            self.sampler.num_samples = old_num_samples
-
-            samples = result["resampled"].samples  # already unnormalized
-
-            self.net.train()
-
-            datamodule.data_train.buffer.add(samples, datamodule.test_sequences[0])
-            datamodule.save_buffer()
-
         self.train_metrics.reset()
 
     def on_validation_epoch_start(self) -> None:

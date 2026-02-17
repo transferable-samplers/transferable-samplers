@@ -13,24 +13,26 @@ model:
     num_blocks: 8
     layers_per_block: 8
 
-  sampler:
-    _target_: src.models.samplers.smc_sampler.SMCSampler
-    num_samples: 10_000
-    proposal_batch_size: 10_000
-    kernel_type: ula
-    langevin_eps: 2e-8
-    num_timesteps: 500
-    ess_threshold: 0.5
-    systematic_resampling: false
-    warmup: 0.0
-    gradient_batch_size: 128
-    input_energy_filter_cutoff: -300
-    use_com_adjustment: true
-    logit_clip_filter: 0.002
-    do_energy_plots: true
-    log_freq: 1
-
   ema_decay: 0.0
+
+callbacks:
+  sampling_evaluation:
+    sampler:
+      _target_: src.models.samplers.smc_sampler.SMCSampler
+      num_samples: 10_000
+      proposal_batch_size: 10_000
+      kernel_type: ula
+      langevin_eps: 2e-8
+      num_annealing_steps: 500
+      ess_threshold: 0.5
+      systematic_resampling: false
+      warmup: 0.0
+      gradient_batch_size: 128
+      input_energy_filter_cutoff: -300
+      use_com_adjustment: true
+      logit_clip_filter: 0.002
+      do_energy_plots: true
+      log_freq: 1
 
 data:
   batch_size: 10_000

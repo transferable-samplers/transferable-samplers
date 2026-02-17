@@ -1,5 +1,6 @@
 sampling_evaluation:
-  _target_: src.callbacks.sampling_evaluation.SamplingEvaluationCallback
+  _target_: src.callbacks.sampling_evaluation_callback.SamplingEvaluationCallback
+  sampler: null
   evaluator:
     _target_: src.evaluation.evaluator.Evaluator
     fix_symmetry: true

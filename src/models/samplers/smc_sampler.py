@@ -40,7 +40,7 @@ class SMCSampler(BaseSampler):
         proposal_batch_size: int,
         kernel_type: str = "ula",
         langevin_eps: float = 1e-7,
-        num_timesteps: int = 100,
+        num_annealing_steps: int = 100,
         ess_threshold: float = -1.0,
         systematic_resampling: bool = False,
         adaptive_step_size: bool = False,
@@ -63,7 +63,7 @@ class SMCSampler(BaseSampler):
         self.kernel_type = kernel_type
         self.kernel_fn = KERNEL_FNS[kernel_type]
         self.langevin_eps = langevin_eps
-        self.num_timesteps = num_timesteps
+        self.num_annealing_steps = num_annealing_steps
         self.ess_threshold = ess_threshold
         self.systematic_resampling = systematic_resampling
         self.adaptive_step_size = adaptive_step_size
@@ -198,8 +198,8 @@ class SMCSampler(BaseSampler):
             proposal_samples = proposal_samples[energies < self.input_energy_filter_cutoff]
             logger.info("Clipping energies")
 
-        num_timesteps = self.num_timesteps
-        timesteps = torch.linspace(0, 1, num_timesteps + 1)
+        num_annealing_steps = self.num_annealing_steps
+        timesteps = torch.linspace(0, 1, num_annealing_steps + 1)
 
         # Shard particles across DDP ranks
         if world_size > 1:
@@ -233,7 +233,7 @@ class SMCSampler(BaseSampler):
             ]
 
         t_previous = 0.0
-        for j, t in tqdm(enumerate(timesteps[:-1]), total=num_timesteps):
+        for j, t in tqdm(enumerate(timesteps[:-1]), total=num_annealing_steps):
             logger.info(f"Outer loop iteration {j}")
 
             # Split into gradient-computation batches
@@ -275,7 +275,7 @@ class SMCSampler(BaseSampler):
             assert A.dim() == 1, "A should be a flat vector"
 
             # Plot on NaN, at log_freq intervals, or at final step
-            if X.isnan().any() or A.isnan().any() or not (j + 1) % self.log_freq or j + 1 == num_timesteps:
+            if X.isnan().any() or A.isnan().any() or not (j + 1) % self.log_freq or j + 1 == num_annealing_steps:
                 if self.log_image_fn is not None:
                     if self.do_energy_plots:
                         self._plot_stepwise_energy(target_energy_list, interpolation_energy_list, t_list)
@@ -314,7 +314,7 @@ class SMCSampler(BaseSampler):
                 interpolation_energy_list.append(np.concatenate(interpolation_energy_batches))
 
             # Resampling when ESS drops below threshold
-            if ESS < self.ess_threshold and not j + 1 == num_timesteps:
+            if ESS < self.ess_threshold and not j + 1 == num_annealing_steps:
                 if world_size > 1:
                     global_X = model.all_gather(X).reshape(-1, *X.shape[1:])
                     global_X, indexes = self._resample(global_X, global_A)

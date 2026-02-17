@@ -80,42 +80,6 @@ class FlowMatchLitModule(BaseLightningModule):
 
         return loss
 
-    def test_integrators(self) -> torch.Tensor:
-        batch_size = self.sampler.proposal_batch_size if self.sampler else 64
-        x = self.prior.sample(batch_size, device=self.device)
-        integrators = [
-            "exact",
-            "exact_no_functional",
-            "hutch_rademacher",
-            "hutch_gaussian",
-        ]
-        logger.info("Testing integrators")
-        self.hparams.div_estimator = "exact"
-        self.nfe = 0
-        self.hparams.n_eps = 1
-        base_x, base_dlog_p = self.flow(x, reverse=False)
-        for integrator in integrators:
-            logger.info(f"Testing integrator {integrator}")
-            self.hparams.div_estimator = integrator
-            for n in [1, 2, 4, 8, 16, 32]:
-                if integrator.startswith("exact") and n > 1:
-                    continue
-                self.hparams.n_eps = n
-                x, dlog_p = self.flow(x, reverse=False)
-                self.log_dict(
-                    {
-                        f"test_integrators/{integrator}_{n}/x_err": torch.norm(base_x - x),
-                        f"test_integrators/{integrator}_{n}/dlog_p_err": torch.norm(base_dlog_p - dlog_p),
-                        f"test_integrators/{integrator}_{n}/nfe": self.nfe / (max(self.num_integrations, 1e-4)),
-                    }
-                )
-                logger.info(
-                    f"estimator: {integrator} n: {n}, x_err: {torch.norm(base_x - x)}, "
-                    f"dlog_p_err: {torch.norm(base_dlog_p - dlog_p)}, "
-                    f"nfe: {self.nfe / max(self.num_integrations, 1e-4)}"
-                )
-                self.nfe = 0
-
     @torch.no_grad()
     def flow(self, x: torch.Tensor, encodings=None, reverse=False, dummy_ll=False) -> torch.Tensor:
         batch_size = x.shape[0]

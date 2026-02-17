@@ -1,6 +1,7 @@
 import logging
 import statistics as stats
 from collections import defaultdict
+from typing import Optional
 
 import matplotlib.pyplot as plt
 import torch
@@ -9,6 +10,7 @@ from lightning.pytorch.loggers import WandbLogger
 
 from src.evaluation.evaluator import Evaluator
 from src.models.neural_networks.ema import EMA
+from src.models.samplers.base_sampler_class import BaseSampler
 
 logger = logging.getLogger(__name__)
 
@@ -65,16 +67,17 @@ class SamplingEvaluationCallback(Callback):
 
     On validation/test epoch end:
     1. Swaps to EMA weights if applicable
-    2. Loops over sequences, generating samples via model.sampler
+    2. Loops over sequences, generating samples via self.sampler
     3. Evaluates samples via the Evaluator
     4. Aggregates metrics across sequences
     5. Handles DDP broadcasting of metrics
     6. Logs everything
     """
 
-    def __init__(self, evaluator: Evaluator):
+    def __init__(self, evaluator: Evaluator, sampler: Optional[BaseSampler] = None):
         super().__init__()
         self.evaluator = evaluator
+        self.sampler = sampler
 
     def on_validation_epoch_end(self, trainer, pl_module):
         self.evaluate(trainer, pl_module, "val")
@@ -85,7 +88,7 @@ class SamplingEvaluationCallback(Callback):
         logger.info("Test evaluation complete")
 
     def evaluate(self, trainer, pl_module, prefix):
-        if pl_module.sampler is None:
+        if self.sampler is None:
             return
 
         use_ema = isinstance(pl_module.net, EMA) and pl_module.hparams.ema_decay > 0
@@ -98,8 +101,8 @@ class SamplingEvaluationCallback(Callback):
         log_image_fn = self._make_log_image_fn(pl_module)
 
         # Set log_image_fn on SMCSampler if applicable
-        if hasattr(pl_module.sampler, 'log_image_fn'):
-            pl_module.sampler.log_image_fn = log_image_fn
+        if hasattr(self.sampler, 'log_image_fn'):
+            self.sampler.log_image_fn = log_image_fn
 
         metrics = {}
         for sequence in eval_sequences:
@@ -107,7 +110,7 @@ class SamplingEvaluationCallback(Callback):
             logger.info(f"Evaluating {sequence} samples")
 
             # Generate samples via the sampler
-            samples_dict = pl_module.sampler.sample(
+            samples_dict = self.sampler.sample(
                 pl_module,
                 eval_ctx.proposal_cond,
                 eval_ctx.target_energy_fn,

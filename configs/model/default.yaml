@@ -1,8 +1,6 @@
 defaults:
   - optimizer: adam_w
 
-sampler: null
-
 # compile model for faster training with pytorch 2.0
 compile: false
 

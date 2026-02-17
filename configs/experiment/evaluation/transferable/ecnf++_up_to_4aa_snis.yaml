@@ -8,16 +8,19 @@ defaults:
 state_dict_hf_path: transferable/ecnf++_up_to_4aa.pth
 
 model:
-  sampler:
-    _target_: src.models.samplers.snis_sampler.SNISSampler
-    num_samples: 10_000
-    proposal_batch_size: 4
-    logit_clip_filter: 0.002
   net:
     channels: 256
     num_layers: 9
     num_aa_max: ${data.num_aa_max}
     num_aa_min: ${data.num_aa_min}
+
+callbacks:
+  sampling_evaluation:
+    sampler:
+      _target_: src.models.samplers.snis_sampler.SNISSampler
+      num_samples: 10_000
+      proposal_batch_size: 4
+      logit_clip_filter: 0.002
 
 data:
   batch_size: 128
