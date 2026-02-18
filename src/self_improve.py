@@ -42,7 +42,7 @@ torch.set_float32_matmul_precision("highest")  # high at minimum!
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
 
-log = RankedLogger(__name__, rank_zero_only=True)
+logger = RankedLogger(__name__, rank_zero_only=False)
 
 
 @task_wrapper
@@ -63,32 +63,32 @@ def self_improve(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
     if cfg.get("torch_num_threads"):
         torch.set_num_threads(cfg.torch_num_threads)
 
-    log.info(f"Instantiating datamodule <{cfg.data._target_}>")
+    logger.info(f"Instantiating datamodule <{cfg.data._target_}>")
     datamodule: LightningDataModule = hydra.utils.instantiate(cfg.data)
 
-    log.info(f"Instantiating model <{cfg.model._target_}>")
+    logger.info(f"Instantiating model <{cfg.model._target_}>")
     model: LightningModule = hydra.utils.instantiate(cfg.model)
 
-    log.info("Instantiating callbacks...")
+    logger.info("Instantiating callbacks...")
     callbacks: list[Callback] = instantiate_callbacks(cfg.get("callbacks"))
 
-    log.info("Instantiating loggers...")
-    logger: list[Logger] = instantiate_loggers(cfg.get("logger"))
+    logger.info("Instantiating loggers...")
+    loggers: list[Logger] = instantiate_loggers(cfg.get("logger"))
 
-    log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
-    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger)
+    logger.info(f"Instantiating trainer <{cfg.trainer._target_}>")
+    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=loggers)
 
     object_dict = {
         "cfg": cfg,
         "datamodule": datamodule,
         "model": model,
         "callbacks": callbacks,
-        "logger": logger,
+        "logger": loggers,
         "trainer": trainer,
     }
 
-    if logger:
-        log.info("Logging hyperparameters!")
+    if loggers:
+        logger.info("Logging hyperparameters!")
         log_hyperparameters(object_dict)
 
     assert not cfg.trainer.num_sanity_val_steps, "num_sanity_val_steps should be 0 for finetuning!"
@@ -99,20 +99,20 @@ def self_improve(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
         "Setting ema decay will cause silent errors in self-improvement when using huggingface weights"
     )
 
-    log.info("Downloading weights from huggingface...")
+    logger.info("Downloading weights from huggingface...")
     dst_dir = os.path.join(cfg.paths.scratch_dir, "model-weights")
     state_dict_path = download_weights(hf_filepath=state_dict_hf_path, destination_dir=dst_dir)
 
     state_dict = torch.load(state_dict_path, map_location="cpu")
     model.load_state_dict(state_dict)
 
-    log.info("Starting self-refinement training!")
+    logger.info("Starting self-refinement training!")
     trainer.fit(model=model, datamodule=datamodule)
 
     train_metrics = trainer.callback_metrics
 
     if cfg.get("test"):
-        log.info("Starting testing!")
+        logger.info("Starting testing!")
         trainer.test(model=model, datamodule=datamodule)
 
     test_metrics = trainer.callback_metrics

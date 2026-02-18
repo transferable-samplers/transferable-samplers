@@ -1,4 +1,3 @@
-import logging
 from typing import TYPE_CHECKING, Callable, Optional
 
 import matplotlib.pyplot as plt
@@ -9,8 +8,9 @@ from tqdm import tqdm
 
 from src.data.normalization import unnormalize
 from src.evaluation.metrics.ess import sampling_efficiency
-from src.models.samplers.base_sampler_class import BaseSampler
+from src.models.samplers.base_sampler import BaseSampler
 from src.models.samplers.mcmc import mala_kernel, ula_kernel
+from src.utils import pylogger
 from src.utils.dataclasses import ProposalCond, SamplesData
 from src.utils.resampling import (
     com_energy_adjustment,
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 KERNEL_FNS = {"ula": ula_kernel, "mala": mala_kernel}
 
-logger = logging.getLogger(__name__)
+logger = pylogger.RankedLogger(__name__, rank_zero_only=False)
 
 
 class SMCSampler(BaseSampler):
@@ -51,7 +51,6 @@ class SMCSampler(BaseSampler):
         use_com_adjustment: bool = False,
         logit_clip_filter: Optional[float] = None,
         # Plotting
-        log_image_fn: Optional[Callable] = None,
         do_energy_plots: bool = False,
         log_freq: int = 10,
     ):
@@ -72,7 +71,6 @@ class SMCSampler(BaseSampler):
         self.input_energy_filter_cutoff = input_energy_filter_cutoff
         self.use_com_adjustment = use_com_adjustment
         self.logit_clip_filter = logit_clip_filter
-        self.log_image_fn = log_image_fn
         self.do_energy_plots = do_energy_plots
         self.log_freq = log_freq
 
@@ -81,8 +79,9 @@ class SMCSampler(BaseSampler):
         model: "LightningModule",
         proposal_cond: Optional[ProposalCond],
         target_energy_fn,
-        prefix: str = "",
+        log_image_fn: Optional[Callable] = None,
     ) -> dict[str, SamplesData]:
+        self.log_image_fn = log_image_fn
         # 1. Generate proposal samples (normalized)
         samples, log_q = self.sample_proposal_in_batches(model, self.num_samples, proposal_cond)
         target_energy = target_energy_fn(samples)

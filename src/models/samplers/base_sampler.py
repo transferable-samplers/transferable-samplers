@@ -27,7 +27,6 @@ class BaseSampler(ABC):
         model: "LightningModule",
         proposal_cond: Optional[ProposalCond],
         target_energy_fn,
-        prefix: str = "",
     ) -> dict[str, SamplesData]:
         """Run the full sampling pipeline.
 
@@ -35,7 +34,6 @@ class BaseSampler(ABC):
             model: LightningModule with sample_proposal() and proposal_energy() methods.
             proposal_cond: Optional conditioning (permutations, encodings).
             target_energy_fn: Maps normalized samples to energy scalars.
-            prefix: Logging prefix.
 
         Returns:
             Dict mapping sample set names to SamplesData, e.g.

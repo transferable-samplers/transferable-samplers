@@ -6,7 +6,7 @@ from omegaconf import DictConfig
 
 from src.utils import pylogger, rich_utils
 
-log = pylogger.RankedLogger(__name__, rank_zero_only=True)
+logger = pylogger.RankedLogger(__name__, rank_zero_only=True)
 
 
 def extras(cfg: DictConfig) -> None:
@@ -21,22 +21,22 @@ def extras(cfg: DictConfig) -> None:
     """
     # return if no `extras` config
     if not cfg.get("extras"):
-        log.warning("Extras config not found! <cfg.extras=null>")
+        logger.warning("Extras config not found! <cfg.extras=null>")
         return
 
     # disable python warnings
     if cfg.extras.get("ignore_warnings"):
-        log.info("Disabling python warnings! <cfg.extras.ignore_warnings=True>")
+        logger.info("Disabling python warnings! <cfg.extras.ignore_warnings=True>")
         warnings.filterwarnings("ignore")
 
     # prompt user to input tags from command line if none are provided in the config
     if cfg.extras.get("enforce_tags"):
-        log.info("Enforcing tags! <cfg.extras.enforce_tags=True>")
+        logger.info("Enforcing tags! <cfg.extras.enforce_tags=True>")
         rich_utils.enforce_tags(cfg, save_to_file=True)
 
     # pretty print config tree using Rich library
     if cfg.extras.get("print_config"):
-        log.info("Printing config tree with Rich! <cfg.extras.print_config=True>")
+        logger.info("Printing config tree with Rich! <cfg.extras.print_config=True>")
         rich_utils.print_config_tree(cfg, resolve=True, save_to_file=True)
 
 
@@ -70,7 +70,7 @@ def task_wrapper(task_func: Callable) -> Callable:
         # things to do if exception occurs
         except Exception as ex:
             # save exception to `.log` file
-            log.exception("")
+            logger.exception("")
 
             # some hyperparameter combinations might be invalid or cause out-of-memory errors
             # so when using hparam search plugins like Optuna, you might want to disable
@@ -80,14 +80,14 @@ def task_wrapper(task_func: Callable) -> Callable:
         # things to always do after either success or exception
         finally:
             # display output dir path in terminal
-            log.info(f"Output dir: {cfg.paths.output_dir}")
+            logger.info(f"Output dir: {cfg.paths.output_dir}")
 
             # always close wandb run (even if exception occurs so multirun won't fail)
             if find_spec("wandb"):  # check if wandb is installed
                 import wandb
 
                 if wandb.run:
-                    log.info("Closing wandb!")
+                    logger.info("Closing wandb!")
                     wandb.finish()
 
         return metric_dict, object_dict
@@ -103,7 +103,7 @@ def get_metric_value(metric_dict: dict[str, Any], metric_name: Optional[str]) ->
     :return: If a metric name was provided, the value of the metric.
     """
     if not metric_name:
-        log.info("Metric name is None! Skipping metric value retrieval...")
+        logger.info("Metric name is None! Skipping metric value retrieval...")
         return None
 
     if metric_name not in metric_dict:
@@ -114,6 +114,6 @@ def get_metric_value(metric_dict: dict[str, Any], metric_name: Optional[str]) ->
         )
 
     metric_value = metric_dict[metric_name].item()
-    log.info(f"Retrieved metric value! <{metric_name}={metric_value}>")
+    logger.info(f"Retrieved metric value! <{metric_name}={metric_value}>")
 
     return metric_value

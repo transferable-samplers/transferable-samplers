@@ -1,65 +1,19 @@
-import logging
-import statistics as stats
-from collections import defaultdict
+import inspect
+from functools import partial
 from typing import Optional
 
 import matplotlib.pyplot as plt
 import torch
+import torch.utils._pytree as pytree
 from lightning import Callback
-from lightning.pytorch.loggers import WandbLogger
 
 from src.evaluation.evaluator import Evaluator
 from src.models.neural_networks.ema import EMA
-from src.models.samplers.base_sampler_class import BaseSampler
+from src.models.samplers.base_sampler import BaseSampler
+from src.utils import pylogger
+from src.utils.logging_utils import compute_mean_metrics, make_log_image_fn
 
-logger = logging.getLogger(__name__)
-
-
-def detach_and_cpu(obj):
-    """Recursively detach and move all tensors to CPU within a nested structure."""
-    if isinstance(obj, torch.Tensor):
-        return obj.detach().cpu()
-    elif isinstance(obj, dict):
-        return {k: detach_and_cpu(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [detach_and_cpu(v) for v in obj]
-    elif isinstance(obj, tuple):
-        return tuple(detach_and_cpu(v) for v in obj)
-    else:
-        return obj
-
-
-def add_aggregate_metrics(metrics: dict, prefix: str = "val") -> dict:
-    """Aggregate metrics across all sequences by computing mean and median."""
-    mean_dict_list = defaultdict(list)
-    median_dict_list = defaultdict(list)
-    count_dict = defaultdict(int)
-
-    for key, value in metrics.items():
-        if key.startswith(prefix):
-            parts = key.split("/")
-            metric_name = "/".join(parts[2:])
-
-            mean_key = f"{prefix}/mean/{metric_name}"
-            median_key = f"{prefix}/median/{metric_name}"
-            count_key = f"{prefix}/count/{metric_name}"
-
-            if isinstance(value, torch.Tensor):
-                value = value.item()
-            elif isinstance(value, (int, float)):
-                value = float(value)
-
-            mean_dict_list[mean_key].append(value)
-            median_dict_list[median_key].append(value)
-            count_dict[count_key] += 1
-
-    mean_dict = {k: stats.mean(v) for k, v in mean_dict_list.items()}
-    median_dict = {k: stats.median(v) for k, v in median_dict_list.items()}
-
-    metrics.update(mean_dict)
-    metrics.update(median_dict)
-    metrics.update(count_dict)
-    return metrics
+logger = pylogger.RankedLogger(__name__, rank_zero_only=False)
 
 
 class SamplingEvaluationCallback(Callback):
@@ -67,11 +21,9 @@ class SamplingEvaluationCallback(Callback):
 
     On validation/test epoch end:
     1. Swaps to EMA weights if applicable
-    2. Loops over sequences, generating samples via self.sampler
-    3. Evaluates samples via the Evaluator
-    4. Aggregates metrics across sequences
-    5. Handles DDP broadcasting of metrics
-    6. Logs everything
+    2. Loops over sequences, generating samples via self.sampler (all ranks)
+    3. Global zero only: evaluates samples, plots, logs per-sequence metrics
+    4. Global zero only: aggregates and logs mean metrics across sequences
     """
 
     def __init__(self, evaluator: Evaluator, sampler: Optional[BaseSampler] = None):
@@ -98,58 +50,50 @@ class SamplingEvaluationCallback(Callback):
 
         datamodule = trainer.datamodule
         eval_sequences = datamodule.val_sequences if prefix == "val" else datamodule.test_sequences
-        log_image_fn = self._make_log_image_fn(pl_module)
 
-        # Set log_image_fn on SMCSampler if applicable
-        if hasattr(self.sampler, 'log_image_fn'):
-            self.sampler.log_image_fn = log_image_fn
+        base_log_image_fn = make_log_image_fn(trainer)
 
-        metrics = {}
+        all_metrics = {}
         for sequence in eval_sequences:
             eval_ctx = datamodule.prepare_eval(sequence=sequence, stage=prefix)
             logger.info(f"Evaluating {sequence} samples")
 
-            # Generate samples via the sampler
+            seq_prefix = f"{prefix}/{sequence}"
+            log_image_fn = partial(base_log_image_fn, title_prefix=seq_prefix)
+
+            # ALL ranks must participate in sampling (all_gather)
+            sample_kwargs = {}
+            if "log_image_fn" in inspect.signature(self.sampler.sample).parameters:
+                sample_kwargs["log_image_fn"] = log_image_fn
             samples_dict = self.sampler.sample(
                 pl_module,
                 eval_ctx.proposal_cond,
                 eval_ctx.target_energy_fn,
-                prefix=f"{prefix}/{sequence}",
-            )
-            # Evaluate: chirality fixing, metrics, plots
-            seq_metrics = self.evaluator.evaluate(
-                sequence,
-                samples_dict,
-                eval_ctx,
-                log_image_fn=log_image_fn,
-                prefix=f"{prefix}/{sequence}",
-                normalization_std=datamodule.std,
+                **sample_kwargs,
             )
 
-            metrics.update(seq_metrics)
+            # Only rank 0: evaluate, plot, log per-sequence metrics
+            if trainer.is_global_zero:
+                seq_metrics = self.evaluator.evaluate(
+                    sequence,
+                    samples_dict,
+                    eval_ctx,
+                    log_image_fn=log_image_fn,
+                    prefix=seq_prefix,
+                    normalization_std=datamodule.std,
+                )
+                # Had some graph retention issues
+                seq_metrics = pytree.tree_map(
+                    lambda x: x.detach().cpu() if isinstance(x, torch.Tensor) else x,
+                    seq_metrics,
+                )
+                pl_module.log_dict(seq_metrics)
+                all_metrics.update(seq_metrics)
 
         if use_ema:
             pl_module.net.restore_to_model()
-        plt.close("all")
 
-        # Aggregate metrics across all sequences
-        if pl_module.local_rank == 0:
-            metrics = detach_and_cpu(metrics)
-            metric_object_list = [add_aggregate_metrics(metrics, prefix=prefix)]
-        else:
-            metric_object_list = [None]
-
-        if trainer.world_size > 1:
-            torch.distributed.broadcast_object_list(metric_object_list, src=0)
-
-        pl_module.log_dict(metric_object_list[0])
-
-    @staticmethod
-    def _make_log_image_fn(pl_module):
-        """Create an image logging function from the model's loggers."""
-        def log_image(img, title=None):
-            if pl_module.loggers is not None:
-                for lg in pl_module.loggers:
-                    if isinstance(lg, WandbLogger):
-                        lg.log_image(title, [img])
-        return log_image
+        if trainer.is_global_zero:
+            plt.close("all")
+            mean_metrics = compute_mean_metrics(all_metrics, prefix=prefix)
+            pl_module.log_dict(mean_metrics)

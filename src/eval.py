@@ -53,7 +53,7 @@ logging.info(
     "observed for ECNF but other neural networks may be slower than expected."
 )
 # TODO consolidate codebase logging into single library.
-log = RankedLogger(__name__, rank_zero_only=True)
+logger = RankedLogger(__name__, rank_zero_only=False)
 
 
 @task_wrapper
@@ -74,32 +74,32 @@ def eval(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
     if cfg.get("torch_num_threads"):
         torch.set_num_threads(cfg.torch_num_threads)
 
-    log.info(f"Instantiating datamodule <{cfg.data._target_}>")
+    logger.info(f"Instantiating datamodule <{cfg.data._target_}>")
     datamodule: LightningDataModule = hydra.utils.instantiate(cfg.data)
 
-    log.info(f"Instantiating model <{cfg.model._target_}>")
+    logger.info(f"Instantiating model <{cfg.model._target_}>")
     model: LightningModule = hydra.utils.instantiate(cfg.model)
 
-    log.info("Instantiating callbacks...")
+    logger.info("Instantiating callbacks...")
     callbacks: list[Callback] = instantiate_callbacks(cfg.get("callbacks"))
 
-    log.info("Instantiating loggers...")
-    logger: list[Logger] = instantiate_loggers(cfg.get("logger"))
+    logger.info("Instantiating loggers...")
+    loggers: list[Logger] = instantiate_loggers(cfg.get("logger"))
 
-    log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
-    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger)
+    logger.info(f"Instantiating trainer <{cfg.trainer._target_}>")
+    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=loggers)
 
     object_dict = {
         "cfg": cfg,
         "datamodule": datamodule,
         "model": model,
         "callbacks": callbacks,
-        "logger": logger,
+        "logger": loggers,
         "trainer": trainer,
     }
 
-    if logger:
-        log.info("Logging hyperparameters!")
+    if loggers:
+        logger.info("Logging hyperparameters!")
         log_hyperparameters(object_dict)
 
     ckpt_path = cfg.get("ckpt_path")
@@ -110,7 +110,7 @@ def eval(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
 
     if state_dict_hf_path is not None:
         # Provided a remote state dict path
-        log.info("Downloading weights from huggingface...")
+        logger.info("Downloading weights from huggingface...")
         dst_dir = os.path.join(cfg.paths.scratch_dir, "model-weights")
         state_dict_path = download_weights(hf_filepath=state_dict_hf_path, destination_dir=dst_dir)
 
@@ -124,7 +124,7 @@ def eval(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
     assert cfg.get("val", False) or cfg.get("test", False), "At least one of validation or test must be enabled!"
 
     if cfg.get("val"):
-        log.info("Starting validation!")
+        logger.info("Starting validation!")
         trainer.validate(
             model=model, datamodule=datamodule, ckpt_path=ckpt_path
         )  # ckpt_path is None if using state_dict_hf_path
@@ -133,7 +133,7 @@ def eval(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
         val_metrics = {}
 
     if cfg.get("test"):
-        log.info("Starting testing!")
+        logger.info("Starting testing!")
         trainer.test(
             model=model, datamodule=datamodule, ckpt_path=ckpt_path
         )  # ckpt_path is None if using state_dict_hf_path
@@ -164,7 +164,7 @@ def main(cfg: DictConfig) -> Optional[float]:
         # before starting the training. This is a workaround to avoid hitting the rate limits.
         # It seems to be fine having many concurrent jobs, but not starting simultaneously.
         sleep_time = random.uniform(0, 60)  # noqa:S311
-        log.info(f"Sleeping for {sleep_time:.2f} seconds to avoid wandb rate limitations.")
+        logger.info(f"Sleeping for {sleep_time:.2f} seconds to avoid wandb rate limitations.")
         time.sleep(sleep_time)
 
     # train the model

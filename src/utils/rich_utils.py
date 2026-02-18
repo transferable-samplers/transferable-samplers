@@ -11,7 +11,7 @@ from rich.prompt import Prompt
 
 from src.utils import pylogger
 
-log = pylogger.RankedLogger(__name__, rank_zero_only=True)
+logger = pylogger.RankedLogger(__name__, rank_zero_only=True)
 
 
 @rank_zero_only
@@ -47,7 +47,7 @@ def print_config_tree(
         (
             queue.append(field)
             if field in cfg
-            else log.warning(f"Field '{field}' not found in config. Skipping '{field}' config printing...")
+            else logger.warning(f"Field '{field}' not found in config. Skipping '{field}' config printing...")
         )
 
     # add all the other fields to queue (not specified in `print_order`)
@@ -87,14 +87,14 @@ def enforce_tags(cfg: DictConfig, save_to_file: bool = False) -> None:
         if "id" in HydraConfig().cfg.hydra.job:
             raise ValueError("Specify tags before launching a multirun!")
 
-        log.warning("No tags provided in config. Prompting user to input tags...")
+        logger.warning("No tags provided in config. Prompting user to input tags...")
         tags = Prompt.ask("Enter a list of comma separated tags", default="dev")
         tags = [t.strip() for t in tags.split(",") if t != ""]
 
         with open_dict(cfg):
             cfg.tags = tags
 
-        log.info(f"Tags: {cfg.tags}")
+        logger.info(f"Tags: {cfg.tags}")
 
     if save_to_file:
         with open(Path(cfg.paths.output_dir, "tags.log"), "w") as file:

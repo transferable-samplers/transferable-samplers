@@ -50,8 +50,7 @@ logging.info(
     "Some numerical settings applied for TarFlow invertibility. No slowdown was "
     "observed for ECNF but other neural networks may be slower than expected."
 )
-# TODO consolidate codebase logging into single library.
-log = RankedLogger(__name__, rank_zero_only=True)
+logger = RankedLogger(__name__, rank_zero_only=False)
 
 
 @task_wrapper
@@ -72,41 +71,41 @@ def train(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
     if cfg.get("torch_num_threads"):
         torch.set_num_threads(cfg.torch_num_threads)
 
-    log.info(f"Instantiating datamodule <{cfg.data._target_}>")
+    logger.info(f"Instantiating datamodule <{cfg.data._target_}>")
     datamodule: LightningDataModule = hydra.utils.instantiate(cfg.data)
 
-    log.info(f"Instantiating model <{cfg.model._target_}>")
+    logger.info(f"Instantiating model <{cfg.model._target_}>")
     model: LightningModule = hydra.utils.instantiate(cfg.model)
 
-    log.info("Instantiating callbacks...")
+    logger.info("Instantiating callbacks...")
     callbacks: list[Callback] = instantiate_callbacks(cfg.get("callbacks"))
 
-    log.info("Instantiating loggers...")
-    logger: list[Logger] = instantiate_loggers(cfg.get("logger"))
+    logger.info("Instantiating loggers...")
+    loggers: list[Logger] = instantiate_loggers(cfg.get("logger"))
 
-    log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
-    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger)
+    logger.info(f"Instantiating trainer <{cfg.trainer._target_}>")
+    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=loggers)
 
     object_dict = {
         "cfg": cfg,
         "datamodule": datamodule,
         "model": model,
         "callbacks": callbacks,
-        "logger": logger,
+        "logger": loggers,
         "trainer": trainer,
     }
 
-    if logger:
-        log.info("Logging hyperparameters!")
+    if loggers:
+        logger.info("Logging hyperparameters!")
         log_hyperparameters(object_dict)
 
-    log.info("Starting training!")
+    logger.info("Starting training!")
     ckpt_path = cfg.get("ckpt_path")
     if ckpt_path:
         if os.path.exists(ckpt_path):
-            log.info(f"Resuming training from checkpoint: {ckpt_path}")
+            logger.info(f"Resuming training from checkpoint: {ckpt_path}")
         else:
-            log.warning(f"Checkpoint path {ckpt_path} not found! Ignoring...")
+            logger.warning(f"Checkpoint path {ckpt_path} not found! Ignoring...")
             ckpt_path = None
 
     trainer.fit(model=model, datamodule=datamodule, ckpt_path=ckpt_path)
@@ -133,7 +132,7 @@ def main(cfg: DictConfig) -> Optional[float]:
         # before starting the training. This is a workaround to avoid hitting the rate limits.
         # It seems to be fine having many concurrent jobs, but not starting simultaneously.
         sleep_time = random.uniform(0, 60)  # noqa:S311
-        log.info(f"Sleeping for {sleep_time:.2f} seconds to avoid wandb rate limitations.")
+        logger.info(f"Sleeping for {sleep_time:.2f} seconds to avoid wandb rate limitations.")
         time.sleep(sleep_time)
 
     # train the model

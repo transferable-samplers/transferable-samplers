@@ -1,17 +1,17 @@
-import logging
 from typing import TYPE_CHECKING, Optional
 
 import torch
 
 from src.data.normalization import unnormalize
-from src.models.samplers.base_sampler_class import BaseSampler
+from src.models.samplers.base_sampler import BaseSampler
+from src.utils import pylogger
 from src.utils.dataclasses import ProposalCond, SamplesData
 from src.utils.resampling import com_energy_adjustment, resample_multinomial
 
 if TYPE_CHECKING:
     from lightning import LightningModule
 
-logger = logging.getLogger(__name__)
+logger = pylogger.RankedLogger(__name__, rank_zero_only=False)
 
 
 class SNISSampler(BaseSampler):
@@ -38,7 +38,6 @@ class SNISSampler(BaseSampler):
         model: "LightningModule",
         proposal_cond: Optional[ProposalCond],
         target_energy_fn,
-        prefix: str = "",
     ) -> dict[str, SamplesData]:
         samples, log_q = self.sample_proposal_in_batches(model, self.num_samples, proposal_cond)
         target_energy = target_energy_fn(samples)

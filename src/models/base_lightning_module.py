@@ -1,5 +1,4 @@
 import inspect
-import logging
 from abc import abstractmethod
 from copy import deepcopy
 from typing import Any, Optional
@@ -10,9 +9,10 @@ from lightning import LightningModule
 from torchmetrics import MeanMetric
 
 from src.models.neural_networks.ema import EMA
+from src.utils import pylogger
 from src.utils.dataclasses import ProposalCond
 
-logger = logging.getLogger(__name__)
+logger = pylogger.RankedLogger(__name__, rank_zero_only=False)
 
 
 class BaseLightningModule(LightningModule):
@@ -140,30 +140,30 @@ class BaseLightningModule(LightningModule):
                 param.requires_grad = False
 
     def on_train_epoch_start(self) -> None:
-        logging.info("Train epoch start")
+        logger.info("Train epoch start")
         self.train_metrics.reset()
 
     def on_validation_epoch_start(self) -> None:
-        logging.info("Validation epoch start")
+        logger.info("Validation epoch start")
         self.val_metrics.reset()
 
     def on_test_epoch_start(self) -> None:
-        logging.info("Test epoch start")
+        logger.info("Test epoch start")
         self.test_metrics.reset()
 
     def on_train_epoch_end(self) -> None:
         self.train_metrics.reset()
-        logging.info("Train epoch end")
+        logger.info("Train epoch end")
 
     def on_validation_epoch_end(self):
         self.log_dict(self.val_metrics.compute(), sync_dist=True)
         self.val_metrics.reset()
-        logging.info("Validation epoch end")
+        logger.info("Validation epoch end")
 
     def on_test_epoch_end(self) -> None:
         self.log_dict(self.test_metrics.compute(), sync_dist=True)
         self.test_metrics.reset()
-        logging.info("Test epoch end")
+        logger.info("Test epoch end")
 
     def on_after_backward(self) -> None:
         valid_gradients = True

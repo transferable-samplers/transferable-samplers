@@ -1,5 +1,4 @@
 import copy
-import logging
 from functools import partial
 from typing import Optional
 
@@ -8,9 +7,10 @@ from torchdyn.core import NeuralODE
 
 from src.models.base_lightning_module import BaseLightningModule
 from src.models.neural_networks.wrappers import TorchdynWrapper, torch_wrapper
+from src.utils import pylogger
 from src.utils.dataclasses import ProposalCond
 
-logger = logging.getLogger(__name__)
+logger = pylogger.RankedLogger(__name__, rank_zero_only=False)
 
 
 class FlowMatchLitModule(BaseLightningModule):
@@ -98,7 +98,7 @@ class FlowMatchLitModule(BaseLightningModule):
 
         if dummy_ll:
             wrapped_net = torch_wrapper(eval_fn)
-            logging.info("Using dummy ll")
+            logger.info("Using dummy ll")
         else:
             wrapped_net = TorchdynWrapper(
                 eval_fn,
@@ -106,7 +106,7 @@ class FlowMatchLitModule(BaseLightningModule):
                 logp_tol_scale=self.hparams.logp_tol_scale,
                 n_eps=self.hparams.n_eps,
             )
-            logging.info(f"Using {self.hparams.div_estimator} with n_eps {self.hparams.n_eps}")
+            logger.info(f"Using {self.hparams.div_estimator} with n_eps {self.hparams.n_eps}")
 
         node = NeuralODE(
             wrapped_net,
@@ -118,7 +118,7 @@ class FlowMatchLitModule(BaseLightningModule):
         if not dummy_ll:
             x = torch.cat([x, dlog_p], dim=-1)
         x = node.trajectory(x, t_span=t_span)[-1]
-        logging.info(f"nfe: {wrapped_net.nfe}")
+        logger.info(f"nfe: {wrapped_net.nfe}")
         self.nfe += wrapped_net.nfe
         self.num_integrations += 1
         wrapped_net.nfe = 0

@@ -1,12 +1,11 @@
-import logging
-
 import torch
 from lightning import Callback
 
 from src.models.neural_networks.ema import EMA
-from src.models.samplers.base_sampler_class import BaseSampler
+from src.models.samplers.base_sampler import BaseSampler
+from src.utils import pylogger
 
-logger = logging.getLogger(__name__)
+logger = pylogger.RankedLogger(__name__, rank_zero_only=False)
 
 
 class SelfImprovementCallback(Callback):
