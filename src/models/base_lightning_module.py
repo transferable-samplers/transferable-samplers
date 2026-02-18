@@ -8,7 +8,7 @@ import torchmetrics
 from lightning import LightningModule
 from torchmetrics import MeanMetric
 
-from src.models.neural_networks.ema import EMA
+from src.callbacks.ema_weight_averaging import EMAWeightAveraging
 from src.utils import pylogger
 from src.utils.dataclasses import ProposalCond
 
@@ -22,7 +22,6 @@ class BaseLightningModule(LightningModule):
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
         prior,
-        ema_decay: float = 0.0,
         compile: bool = False,
         fix_symmetry: bool = True,
         drop_unfixable_symmetry: bool = False,
@@ -38,8 +37,6 @@ class BaseLightningModule(LightningModule):
             logger.warning(f"Unexpected arguments: {args}, {kwargs}")
 
         self.net = net
-        if self.hparams.ema_decay > 0:
-            self.net = EMA(net, decay=self.hparams.ema_decay)
 
         self.prior = prior
 
@@ -128,14 +125,16 @@ class BaseLightningModule(LightningModule):
     def test_step(self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
         self.eval_step(batch, batch_idx, prefix="test")
 
+    def _build_ema_net_copy(self):
+        """Return a detached copy of the EMA-averaged net (or plain net if no EMA callback)."""
+        for cb in self.trainer.callbacks:
+            if isinstance(cb, EMAWeightAveraging):
+                return deepcopy(cb._average_model.module.net)
+        return deepcopy(self.net)
+
     def on_fit_start(self) -> None:
         if self.hparams.use_distill_loss:
-            self.teacher = deepcopy(self.net)
-
-            if self.hparams.ema_decay > 0:
-                self.teacher.backup()
-                self.teacher.copy_to_model()
-
+            self.teacher = self._build_ema_net_copy()
             for param in self.teacher.parameters():
                 param.requires_grad = False
 
@@ -190,11 +189,6 @@ class BaseLightningModule(LightningModule):
                 total_norm += param_norm.item() ** 2
         total_norm = total_norm ** (1.0 / 2)
         self.log_dict({"train/grad_norm": total_norm}, prog_bar=True)
-
-    def optimizer_step(self, *args, **kwargs):
-        super().optimizer_step(*args, **kwargs)
-        if isinstance(self.net, EMA):
-            self.net.update_ema()
 
     def state_dict(self, *args, **kwargs):
         sd = super().state_dict(*args, **kwargs)

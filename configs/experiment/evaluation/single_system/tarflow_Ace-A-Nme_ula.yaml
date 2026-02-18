@@ -13,8 +13,6 @@ model:
     num_blocks: 4
     layers_per_block: 4
 
-  ema_decay: 0.0
-
 callbacks:
   sampling_evaluation:
     sampler:
@@ -43,3 +41,4 @@ trainer:
   limit_val_batches: 1
 
 state_dict_hf_path: single_system/tarflow_Ace-A-Nme_0.pth
+

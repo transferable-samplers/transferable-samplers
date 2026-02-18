@@ -12,8 +12,6 @@ model:
     num_blocks: 6
     layers_per_block: 6
 
-  ema_decay: 0.0
-
 callbacks:
   sampling_evaluation:
     sampler:
@@ -42,3 +40,4 @@ trainer:
   limit_val_batches: 1
 
 state_dict_hf_path: single_system/tarflow_AAA_0.pth
+

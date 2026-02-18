@@ -8,6 +8,9 @@
 #SBATCH -c 8
 #SBATCH --get-user-env
 
+source .env
+source ${UV_ENV_PATH}
+
 export PYTEST_REPORT_DIR="tests/reports"
 export PYTEST_TRAINER="gpu" # this is default value but made explicit here
 

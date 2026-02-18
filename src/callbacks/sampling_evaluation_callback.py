@@ -8,7 +8,6 @@ import torch.utils._pytree as pytree
 from lightning import Callback
 
 from src.evaluation.evaluator import Evaluator
-from src.models.neural_networks.ema import EMA
 from src.models.samplers.base_sampler import BaseSampler
 from src.utils import pylogger
 from src.utils.logging_utils import compute_mean_metrics, make_log_image_fn
@@ -20,10 +19,11 @@ class SamplingEvaluationCallback(Callback):
     """Lightning callback that orchestrates sample generation + evaluation.
 
     On validation/test epoch end:
-    1. Swaps to EMA weights if applicable
-    2. Loops over sequences, generating samples via self.sampler (all ranks)
-    3. Global zero only: evaluates samples, plots, logs per-sequence metrics
-    4. Global zero only: aggregates and logs mean metrics across sequences
+    1. Loops over sequences, generating samples via self.sampler (all ranks)
+    2. Global zero only: evaluates samples, plots, logs per-sequence metrics
+    3. Global zero only: aggregates and logs mean metrics across sequences
+
+    EMA weight swapping is handled by the EMAWeightAveraging callback.
     """
 
     def __init__(self, evaluator: Evaluator, sampler: Optional[BaseSampler] = None):
@@ -42,11 +42,6 @@ class SamplingEvaluationCallback(Callback):
     def evaluate(self, trainer, pl_module, prefix):
         if self.sampler is None:
             return
-
-        use_ema = isinstance(pl_module.net, EMA) and pl_module.hparams.ema_decay > 0
-        if use_ema:
-            pl_module.net.backup()
-            pl_module.net.copy_to_model()
 
         datamodule = trainer.datamodule
         eval_sequences = datamodule.val_sequences if prefix == "val" else datamodule.test_sequences
@@ -89,9 +84,6 @@ class SamplingEvaluationCallback(Callback):
                 )
                 pl_module.log_dict(seq_metrics)
                 all_metrics.update(seq_metrics)
-
-        if use_ema:
-            pl_module.net.restore_to_model()
 
         if trainer.is_global_zero:
             plt.close("all")

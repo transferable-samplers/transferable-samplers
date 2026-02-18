@@ -6,7 +6,7 @@ defaults:
   - _self_
   - data: transferable/up_to_8aa
   - model: flow_matching
-  - callbacks: default
+  - callbacks: default_eval
   - logger: many_loggers # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: default
   - paths: default

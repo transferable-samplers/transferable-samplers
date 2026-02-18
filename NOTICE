@@ -19,11 +19,6 @@ The affected files are listed below with references to their sources and license
   Licensed under Apple Software License
   Copyright (c) 2024 Apple Inc.
 
-- src/models/neural_networks/ema.py
-  Adapted from https://github.com/facebookresearch/riemannian-fm
-  Licensed under CC BY-NC 4.0 https://creativecommons.org/licenses/by-nc/4.0/
-  Copyright (c) Meta Platforms, Inc. and affiliates
-
 - src/models/neural_networks/tarflow/adaptive_blocks.py
   Adapted from https://github.com/NVIDIA-Digital-Bio/proteina
   Licensed under NVIDIA License

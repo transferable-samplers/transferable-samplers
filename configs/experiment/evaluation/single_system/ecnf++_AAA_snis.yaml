@@ -12,7 +12,6 @@ model:
   net:
     channels: 256
     num_layers: 5
-  ema_decay: 0.0
 
 callbacks:
   sampling_evaluation:
@@ -28,3 +27,4 @@ data:
 trainer:
   limit_test_batches: 1
   limit_val_batches: 1
+

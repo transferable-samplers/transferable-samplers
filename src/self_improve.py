@@ -93,12 +93,15 @@ def self_improve(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
 
     assert not cfg.trainer.num_sanity_val_steps, "num_sanity_val_steps should be 0 for finetuning!"
 
-    state_dict_hf_path = cfg.get("state_dict_hf_path")
-    assert state_dict_hf_path is not None, "Need state_dict_hf_path to give initial proposal"
-    assert not cfg.model.ema_decay, (
-        "Setting ema decay will cause silent errors in self-improvement when using huggingface weights"
+    from src.callbacks.ema_weight_averaging import EMAWeightAveraging
+
+    assert not any(isinstance(cb, EMAWeightAveraging) for cb in callbacks), (
+        "EMA is not supported with self-improvement. The EMAWeightAveraging callback "
+        "only swaps weights during validation/test, not during training hooks."
     )
 
+    state_dict_hf_path = cfg.get("state_dict_hf_path")
+    assert state_dict_hf_path is not None, "Need state_dict_hf_path to give initial proposal"
     logger.info("Downloading weights from huggingface...")
     dst_dir = os.path.join(cfg.paths.scratch_dir, "model-weights")
     state_dict_path = download_weights(hf_filepath=state_dict_hf_path, destination_dir=dst_dir)

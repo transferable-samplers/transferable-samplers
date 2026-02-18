@@ -14,9 +14,9 @@ model:
 
   optimizer:
     lr: 5.e-6
-  ema_decay: 0.0
 
 callbacks:
+  ema: null
   sampling_evaluation:
     sampler:
       _target_: src.models.samplers.snis_sampler.SNISSampler
@@ -51,3 +51,5 @@ trainer:
   num_sanity_val_steps: 0
   check_val_every_n_epoch: 100 # larger than number of epochs to self-refine
   reload_dataloaders_every_n_epochs: 1
+
+

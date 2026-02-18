@@ -8,9 +8,6 @@ defaults:
 
 state_dict_hf_path: transferable/tarflow_up_to_8aa.pth
 
-model:
-  ema_decay: 0.0
-
 callbacks:
   sampling_evaluation:
     sampler:
