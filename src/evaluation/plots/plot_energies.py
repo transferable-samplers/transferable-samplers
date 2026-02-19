@@ -6,58 +6,48 @@ import torch
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
 
+COLORS = ["r", "b", "orange", "purple", "brown", "pink"]
+
 
 def plot_energies(
     log_image_fn,
-    test_samples_energy,
-    proposal_samples_energy,
-    resampled_samples_energy,
-    smc_samples_energy,
+    true_energy,
+    samples_energy_dict: dict[str, torch.Tensor],
     max_energy=100,
     ylim=None,
     prefix="",
 ):
+    """Plot energy histograms for ground truth and generated sample sets.
+
+    Args:
+        log_image_fn: Callable to log the figure.
+        true_energy: Ground truth energy tensor.
+        samples_energy_dict: Dict mapping sample set names to energy tensors.
+        max_energy: Maximum energy for x-axis clipping.
+        ylim: Optional y-axis limits.
+        prefix: Metric key prefix.
+    """
     fig, ax = plt.subplots(figsize=(4, 3), dpi=300, constrained_layout=True)
     fig.patch.set_facecolor("white")
 
-    if test_samples_energy is not None:
-        test_samples_energy = test_samples_energy.cpu()
-    if proposal_samples_energy is not None:
-        proposal_samples_energy = proposal_samples_energy.cpu()
-    if resampled_samples_energy is not None:
-        resampled_samples_energy = resampled_samples_energy.cpu()
-    if smc_samples_energy is not None:
-        smc_samples_energy = smc_samples_energy.cpu()
+    true_energy = true_energy.cpu()
 
-    x_max = -float("inf")
+    all_energies = [true_energy]
+    for energy in samples_energy_dict.values():
+        all_energies.append(energy.cpu())
+
     if max_energy is None:
-        if test_samples_energy is not None:
-            x_max = max(x_max, test_samples_energy.max())
-        if proposal_samples_energy is not None:
-            x_max = max(x_max, proposal_samples_energy.max())
-        if resampled_samples_energy is not None:
-            x_max = max(x_max, resampled_samples_energy.max())
-        if smc_samples_energy is not None:
-            x_max = max(x_max, smc_samples_energy.max())
+        x_max = max(e.max() for e in all_energies)
     else:
         x_max = max_energy
 
     energy_cropper = (lambda x: torch.clamp(x, max=x_max - 0.1)) if x_max is not None else (lambda x: x)
 
-    x_min = float("inf")
-    if test_samples_energy is not None:
-        x_min = min(x_min, test_samples_energy.min())
-    if proposal_samples_energy is not None:
-        x_min = min(x_min, proposal_samples_energy.min())
-    if resampled_samples_energy is not None:
-        x_min = min(x_min, resampled_samples_energy.min())
-    if smc_samples_energy is not None:
-        x_min = min(x_min, smc_samples_energy.min())
-
+    x_min = min(e.min() for e in all_energies)
     bin_edges = np.linspace(x_min, x_max, 100)
 
     ax.hist(
-        energy_cropper(test_samples_energy.cpu()),
+        energy_cropper(true_energy),
         bins=bin_edges,
         density=True,
         alpha=0.4,
@@ -66,38 +56,17 @@ def plot_energies(
         linewidth=3,
         label="True data",
     )
-    if proposal_samples_energy is not None:
+
+    for (name, energy), color in zip(samples_energy_dict.items(), COLORS):
         ax.hist(
-            energy_cropper(proposal_samples_energy.cpu()),
+            energy_cropper(energy.cpu()),
             bins=bin_edges,
             density=True,
             alpha=0.4,
-            color="r",
+            color=color,
             histtype="step",
             linewidth=3,
-            label="Proposal",
-        )
-    if resampled_samples_energy is not None:
-        ax.hist(
-            energy_cropper(resampled_samples_energy.cpu()),
-            bins=bin_edges,
-            density=True,
-            alpha=0.4,
-            histtype="step",
-            linewidth=3,
-            color="b",
-            label="Proposal (reweighted)",
-        )
-    if smc_samples_energy is not None:
-        ax.hist(
-            energy_cropper(smc_samples_energy.cpu()),
-            bins=bin_edges,
-            density=True,
-            alpha=0.4,
-            histtype="step",
-            linewidth=3,
-            color="orange",
-            label="SMC",
+            label=name,
         )
 
     xticks = list(ax.get_xticks())
@@ -115,9 +84,9 @@ def plot_energies(
     if ylim is not None:
         ax.set_ylim(ylim)
 
-    plt.xlabel(r"$\mathcal{E}(x)$", labelpad=-5)  # , fontsize=35)
-    plt.ylabel("Normalized Density")  # , fontsize=35)
-    plt.legend()  # fontsize=30)
+    plt.xlabel(r"$\mathcal{E}(x)$", labelpad=-5)
+    plt.ylabel("Normalized Density")
+    plt.legend()
 
     fig.canvas.draw()
 

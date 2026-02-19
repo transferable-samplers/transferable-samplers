@@ -6,7 +6,7 @@ import torch
 from matplotlib.colors import LogNorm
 from tqdm import tqdm
 
-from src.evaluation.metrics.ess import sampling_efficiency
+from src.evaluation.metrics.ess import normalized_ess
 from src.models.samplers.base_sampler import BaseSampler
 from src.models.samplers.mcmc import mala_kernel, ula_kernel
 from src.utils import pylogger
@@ -294,7 +294,7 @@ class SMCSampler(BaseSampler):
             else:
                 global_A = A
 
-            ESS = sampling_efficiency(global_A)
+            ESS = normalized_ess(global_A)
             ESS_list.append(ESS.cpu())
             acceptance_rate_list.append(acceptance_rate.cpu())
             unique_ratio = particle_ids.unique().numel() / len(particle_ids)
@@ -326,7 +326,7 @@ class SMCSampler(BaseSampler):
                     global_A = dist_ops.all_gather(A).reshape(-1)
                 else:
                     global_A = A
-                ESS = sampling_efficiency(global_A)
+                ESS = normalized_ess(global_A)
                 ESS_list.append(ESS.cpu())
 
                 t_list.append(t + 1e-9)

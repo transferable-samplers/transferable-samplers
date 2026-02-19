@@ -2,63 +2,43 @@ import logging
 
 import matplotlib
 import matplotlib.pyplot as plt
-from lightning.pytorch.loggers import WandbLogger
+import torch
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
 
+COLORS = ["r", "b", "orange", "purple", "brown", "pink"]
+
 
 def plot_com_norms(
     log_image_fn,
-    proposal_samples,
-    resampled_samples,
-    smc_samples,
+    samples_dict: dict[str, torch.Tensor],
     ylim=None,
     prefix="",
-    wandb_logger: WandbLogger = None,
 ):
+    """Plot center-of-mass norm histograms for generated sample sets.
+
+    Args:
+        log_image_fn: Callable to log the figure.
+        samples_dict: Dict mapping sample set names to sample tensors.
+        ylim: Optional y-axis limits.
+        prefix: Metric key prefix.
+    """
     logging.info(f"Plotting com norms for {prefix}")
-    if proposal_samples is not None:
-        proposal_samples_com_norm = proposal_samples.mean(dim=1).norm(dim=-1).cpu()
-
-    if resampled_samples is not None:
-        resampled_samples_com_norm = resampled_samples.mean(dim=1).norm(dim=-1).cpu()
-
-    if smc_samples is not None:
-        smc_samples_com_norm = smc_samples.mean(dim=1).norm(dim=-1).cpu()
 
     fig, ax = plt.subplots(figsize=(4, 3), dpi=300, constrained_layout=True)
     fig.patch.set_facecolor("white")
 
-    if proposal_samples is not None:
+    for (name, samples), color in zip(samples_dict.items(), COLORS):
+        com_norm = samples.mean(dim=1).norm(dim=-1).cpu()
         ax.hist(
-            proposal_samples_com_norm,
+            com_norm,
             density=True,
             alpha=0.4,
-            color="r",
+            color=color,
             histtype="step",
             linewidth=3,
-            label="Proposal",
-        )
-    if resampled_samples is not None:
-        ax.hist(
-            resampled_samples_com_norm,
-            density=True,
-            alpha=0.4,
-            histtype="step",
-            linewidth=3,
-            color="b",
-            label="Proposal (reweighted)",
-        )
-    if smc_samples is not None:
-        ax.hist(
-            smc_samples_com_norm,
-            density=True,
-            alpha=0.4,
-            histtype="step",
-            linewidth=3,
-            color="orange",
-            label="SMC",
+            label=name,
         )
 
     if ylim is not None:

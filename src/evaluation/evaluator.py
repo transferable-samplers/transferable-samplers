@@ -1,7 +1,15 @@
+import logging
+
 import torch
 
 from src.data.normalization import unnormalize
-from src.evaluation.metrics.evaluate_peptide_data import evaluate_peptide_data
+from src.evaluation.metrics.wasserstein_distances import (
+    energy_wasserstein,
+    tica_wasserstein,
+    torus_wasserstein,
+)
+from src.evaluation.metrics.ess import normalized_ess
+from src.evaluation.metrics.kmeans_jsd import tica_kmeans_jsd, torus_kmeans_jsd
 from src.evaluation.plots.plot_atom_distances import plot_atom_distances
 from src.evaluation.plots.plot_com_norms import plot_com_norms
 from src.evaluation.plots.plot_energies import plot_energies
@@ -112,14 +120,12 @@ class Evaluator:
             data = data[: self.num_eval_samples * 2]
 
             metrics.update(
-                evaluate_peptide_data(
+                self._evaluate_peptide_data(
                     true_data,
                     data,
                     topology=topology,
                     tica_model=tica_model,
-                    num_eval_samples=self.num_eval_samples,
                     prefix=prefix + name,
-                    compute_distribution_distances=False,
                 )
             )
 
@@ -131,37 +137,73 @@ class Evaluator:
         if self.do_plots and log_image_fn is not None:
             # Reduce size so plotting doesn't crash with many samples
             true_plot = true_data[: self.num_eval_samples]
-            proposal_plot = samples_data_dict.get("proposal")
-            resampled_plot = samples_data_dict.get("resampled")
-            smc_plot = samples_data_dict.get("smc")
-
-            proposal_plot = proposal_plot[: self.num_eval_samples] if proposal_plot is not None else None
-            resampled_plot = resampled_plot[: self.num_eval_samples] if resampled_plot is not None else None
-            smc_plot = smc_plot[: self.num_eval_samples] if smc_plot is not None else None
+            plot_dict = {
+                name: data[: self.num_eval_samples]
+                for name, data in samples_data_dict.items()
+                if data is not None and len(data) > 0
+            }
 
             plot_energies(
                 log_image_fn,
                 true_plot.energy,
-                proposal_plot.energy if (proposal_plot is not None and len(proposal_plot) > 0) else None,
-                resampled_plot.energy if (resampled_plot is not None and len(resampled_plot) > 0) else None,
-                smc_plot.energy if (smc_plot is not None and len(smc_plot) > 0) else None,
+                {name: data.energy for name, data in plot_dict.items()},
                 prefix=prefix,
             )
             plot_atom_distances(
                 log_image_fn,
                 true_plot.samples,
-                proposal_plot.samples if (proposal_plot is not None and len(proposal_plot) > 0) else None,
-                resampled_plot.samples if (resampled_plot is not None and len(resampled_plot) > 0) else None,
-                smc_plot.samples if (smc_plot is not None and len(smc_plot) > 0) else None,
+                {name: data.samples for name, data in plot_dict.items()},
                 prefix=prefix,
             )
             plot_com_norms(
                 log_image_fn,
-                proposal_plot.samples if (proposal_plot is not None and len(proposal_plot) > 0) else None,
-                resampled_plot.samples if (resampled_plot is not None and len(resampled_plot) > 0) else None,
-                smc_plot.samples if (smc_plot is not None and len(smc_plot) > 0) else None,
+                {name: data.samples for name, data in plot_dict.items()},
                 prefix=prefix,
             )
+
+        return metrics
+
+    def _evaluate_peptide_data(
+        self,
+        true_data,
+        pred_data,
+        topology,
+        tica_model,
+        prefix: str = "",
+    ):
+        """Computes all metrics between true and predicted data."""
+        metrics = {}
+        num_eval_samples = self.num_eval_samples
+
+        if len(pred_data) < 0.9 * num_eval_samples:
+            logging.warning(r"Less than 90% of required eval samples supplied.")
+
+        # Slice data to subset
+        num_eval_samples = min(num_eval_samples, len(pred_data), len(true_data))
+        true_data = true_data[:num_eval_samples]
+        pred_data = pred_data[:num_eval_samples]
+        metrics[f"{prefix}/num_eval_samples"] = min(num_eval_samples, len(pred_data))
+
+        # Compute effective sample size
+        if pred_data.logits is not None:
+            ess = normalized_ess(pred_data.logits)
+            metrics[f"{prefix}/effective_sample_size"] = ess
+
+        metrics[f"{prefix}/mean_energy"] = pred_data.energy.mean().cpu()
+        metrics[f"{prefix}/median_energy"] = pred_data.energy.median().cpu()
+
+        metrics.update(energy_wasserstein(true_data.energy, pred_data.energy, prefix=prefix))
+        logging.info("Energy wasserstein computed")
+
+        metrics.update(torus_wasserstein(true_data.samples, pred_data.samples, topology, prefix=prefix))
+        logging.info("Torus wasserstein computed")
+
+        metrics.update(tica_wasserstein(true_data.samples, pred_data.samples, topology, tica_model, prefix=prefix))
+        logging.info("TICA wasserstein computed")
+
+        metrics.update(tica_kmeans_jsd(true_data.samples, pred_data.samples, topology, tica_model=tica_model, prefix=prefix))
+        metrics.update(torus_kmeans_jsd(true_data.samples, pred_data.samples, topology, prefix=prefix))
+        logging.info("kMeans JSD computed")
 
         return metrics
 

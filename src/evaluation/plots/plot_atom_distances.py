@@ -4,10 +4,11 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from lightning.pytorch.loggers import WandbLogger
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
+
+COLORS = ["r", "b", "orange", "purple", "brown", "pink"]
 
 
 def interatomic_dist(x, flatten=True):
@@ -32,32 +33,30 @@ def interatomic_dist(x, flatten=True):
 def plot_atom_distances(
     log_image_fn,
     true_samples,
-    proposal_samples,
-    resampled_samples,
-    smc_samples,
+    samples_dict: dict[str, torch.Tensor],
     ylim=None,
     prefix="",
-    wandb_logger: WandbLogger = None,
 ):
+    """Plot interatomic distance histograms for ground truth and generated sample sets.
+
+    Args:
+        log_image_fn: Callable to log the figure.
+        true_samples: Ground truth samples tensor [batch, atoms, 3].
+        samples_dict: Dict mapping sample set names to sample tensors.
+        ylim: Optional y-axis limits.
+        prefix: Metric key prefix.
+    """
     logging.info(f"Plotting interatomic distances for {prefix}")
     true_samples_dist = interatomic_dist(true_samples).cpu()
     min_dist = true_samples_dist.min()
     max_dist = true_samples_dist.max()
 
-    if proposal_samples is not None:
-        proposal_samples_dist = interatomic_dist(proposal_samples).cpu()
-        min_dist = min(min_dist, proposal_samples_dist.min())
-        max_dist = max(max_dist, proposal_samples_dist.max())
-
-    if resampled_samples is not None:
-        resampled_samples_dist = interatomic_dist(resampled_samples).cpu()
-        min_dist = min(min_dist, resampled_samples_dist.min())
-        max_dist = max(max_dist, resampled_samples_dist.max())
-
-    if smc_samples is not None:
-        smc_samples_dist = interatomic_dist(smc_samples).cpu()
-        min_dist = min(min_dist, smc_samples_dist.min())
-        max_dist = max(max_dist, smc_samples_dist.max())
+    named_dists = {}
+    for name, samples in samples_dict.items():
+        dist = interatomic_dist(samples).cpu()
+        named_dists[name] = dist
+        min_dist = min(min_dist, dist.min())
+        max_dist = max(max_dist, dist.max())
 
     fig, ax = plt.subplots(figsize=(4, 3), dpi=300, constrained_layout=True)
     fig.patch.set_facecolor("white")
@@ -73,46 +72,25 @@ def plot_atom_distances(
         linewidth=3,
         label="True data",
     )
-    if proposal_samples is not None:
+
+    for (name, dist), color in zip(named_dists.items(), COLORS):
         ax.hist(
-            proposal_samples_dist,
+            dist,
             bins=bin_edges,
             density=True,
             alpha=0.4,
-            color="r",
+            color=color,
             histtype="step",
             linewidth=3,
-            label="Proposal",
-        )
-    if resampled_samples is not None:
-        ax.hist(
-            resampled_samples_dist,
-            bins=bin_edges,
-            density=True,
-            alpha=0.4,
-            histtype="step",
-            linewidth=3,
-            color="b",
-            label="Proposal (reweighted)",
-        )
-    if smc_samples is not None:
-        ax.hist(
-            smc_samples_dist,
-            bins=bin_edges,
-            density=True,
-            alpha=0.4,
-            histtype="step",
-            linewidth=3,
-            color="orange",
-            label="SMC",
+            label=name,
         )
 
     if ylim is not None:
         ax.set_ylim(ylim)
 
-    plt.xlabel("Interatomic Distance  ", labelpad=-2)  # , fontsize=35)
-    plt.ylabel("Normalized Density")  # , fontsize=35)
-    plt.legend()  # fontsize=30)
+    plt.xlabel("Interatomic Distance  ", labelpad=-2)
+    plt.ylabel("Normalized Density")
+    plt.legend()
 
     fig.canvas.draw()
 
