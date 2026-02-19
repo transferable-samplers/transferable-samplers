@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LogNorm
 
-from src.evaluation.metrics.ramachandran import get_phi_psi_vectors
+from src.evaluation.metrics.wasserstein_distances import _get_phi_psi_vectors as get_phi_psi_vectors
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
