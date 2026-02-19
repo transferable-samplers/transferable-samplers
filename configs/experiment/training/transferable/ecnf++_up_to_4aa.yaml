@@ -17,7 +17,7 @@ data:
 trainer:
   check_val_every_n_epoch: 50
   limit_train_batches: 1000
-  limit_val_batches: 0.5 # it's quite slow otherwise - only affects val/loss
-  limit_test_batches: null
+  limit_val_batches: 1
+  limit_test_batches: 1
   max_epochs: 500
   num_sanity_val_steps: 0

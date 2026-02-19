@@ -1,5 +1,6 @@
-_target_: src.data.transferable_peptide_datamodule.TransferablePeptideDataModule
+_target_: src.data.many_peptides_datamodule.ManyPeptidesDataModule
 data_dir: ${paths.data_dir}
+system_cond_ids: [encodings, permutations] # Can remove permutations if not needed for startup / memory efficiency.
 num_dimensions: 3
 num_atoms: 178       # Max number of atoms + at least a single padding token
 num_aa_min: 2
@@ -7,6 +8,7 @@ num_aa_max: 8
 precomputed_std: 0.35 # Standardization factor for normalization
 batch_size: 512 # Needs to be divisible by the number of devices (e.g., if in a distributed setup)
 num_workers: 2
+persistent_workers: False
 pin_memory: False
 val_sequences:
 - AL

@@ -1,27 +1,15 @@
 from typing import Any
 
-import torch
 
-
-class AddPermutationsTransform(torch.nn.Module):
+class AddPermutationsTransform:
     """Adds permutations to the data dictionary based on the sequence name."""
 
     def __init__(self, permutations_dict: dict[str, Any]) -> None:
-        """
-        Args:
-            permutations_dict (Dict[str, Any]): A dictionary mapping sequence names to their respective permutations.
-        """
-        super().__init__()
         self.permutations_dict = permutations_dict
 
-    def forward(self, data: dict[str, Any]) -> dict[str, Any]:
-        """
-        Args:
-            data (Dict[str, Any]): The input data dictionary containing (at least) the key "sequence".
-        Returns:
-            Dict[str, Any]: The updated data dictionary with the permutations added.
-        """
+    def __call__(self, data: dict[str, Any]) -> dict[str, Any]:
         assert "mask" not in data, "data should be unpadded (so without a mask)"
+        assert data["x"].ndim == 2, f"AddPermutationsTransform only handles single samples, got shape {data['x'].shape}"
 
         sequence = data["sequence"]
         return {

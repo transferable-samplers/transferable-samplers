@@ -1,15 +1,11 @@
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 import torch
 
-from src.data.normalization import unnormalize
 from src.models.samplers.base_sampler import BaseSampler
 from src.utils import pylogger
-from src.utils.dataclasses import ProposalCond, SamplesData
+from src.utils.dataclasses import DistOps, ProposalModel, SamplesData
 from src.utils.resampling import com_energy_adjustment, resample_multinomial
-
-if TYPE_CHECKING:
-    from lightning import LightningModule
 
 logger = pylogger.RankedLogger(__name__, rank_zero_only=False)
 
@@ -35,15 +31,15 @@ class SNISSampler(BaseSampler):
     @torch.no_grad()
     def sample(
         self,
-        model: "LightningModule",
-        proposal_cond: Optional[ProposalCond],
+        proposal_model: ProposalModel,
         target_energy_fn,
+        dist_ops: Optional[DistOps] = None,
+        log_metrics: bool = True,
     ) -> dict[str, SamplesData]:
-        samples, log_q = self.sample_proposal_in_batches(model, self.num_samples, proposal_cond)
+        samples, log_q = self.sample_proposal_in_batches(proposal_model, self.num_samples, dist_ops=dist_ops, log_metrics=log_metrics)
         target_energy = target_energy_fn(samples)
 
-        std = model.trainer.datamodule.std
-        proposal_data = SamplesData(unnormalize(samples, std), target_energy)
+        proposal_data = SamplesData(samples, target_energy)
 
         # CoM adjustment
         if self.use_com_adjustment:
@@ -67,7 +63,7 @@ class SNISSampler(BaseSampler):
         _, resampling_index = resample_multinomial(samples, logits)
 
         resampled_data = SamplesData(
-            unnormalize(samples[resampling_index], std),
+            samples[resampling_index],
             target_energy[resampling_index],
             logits=logits,
         )

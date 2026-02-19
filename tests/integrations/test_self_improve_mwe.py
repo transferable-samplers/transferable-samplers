@@ -11,7 +11,7 @@ import pytest
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, open_dict
 
-from src.self_improve import self_improve
+from src.train import train
 from tests.helpers.utils import compose_config, get_config_stem
 
 EXPERIMENT_NAMES = ["evaluation/transferable/prose_up_to_8aa_self_improve.yaml"]
@@ -47,7 +47,7 @@ def cfg_test_self_improve_mwe(request: pytest.FixtureRequest, trainer_name_param
         cfg.trainer.num_sanity_val_steps = 0  # disable val sanity checks
         cfg.trainer.max_epochs = 1
         cfg.trainer.limit_train_batches = 1
-        cfg.callbacks.self_improve.sampler.num_samples = 16
+        cfg.model.sampler.num_samples = 16
         cfg.data.num_workers = 0  # avoid multiprocessing issues in tests
         cfg.data.batch_size = 4
         cfg.data.test_sequences = "AA"
@@ -71,7 +71,7 @@ def test_self_improve_mwe(cfg_test_self_improve_mwe: DictConfig) -> None:
     Asserts:
         - 'train/loss' is present in returned metrics and is not NaN.
     """
-    metrics, _ = self_improve(cfg_test_self_improve_mwe)
+    metrics, _ = train(cfg_test_self_improve_mwe)
 
     assert "train/loss" in metrics, "train/loss missing from metrics"
     assert not isnan(metrics["train/loss"]), "train/loss is NaN"

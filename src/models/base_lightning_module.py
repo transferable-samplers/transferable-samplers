@@ -1,6 +1,7 @@
 import inspect
 from abc import abstractmethod
 from copy import deepcopy
+from functools import partial
 from typing import Any, Optional
 
 import torch
@@ -9,8 +10,10 @@ from lightning import LightningModule
 from torchmetrics import MeanMetric
 
 from src.callbacks.ema_weight_averaging import EMAWeightAveraging
+from src.models.buffer import Buffer
+from src.models.samplers.base_sampler import BaseSampler
 from src.utils import pylogger
-from src.utils.dataclasses import ProposalCond
+from src.utils.dataclasses import DistOps, ProposalModel, SystemCond
 
 logger = pylogger.RankedLogger(__name__, rank_zero_only=False)
 
@@ -28,11 +31,13 @@ class BaseLightningModule(LightningModule):
         use_distill_loss: bool = False,
         distill_weight: float = 0.5,
         output_dir: str = "",
+        sampler: Optional[BaseSampler] = None,
+        train_from_buffer: bool = False,
         *args,
         **kwargs,
     ) -> None:
         super().__init__()
-        self.save_hyperparameters(logger=False)
+        self.save_hyperparameters(logger=False, ignore=["sampler"])
         if args or kwargs:
             logger.warning(f"Unexpected arguments: {args}, {kwargs}")
 
@@ -40,29 +45,25 @@ class BaseLightningModule(LightningModule):
 
         self.prior = prior
 
-        # loss function
-        self.criterion = torch.nn.MSELoss(reduction="mean")
+        self.sampler = sampler
+        self.train_from_buffer = train_from_buffer
+        self._buffer: Optional[Buffer] = None
 
-        # metric objects for calculating and averaging accuracy across batches
         self.train_metrics = torchmetrics.MetricCollection({"loss": MeanMetric()}, prefix="train/")
-        self.val_metrics = self.train_metrics.clone(prefix="val/")
-        self.test_metrics = self.train_metrics.clone(prefix="test/")
 
         self.output_dir = output_dir
 
     @abstractmethod
-    def model_step(self, batch) -> torch.Tensor:
-        ...
-
-    @abstractmethod
     def sample_proposal(
-        self, num_samples: int, proposal_cond: Optional[ProposalCond]
+        self, net: torch.nn.Module, num_samples: int, system_cond: Optional[SystemCond], log_metrics: bool = True
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Generate samples from the proposal distribution.
 
         Args:
+            net: The network to use for generation (may be EMA copy).
             num_samples: Number of samples to generate.
-            proposal_cond: Optional conditioning (permutations, encodings).
+            system_cond: Optional conditioning (permutations, encodings).
+            log_metrics: Whether to log metrics via self.log().
 
         Returns:
             (samples, log_q) — samples in normalized space, log_q is the log proposal density.
@@ -70,19 +71,54 @@ class BaseLightningModule(LightningModule):
         ...
 
     @abstractmethod
-    def proposal_energy(self, x: torch.Tensor, proposal_cond: Optional[ProposalCond]) -> torch.Tensor:
+    def proposal_energy(self, net: torch.nn.Module, x: torch.Tensor, system_cond: Optional[SystemCond]) -> torch.Tensor:
         ...
 
-    def training_step(self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> torch.Tensor:
-        assert len(batch["x"].shape) == 3, "molecules must be a pointcloud (batch_size, num_atoms, 3)"
-        loss = self.model_step(batch)
-        batch_value = self.train_metrics(loss)
-        self.log_dict(batch_value, prog_bar=True)
-        return loss
+    @abstractmethod
+    def training_step(self, batch, batch_idx: int) -> torch.Tensor:
+        ...
+
+    def build_proposal_model(self, system_cond: Optional[SystemCond], use_ema: bool = False) -> ProposalModel:
+        """Build a ProposalModel with system_cond and net pre-bound.
+
+        Args:
+            system_cond: Optional conditioning (permutations, encodings).
+            use_ema: If True, uses a detached copy of EMA weights (or plain net if no EMA callback).
+        """
+        net = self._build_ema_net_copy() if use_ema else self.net
+        return ProposalModel(
+            sample_proposal=partial(self.sample_proposal, net, system_cond=system_cond),
+            proposal_energy=partial(self.proposal_energy, net, system_cond=system_cond),
+        )
+
+    def build_dist_ops(self) -> DistOps:
+        """Build a DistOps with the current trainer's distributed state."""
+        return DistOps(
+            world_size=self.trainer.world_size if self.trainer else 1,
+            local_rank=self.local_rank if self.trainer else 0,
+            all_gather=self.all_gather,
+        )
+
+    def sample(self, system_cond, target_energy_fn, log_metrics: bool = True):
+        """Run the sampler. Delegates to self.sampler.sample()."""
+        assert self.sampler is not None, "No sampler configured on this model."
+        proposal_model = self.build_proposal_model(system_cond)
+        dist_ops = self.build_dist_ops()
+        return self.sampler.sample(proposal_model, target_energy_fn, dist_ops=dist_ops, log_metrics=log_metrics)
 
     def setup(self, stage: str) -> None:
         if self.hparams.compile and stage == "fit":
             self.net = torch.compile(self.net)
+
+        if self.trainer is not None:
+            assert self.trainer.limit_val_batches == 1, (
+                f"limit_val_batches must be 1 (got {self.trainer.limit_val_batches}). "
+                "0 skips validation phases, >1 wastes compute — real evaluation is in callbacks."
+            )
+            assert self.trainer.limit_test_batches == 1, (
+                f"limit_test_batches must be 1 (got {self.trainer.limit_test_batches}). "
+                "0 skips test phases, >1 wastes compute — real evaluation is in callbacks."
+            )
 
     def configure_optimizers(self) -> dict[str, Any]:
         optimizer = self.hparams.optimizer(params=self.trainer.model.parameters())
@@ -106,24 +142,13 @@ class BaseLightningModule(LightningModule):
             }
         return {"optimizer": optimizer}
 
-    @torch.no_grad()
-    def eval_step(
-        self,
-        batch: tuple[torch.Tensor, torch.Tensor],
-        batch_idx: int,
-        prefix: str = "val",
-    ) -> None:
-        loss = self.model_step(batch)
-        if prefix == "val":
-            self.val_metrics.update(loss)
-        elif prefix == "test":
-            self.test_metrics.update(loss)
+    def validation_step(self, batch, batch_idx):
+        "NOTE: these only exist for Lightning compatibility. All evaluation is handled by custom callbacks."
+        return None
 
-    def validation_step(self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
-        self.eval_step(batch, batch_idx, prefix="val")
-
-    def test_step(self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
-        self.eval_step(batch, batch_idx, prefix="test")
+    def test_step(self, batch, batch_idx):
+        "NOTE: these only exist for Lightning compatibility. All evaluation is handled by custom callbacks."
+        return None
 
     def _build_ema_net_copy(self):
         """Return a detached copy of the EMA-averaged net (or plain net if no EMA callback)."""
@@ -138,30 +163,31 @@ class BaseLightningModule(LightningModule):
             for param in self.teacher.parameters():
                 param.requires_grad = False
 
+        if self.train_from_buffer:
+            assert self.sampler is not None, "train_from_buffer requires a sampler on the model."
+            self._populate_buffer()
+
     def on_train_epoch_start(self) -> None:
         logger.info("Train epoch start")
         self.train_metrics.reset()
 
-    def on_validation_epoch_start(self) -> None:
-        logger.info("Validation epoch start")
-        self.val_metrics.reset()
-
-    def on_test_epoch_start(self) -> None:
-        logger.info("Test epoch start")
-        self.test_metrics.reset()
+        if self.train_from_buffer and self.current_epoch > 0:
+            self._populate_buffer()
 
     def on_train_epoch_end(self) -> None:
         self.train_metrics.reset()
         logger.info("Train epoch end")
 
-    def on_validation_epoch_end(self):
-        self.log_dict(self.val_metrics.compute(), sync_dist=True)
-        self.val_metrics.reset()
+    def on_validation_epoch_start(self) -> None:
+        logger.info("Validation epoch start")
+
+    def on_validation_epoch_end(self) -> None:
         logger.info("Validation epoch end")
 
+    def on_test_epoch_start(self) -> None:
+        logger.info("Test epoch start")
+
     def on_test_epoch_end(self) -> None:
-        self.log_dict(self.test_metrics.compute(), sync_dist=True)
-        self.test_metrics.reset()
         logger.info("Test epoch end")
 
     def on_after_backward(self) -> None:
@@ -193,3 +219,31 @@ class BaseLightningModule(LightningModule):
     def state_dict(self, *args, **kwargs):
         sd = super().state_dict(*args, **kwargs)
         return {k: v for k, v in sd.items() if not k.startswith("teacher.")}
+
+    def _populate_buffer(self):
+        """Generate new samples and store in the buffer for self-improvement training."""
+        datamodule = self.trainer.datamodule
+        assert datamodule.test_sequences is not None, "Eval sequence name should be set"
+        assert len(datamodule.test_sequences) == 1, "Can only self-refine on 1 test sequence at a time."
+
+        sequence = datamodule.test_sequences[0]
+        logger.info(f"Generating {self.sampler.num_samples} samples for self-consumption")
+
+        eval_ctx = datamodule.prepare_eval(sequence, stage="test")
+        proposal_model = self.build_proposal_model(eval_ctx.system_cond, use_ema=True)
+        dist_ops = self.build_dist_ops()
+
+        with torch.no_grad():
+            samples_dict = self.sampler.sample(
+                proposal_model, eval_ctx.target_energy_fn, dist_ops=dist_ops, log_metrics=False
+            )
+
+        batch_transform = getattr(datamodule, "buffer_transforms", None)
+
+        self._buffer = Buffer(
+            samples=samples_dict["resampled"].samples,
+            normalization_std=datamodule.std,
+            system_cond=eval_ctx.system_cond,
+            batch_transform=batch_transform,
+        )
+        logger.info(f"Buffer populated with {len(self._buffer)} resampled samples for sequence '{sequence}'")

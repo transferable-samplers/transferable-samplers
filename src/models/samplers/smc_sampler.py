@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import Callable, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -6,20 +6,16 @@ import torch
 from matplotlib.colors import LogNorm
 from tqdm import tqdm
 
-from src.data.normalization import unnormalize
 from src.evaluation.metrics.ess import sampling_efficiency
 from src.models.samplers.base_sampler import BaseSampler
 from src.models.samplers.mcmc import mala_kernel, ula_kernel
 from src.utils import pylogger
-from src.utils.dataclasses import ProposalCond, SamplesData
+from src.utils.dataclasses import DistOps, ProposalModel, SamplesData
 from src.utils.resampling import (
     com_energy_adjustment,
     resample_multinomial,
     resample_systematic,
 )
-
-if TYPE_CHECKING:
-    from lightning import LightningModule
 
 KERNEL_FNS = {"ula": ula_kernel, "mala": mala_kernel}
 
@@ -76,18 +72,18 @@ class SMCSampler(BaseSampler):
 
     def sample(
         self,
-        model: "LightningModule",
-        proposal_cond: Optional[ProposalCond],
+        proposal_model: ProposalModel,
         target_energy_fn,
+        dist_ops: Optional[DistOps] = None,
         log_image_fn: Optional[Callable] = None,
+        log_metrics: bool = True,
     ) -> dict[str, SamplesData]:
         self.log_image_fn = log_image_fn
         # 1. Generate proposal samples (normalized)
-        samples, log_q = self.sample_proposal_in_batches(model, self.num_samples, proposal_cond)
+        samples, log_q = self.sample_proposal_in_batches(proposal_model, self.num_samples, dist_ops=dist_ops, log_metrics=log_metrics)
         target_energy = target_energy_fn(samples)
 
-        std = model.trainer.datamodule.std
-        proposal_data = SamplesData(unnormalize(samples, std), target_energy)
+        proposal_data = SamplesData(samples, target_energy)
 
         # 2. SNIS resampling
         adjusted_log_q = log_q
@@ -108,24 +104,24 @@ class SMCSampler(BaseSampler):
 
         _, resampling_index = resample_multinomial(samples, logits)
         resampled_data = SamplesData(
-            unnormalize(samples[resampling_index], std),
+            samples[resampling_index],
             target_energy[resampling_index],
             logits=logits,
         )
 
         # 3. Build source energy function (with COM adjustment if enabled)
         if self.use_com_adjustment:
-            source_energy_fn = lambda x: model.proposal_energy(x, proposal_cond) - com_energy_adjustment(x, com_std)
+            source_energy_fn = lambda x: proposal_model.proposal_energy(x) - com_energy_adjustment(x, com_std)
         else:
-            source_energy_fn = lambda x: model.proposal_energy(x, proposal_cond)
+            source_energy_fn = lambda x: proposal_model.proposal_energy(x)
 
         # 4. Run SMC loop on the (possibly clipped) proposal samples
         smc_samples, smc_logits = self._smc_loop(
-            samples, source_energy_fn, target_energy_fn, model
+            samples, source_energy_fn, target_energy_fn, dist_ops
         )
 
         smc_energy = target_energy_fn(smc_samples)
-        smc_data = SamplesData(unnormalize(smc_samples, std), smc_energy, logits=smc_logits)
+        smc_data = SamplesData(smc_samples, smc_energy, logits=smc_logits)
 
         return {"proposal": proposal_data, "resampled": resampled_data, "smc": smc_data}
 
@@ -187,9 +183,9 @@ class SMCSampler(BaseSampler):
     # ── Main SMC loop ────────────────────────────────────────────────────
 
     @torch.no_grad()
-    def _smc_loop(self, proposal_samples, source_energy_fn, target_energy_fn, model):
+    def _smc_loop(self, proposal_samples, source_energy_fn, target_energy_fn, dist_ops: Optional[DistOps] = None):
         """Run SMC loop. In DDP mode, particles are sharded across ranks."""
-        world_size = model.trainer.world_size if model.trainer else 1
+        world_size = dist_ops.world_size if dist_ops else 1
 
         # Filter by energy cutoff
         if self.input_energy_filter_cutoff is not None:
@@ -202,7 +198,7 @@ class SMCSampler(BaseSampler):
 
         # Shard particles across DDP ranks
         if world_size > 1:
-            rank = model.local_rank
+            rank = dist_ops.local_rank
             chunk_size = len(proposal_samples) // world_size
             X = proposal_samples[rank * chunk_size : (rank + 1) * chunk_size]
         else:
@@ -294,7 +290,7 @@ class SMCSampler(BaseSampler):
 
             # ESS — use global weights in DDP
             if world_size > 1:
-                global_A = model.all_gather(A).reshape(-1)
+                global_A = dist_ops.all_gather(A).reshape(-1)
             else:
                 global_A = A
 
@@ -315,7 +311,7 @@ class SMCSampler(BaseSampler):
             # Resampling when ESS drops below threshold
             if ESS < self.ess_threshold and not j + 1 == num_annealing_steps:
                 if world_size > 1:
-                    global_X = model.all_gather(X).reshape(-1, *X.shape[1:])
+                    global_X = dist_ops.all_gather(X).reshape(-1, *X.shape[1:])
                     global_X, indexes = self._resample(global_X, global_A)
                     X = global_X[rank * chunk_size : (rank + 1) * chunk_size]
                 else:
@@ -327,7 +323,7 @@ class SMCSampler(BaseSampler):
 
                 A_list.append(A)
                 if world_size > 1:
-                    global_A = model.all_gather(A).reshape(-1)
+                    global_A = dist_ops.all_gather(A).reshape(-1)
                 else:
                     global_A = A
                 ESS = sampling_efficiency(global_A)
@@ -360,8 +356,8 @@ class SMCSampler(BaseSampler):
 
         # Final gather + resample
         if world_size > 1:
-            X = model.all_gather(X).reshape(-1, *X.shape[1:])
-            A = model.all_gather(A).reshape(-1)
+            X = dist_ops.all_gather(X).reshape(-1, *X.shape[1:])
+            A = dist_ops.all_gather(A).reshape(-1)
 
         X, indexes = self._resample(X, A)
         particle_ids = particle_ids[indexes.cpu()]

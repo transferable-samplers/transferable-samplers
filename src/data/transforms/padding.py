@@ -2,21 +2,11 @@ from typing import Any
 
 import torch
 
-DONE_SEQUENCES = []
-UNPADDED_DICT = {}
-PADDED_DICT = {}
-COLLECT_SEQUENCES = False
 
-
-class PaddingTransform(torch.nn.Module):
+class PaddingTransform:
     """Pads the input data to a fixed size and creates a mask for the padded elements."""
 
     def __init__(self, max_num_atoms: int) -> None:
-        """
-        Args:
-            max_num_atoms (int): Max number of atoms to pad to.
-        """
-        super().__init__()
         self.max_num_atoms = max_num_atoms
 
     def create_permutation_mask(
@@ -61,22 +51,14 @@ class PaddingTransform(torch.nn.Module):
                 padded_permutations[key] = torch.cat([value, pad_values])
             return padded_permutations
 
-    def forward(self, data: dict[str, Any]) -> dict[str, Any]:
-        """
-        Args:
-            data (Dict[str, Any]): The input data dictionary containing the keys "x", "encodings"
-                                   and possibly "permutations".
-        Returns:
-            Dict[str, Any]: The updated data dictionary with padded data, encodings, a mask,
-                            and possibly padded permutations.
-        """
+    def __call__(self, data: dict[str, Any]) -> dict[str, Any]:
         assert "mask" not in data, "data already has a mask, cannot pad again"
 
         x = data["x"]
         encodings = data["encodings"]
         permutations = data["permutations"]
 
-        assert len(x.shape) == 2, f"only process single molecules, got shape of {x.shape}"
+        assert x.ndim == 2, f"PaddingTransform only handles single samples, got shape {x.shape}"
 
         mask = self.create_permutation_mask(permutations, padded_seq_len=self.max_num_atoms)
 

@@ -5,3 +5,6 @@ defaults:
 compile: false
 
 output_dir: ${paths.output_dir}
+
+sampler: null
+train_from_buffer: false

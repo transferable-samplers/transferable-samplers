@@ -35,6 +35,7 @@ load_dotenv(override=True)
 # more info: https://github.com/ashleve/rootutils
 # ------------------------------------------------------------------------------------ #
 
+from src.utils.huggingface import download_weights
 from src.utils.instantiators import instantiate_callbacks, instantiate_loggers
 from src.utils.logging_utils import log_hyperparameters
 from src.utils.pylogger import RankedLogger
@@ -98,6 +99,15 @@ def train(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
     if loggers:
         logger.info("Logging hyperparameters!")
         log_hyperparameters(object_dict)
+
+    # Load pretrained weights from HuggingFace if specified (e.g. for self-improvement / finetuning)
+    init_state_dict_hf_path = cfg.get("init_state_dict_hf_path")
+    if init_state_dict_hf_path is not None:
+        logger.info("Downloading weights from HuggingFace...")
+        dst_dir = os.path.join(cfg.paths.scratch_dir, "model-weights")
+        state_dict_path = download_weights(hf_filepath=init_state_dict_hf_path, destination_dir=dst_dir)
+        state_dict = torch.load(state_dict_path, map_location="cpu")
+        model.load_state_dict(state_dict)
 
     logger.info("Starting training!")
     ckpt_path = cfg.get("ckpt_path")

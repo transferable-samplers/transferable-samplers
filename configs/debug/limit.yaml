@@ -6,8 +6,8 @@ defaults:
 trainer:
   max_epochs: 2
   limit_train_batches: 2
-  limit_val_batches: 2
-  limit_test_batches: 2
+  limit_val_batches: 1
+  limit_test_batches: 1
   accelerator: gpu
 
 callbacks:

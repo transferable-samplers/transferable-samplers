@@ -57,13 +57,15 @@ class SamplingEvaluationCallback(Callback):
             log_image_fn = partial(base_log_image_fn, title_prefix=seq_prefix)
 
             # ALL ranks must participate in sampling (all_gather)
+            proposal_model = pl_module.build_proposal_model(eval_ctx.system_cond)
+            dist_ops = pl_module.build_dist_ops()
             sample_kwargs = {}
             if "log_image_fn" in inspect.signature(self.sampler.sample).parameters:
                 sample_kwargs["log_image_fn"] = log_image_fn
             samples_dict = self.sampler.sample(
-                pl_module,
-                eval_ctx.proposal_cond,
+                proposal_model,
                 eval_ctx.target_energy_fn,
+                dist_ops=dist_ops,
                 **sample_kwargs,
             )
 

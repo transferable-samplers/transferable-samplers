@@ -18,5 +18,8 @@ check_val_every_n_epoch: 10
 # makes training slower but gives more reproducibility than just setting seeds
 deterministic: False
 
+limit_val_batches: 1
+limit_test_batches: 1
+
 gradient_clip_val: 1.0
 inference_mode: False

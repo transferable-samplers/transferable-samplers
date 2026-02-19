@@ -1,3 +1,0 @@
-self_improve:
-  _target_: src.callbacks.self_improvement_callback.SelfImprovementCallback
-  sampler: null

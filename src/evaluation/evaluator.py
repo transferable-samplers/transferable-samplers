@@ -48,12 +48,13 @@ class Evaluator:
             sequence: Peptide sequence string.
             samples_data_dict: Dict mapping sample set names to SamplesData,
                 e.g. {"proposal": ..., "resampled": ..., "smc": ...}.
-                Samples should be unnormalized.
+                Samples are in normalized space; this method unnormalizes them
+                for metrics and plotting.
             eval_context: EvalContext from datamodule.prepare_eval().
             log_image_fn: Optional image logging callable (img, title) -> None.
             prefix: String prefix for metric keys.
             normalization_std: Normalization std tensor used to unnormalize
-                true_samples from eval_context for chirality checks and metrics.
+                samples for metrics and plotting.
 
         Returns:
             Dict mapping metric names to computed values.
@@ -65,11 +66,22 @@ class Evaluator:
         topology = eval_context.topology
         tica_model = eval_context.tica_model
 
-        # Compute true data energy (eval_context.true_samples are normalized)
+        # Unnormalize true samples for metrics/plots
         true_data = SamplesData(
             unnormalize(eval_context.true_samples, normalization_std),
             eval_context.target_energy_fn(eval_context.true_samples),
         )
+
+        # Unnormalize all generated sample sets for metrics/plots
+        samples_data_dict = {
+            name: SamplesData(
+                unnormalize(data.samples, normalization_std),
+                data.energy,
+                logits=data.logits,
+            )
+            for name, data in samples_data_dict.items()
+            if data is not None
+        }
 
         # Fix chirality on proposal samples if present
         proposal_data = samples_data_dict.get("proposal")

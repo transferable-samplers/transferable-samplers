@@ -8,7 +8,7 @@ from torchdyn.core import NeuralODE
 from src.models.base_lightning_module import BaseLightningModule
 from src.models.neural_networks.wrappers import TorchdynWrapper, torch_wrapper
 from src.utils import pylogger
-from src.utils.dataclasses import ProposalCond
+from src.utils.dataclasses import SystemCond
 
 logger = pylogger.RankedLogger(__name__, rank_zero_only=False)
 
@@ -47,10 +47,12 @@ class FlowMatchLitModule(BaseLightningModule):
         vt_flow = x1 - x0
         return vt_flow
 
-    def model_step(
-        self,
-        batch: torch.Tensor,
-    ) -> torch.Tensor:
+    def training_step(self, batch, batch_idx: int) -> torch.Tensor:
+        if self._buffer is not None:
+            batch = self._buffer.sample(batch["x"].shape[0])
+
+        assert len(batch["x"].shape) == 3, "molecules must be a pointcloud (batch_size, num_atoms, 3)"
+
         x1 = batch["x"]
 
         num_samples = x1.shape[0]
@@ -78,10 +80,12 @@ class FlowMatchLitModule(BaseLightningModule):
             loss = loss / mask.int().sum(-1)
         loss = loss.mean()
 
+        batch_value = self.train_metrics(loss)
+        self.log_dict(batch_value, prog_bar=True)
         return loss
 
     @torch.no_grad()
-    def flow(self, x: torch.Tensor, encodings=None, reverse=False, dummy_ll=False) -> torch.Tensor:
+    def flow(self, net: torch.nn.Module, x: torch.Tensor, encodings=None, reverse=False, dummy_ll=False) -> torch.Tensor:
         batch_size = x.shape[0]
         num_atoms = x.shape[1]
 
@@ -90,7 +94,7 @@ class FlowMatchLitModule(BaseLightningModule):
         dlog_p = torch.zeros((x.shape[0], 1), device=x.device)
         t_span = torch.linspace(1, 0, 2) if reverse else torch.linspace(0, 1, 2)
 
-        eval_fn = partial(copy.deepcopy(self.net), encodings=encodings)
+        eval_fn = partial(copy.deepcopy(net), encodings=encodings)
 
         if self.hparams.div_estimator == "ito":
             x_ito, dlog_p_ito = self.sde_integrate(x, reverse=reverse)
@@ -183,15 +187,18 @@ class FlowMatchLitModule(BaseLightningModule):
         samples = torch.stack(samples)
         return x, dlogp_sum
 
-    def proposal_energy(self, x: torch.Tensor, proposal_cond: Optional[ProposalCond] = None) -> torch.Tensor:
-        encodings = proposal_cond.encodings if proposal_cond else None
-        x, dlogp = self.flow(x, encodings=encodings, reverse=True)
+    def proposal_energy(
+        self, net: torch.nn.Module, x: torch.Tensor, system_cond: Optional[SystemCond] = None,
+    ) -> torch.Tensor:
+        encodings = system_cond.encodings if system_cond else None
+        x, dlogp = self.flow(net, x, encodings=encodings, reverse=True)
         return -(-self.prior.energy(x).view(-1) - dlogp.view(-1))
 
     def sample_proposal(
-        self, num_samples: int, proposal_cond: Optional[ProposalCond] = None
+        self, net: torch.nn.Module, num_samples: int,
+        system_cond: Optional[SystemCond] = None, log_metrics: bool = True,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        encodings = proposal_cond.encodings if proposal_cond else None
+        encodings = system_cond.encodings if system_cond else None
 
         if encodings is None:
             num_atoms = self.trainer.datamodule.hparams.num_atoms
@@ -210,7 +217,7 @@ class FlowMatchLitModule(BaseLightningModule):
             }
 
         with torch.no_grad():
-            samples, dlog_p = self.flow(prior_samples, encodings=encodings, reverse=False)
+            samples, dlog_p = self.flow(net, prior_samples, encodings=encodings, reverse=False)
 
         log_p = prior_log_p.flatten() + dlog_p.flatten()
 

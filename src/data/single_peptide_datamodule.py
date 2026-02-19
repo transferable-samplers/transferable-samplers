@@ -12,6 +12,7 @@ from huggingface_hub import snapshot_download
 
 from src.data.base_datamodule import BaseDataModule
 from src.data.normalization import normalize, unnormalize
+from src.data.datasets.dummy_dataset import DummyDataset
 from src.data.datasets.tensor_dataset import TensorDataset
 from src.data.energy.openmm import OpenMMBridge, OpenMMEnergy
 from src.data.preprocessing.tica import get_tica_model
@@ -20,11 +21,11 @@ from src.data.transforms.rotation import Random3DRotationTransform
 from src.data.transforms.standardize import StandardizeTransform
 from src.utils.dataclasses import EvalContext
 
-
 class SinglePeptideDataModule(BaseDataModule):
+    HF_REPO_ID = "transferable-samplers/sequential-boltzmann-generators-data"
+
     def __init__(
         self,
-        repo_id: str,
         data_dir: str,
         sequence: str,
         temperature: float,
@@ -32,14 +33,18 @@ class SinglePeptideDataModule(BaseDataModule):
         num_atoms: int,
         com_augmentation: bool = False,
         num_eval_samples: int = 10_000,
+        train_from_buffer: bool = False,
         batch_size: int = 64,
         num_workers: int = 0,
+        persistent_workers: bool = False,
         pin_memory: bool = False,
     ):
-        super().__init__(batch_size=batch_size, num_workers=num_workers, pin_memory=pin_memory)
+        super().__init__(batch_size=batch_size, num_workers=num_workers, persistent_workers=persistent_workers,  pin_memory=pin_memory)
 
-        self.repo_name = self.hparams.repo_id.split("/")[-1]
+        self.repo_name = self.HF_REPO_ID.split("/")[-1]
         self.trajectory_name = f"{self.hparams.sequence}_{self.hparams.temperature}K"
+
+        self.train_from_buffer = train_from_buffer
 
         # Setup paths
         self.trajectory_data_dir = f"{data_dir}/{self.repo_name}/{self.trajectory_name}"
@@ -68,7 +73,7 @@ class SinglePeptideDataModule(BaseDataModule):
         os.makedirs(f"{self.hparams.data_dir}/{self.repo_name}", exist_ok=True)
 
         local_dir = snapshot_download(
-            repo_id=self.hparams.repo_id,
+            repo_id=self.HF_REPO_ID,
             repo_type="dataset",
             local_dir=f"{self.hparams.data_dir}/{self.repo_name}",
             allow_patterns=[f"{self.trajectory_name}/*"],
@@ -87,25 +92,26 @@ class SinglePeptideDataModule(BaseDataModule):
         :param stage: The stage to setup. Either `"fit"`, `"validate"`, `"test"`, or `"predict"`. Defaults to ``None``.
         """
         # Divide batch size by the number of devices.
-        if self.trainer is not None:
-            if self.hparams.batch_size % self.trainer.world_size != 0:
-                raise RuntimeError(
-                    f"Batch size ({self.hparams.batch_size}) is not divisible by the number "
-                    "of devices ({self.trainer.world_size})."
-                )
-            self.batch_size_per_device = self.hparams.batch_size // self.trainer.world_size
-        else:
-            self.batch_size_per_device = self.hparams.batch_size
+        if self.hparams.batch_size % self.trainer.world_size != 0:
+            raise RuntimeError(
+                f"Batch size ({self.hparams.batch_size}) is not divisible by the number "
+                "of devices ({self.trainer.world_size})."
+            )
+        self.batch_size_per_device = self.hparams.batch_size // self.trainer.world_size
 
-        # Load the data
+        # Dummy val/test datasets — actual evaluation happens via prepare_eval + callbacks
+        self.data_val = DummyDataset()
+        self.data_test = DummyDataset()
+
+        # Load the data (needed to compute std even in eval-only runs)
         data_train = np.load(self.train_data_path)
-        data_val = np.load(self.val_data_path)
-        data_test = np.load(self.test_data_path)
-
-        # Tensorize the data
         data_train = torch.from_numpy(data_train)
-        data_val = torch.from_numpy(data_val)
-        data_test = torch.from_numpy(data_test)
+
+        # Compute std on centered data
+        self.std = (data_train - data_train.mean(dim=1, keepdim=True)).std()
+
+        if stage != "fit":
+            return
 
         # Load the PDB file
         self.pdb = openmm.app.PDBFile(self.pdb_path)
@@ -113,11 +119,8 @@ class SinglePeptideDataModule(BaseDataModule):
         # Load the topology from the PDB file
         self.topology = md.load_topology(self.pdb_path)
 
-        # For compatibility to transferable BG
+        # For compatibility with transferable BG
         self.topology_dict = {self.hparams.sequence: self.topology}
-
-        # Compute std on standardized data
-        self.std = (data_train - data_train.mean(dim=1, keepdim=True)).std()
 
         transform_list = [
             StandardizeTransform(self.std),
@@ -126,26 +129,30 @@ class SinglePeptideDataModule(BaseDataModule):
         if self.hparams.com_augmentation:
             transform_list.append(CenterOfMassTransform())
         train_transforms = torchvision.transforms.Compose(transform_list)
-        self.data_train = TensorDataset(
-            data=data_train,
-            transform=train_transforms,
-        )
 
-        test_transforms = StandardizeTransform(self.std)
-        self.data_val = TensorDataset(
-            data=data_val,
-            transform=test_transforms,
-        )
-        self.data_test = TensorDataset(
-            data=data_test,
-            transform=test_transforms,
-        )
+        if self.train_from_buffer:
+            # Buffer transforms are the same as train transforms for single peptide
+            # (no encoding/permutation lookups or padding needed)
+            # Stored to be accessed by the model for buffer sampling.
+            self.buffer_transforms = self.train_transforms
+
+            # Placeholder dataset; model owns the buffer and samples from it
+            assert isinstance(self.trainer.limit_train_batches, int), (
+                "trainer.limit_train_batches must be set to an integer when using " 
+                "train_from_buffer (the model needs to know how many batches to sample from the buffer each epoch)."
+            )
+            limit = self.trainer.limit_train_batches
+            dummy_size = limit * self.batch_size_per_device
+            self.data_train = DummyDataset(size=dummy_size)
+        else:
+            self.data_train = TensorDataset(
+                data=data_train,
+                transform=train_transforms,
+            )
 
         logging.info(f"Train dataset size: {len(self.data_train)}")
-        logging.info(f"Validation dataset size: {len(self.data_val)}")
-        logging.info(f"Test dataset size: {len(self.data_test)}")
 
-    def setup_potential(self):
+    def _setup_potential(self):
         """
         Set up the OpenMM potential energy function.
 
@@ -196,20 +203,23 @@ class SinglePeptideDataModule(BaseDataModule):
     def prepare_eval(self, sequence: str, stage: str) -> EvalContext:
         """
         Prepare evaluation data and energy function for validation or test trajectories.
-
-        Args:
-            sequence (str): Peptide sequence (always self.hparams.sequence for single peptide).
-            stage (str): Dataset split to evaluate on. Must be either "val" or "test".
-
-        Returns:
-            EvalContext with all components required for evaluation.
         """
+        assert sequence == self.hparams.sequence, f"Requested eval sequence '{sequence}' does not match datamodule sequence '{self.hparams.sequence}'"
         if stage == "test":
-            true_samples = self.data_test.data
+            true_samples = torch.from_numpy(np.load(self.test_data_path))
         elif stage == "val":
-            true_samples = self.data_val.data
+            true_samples = torch.from_numpy(np.load(self.val_data_path))
         else:
             raise ValueError(f"Unknown stage: {stage}. Use 'val' or 'test'.")
+
+        # Load PDB/topology if not already loaded (e.g. eval-only runs)
+        if not hasattr(self, "pdb"):
+            self.pdb = openmm.app.PDBFile(self.pdb_path)
+        if not hasattr(self, "topology"):
+            self.topology = md.load_topology(self.pdb_path)
+        if not hasattr(self, "std"):
+            data_train = torch.from_numpy(np.load(self.train_data_path))
+            self.std = (data_train - data_train.mean(dim=1, keepdim=True)).std()
 
         tica_model = get_tica_model(true_samples, self.topology)
 
@@ -217,13 +227,13 @@ class SinglePeptideDataModule(BaseDataModule):
         true_samples = true_samples[:: len(true_samples) // self.hparams.num_eval_samples]
         true_samples = normalize(true_samples, self.std)
 
-        potential = self.setup_potential()
+        potential = self._setup_potential()
         energy_fn = lambda x: potential.energy(unnormalize(x, self.std)).flatten()
 
         return EvalContext(
             true_samples=true_samples,
             target_energy_fn=energy_fn,
-            proposal_cond=None,
+            system_cond=None,
             tica_model=tica_model,
             topology=self.topology,
         )

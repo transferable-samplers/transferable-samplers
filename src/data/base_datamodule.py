@@ -11,6 +11,7 @@ class BaseDataModule(LightningDataModule):
         self,
         batch_size: int = 64,
         num_workers: int = 0,
+        persistent_workers: bool = False,
         pin_memory: bool = False,
     ) -> None:
         """Initialize a `BaseDataModule`.
@@ -67,46 +68,28 @@ class BaseDataModule(LightningDataModule):
             return data_loader
 
         else:
-            persistent_workers_flag = True if self.hparams.num_workers > 0 else False
-            num_workers = self.hparams.num_workers
-            if hasattr(self.data_train, "buffer"):
-                persistent_workers_flag = False
-                num_workers = 0
-
             return DataLoader(
                 dataset=self.data_train,
                 batch_size=self.batch_size_per_device,
-                num_workers=num_workers,
+                num_workers=self.hparams.num_workers,
                 pin_memory=self.hparams.pin_memory,
                 shuffle=True,
-                persistent_workers=persistent_workers_flag,
+                persistent_workers=self.hparams.persistent_workers,
             )
 
     def val_dataloader(self) -> DataLoader[Any]:
         """Create and return the validation dataloader.
 
-        :return: The validation dataloader.
+        NOTE: these only exist for Lightning compatibility. All evaluation is handled by custom callbacks.
         """
-        return DataLoader(
-            dataset=self.data_val,
-            batch_size=self.batch_size_per_device,
-            num_workers=self.hparams.num_workers,
-            pin_memory=self.hparams.pin_memory,
-            shuffle=True,  # i shuffle in case of trainer.limit_val_batches
-            persistent_workers=True if self.hparams.num_workers > 0 else False,
-        )
+        world_size = self.trainer.world_size if self.trainer is not None else 1
+        return DataLoader(dataset=self.data_val, batch_size=world_size)
 
     def test_dataloader(self) -> DataLoader[Any]:
         """Create and return the test dataloader.
 
-        :return: The test dataloader.
+        NOTE: these only exist for Lightning compatibility. All evaluation is handled by custom callbacks.
         """
-        return DataLoader(
-            dataset=self.data_test,
-            batch_size=self.batch_size_per_device,
-            num_workers=self.hparams.num_workers,
-            pin_memory=self.hparams.pin_memory,
-            shuffle=True,  # shuffle in case of trainer.limit_test_batches
-            persistent_workers=True if self.hparams.num_workers > 0 else False,
-        )
+        world_size = self.trainer.world_size if self.trainer is not None else 1
+        return DataLoader(dataset=self.data_test, batch_size=world_size)
 
