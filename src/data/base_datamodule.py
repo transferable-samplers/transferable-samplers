@@ -1,12 +1,15 @@
 import logging
+from abc import ABC, abstractmethod
 from typing import Any, Optional
 
 import webdataset as wds
 from lightning import LightningDataModule
 from torch.utils.data import DataLoader, IterableDataset
 
+from src.utils.dataclasses import EvalContext
 
-class BaseDataModule(LightningDataModule):
+
+class BaseDataModule(LightningDataModule, ABC):
     def __init__(
         self,
         batch_size: int = 64,
@@ -28,6 +31,7 @@ class BaseDataModule(LightningDataModule):
         # also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=False)
 
+    @abstractmethod
     def prepare_data(self) -> None:
         """Download data if needed. Lightning ensures that `self.prepare_data()` is called only
         within a single process on CPU, so you can safely add your downloading logic within. In
@@ -36,8 +40,9 @@ class BaseDataModule(LightningDataModule):
 
         Do not use it to assign state (self.x = y).
         """
-        raise NotImplementedError
+        ...
 
+    @abstractmethod
     def setup(self, stage: Optional[str] = None) -> None:
         """Load data. Set variables: `self.data_train`, `self.data_val`, `self.data_test`.
 
@@ -48,7 +53,29 @@ class BaseDataModule(LightningDataModule):
 
         :param stage: The stage to setup. Either `"fit"`, `"validate"`, `"test"`, or `"predict"`. Defaults to ``None``.
         """
-        raise NotImplementedError
+        ...
+
+    @abstractmethod
+    def prepare_eval(self, sequence: str, stage: str) -> EvalContext:
+        """Prepare evaluation data and energy function for a given peptide sequence.
+
+        Args:
+            sequence: Peptide sequence identifier to prepare evaluation data for.
+            stage: Dataset split ("val" or "test"). Used to select data path.
+
+        Returns:
+            EvalContext with all components required for evaluation.
+        """
+        ...
+
+    def _validate_and_set_batch_size(self) -> None:
+        """Validate batch size is divisible by world size and set per-device batch size."""
+        if self.hparams.batch_size % self.trainer.world_size != 0:
+            raise RuntimeError(
+                f"Batch size ({self.hparams.batch_size}) is not divisible by the number "
+                f"of devices ({self.trainer.world_size})."
+            )
+        self.batch_size_per_device = self.hparams.batch_size // self.trainer.world_size
 
     def train_dataloader(self) -> DataLoader[Any]:
         """Create and return the train dataloader.

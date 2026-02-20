@@ -15,7 +15,10 @@ import torch
 import torch.nn as nn
 
 from src.models.neural_networks.egnn.egnn import EGNN
-from src.models.neural_networks.egnn.utils import remove_mean
+def remove_mean(x):
+    mean = torch.mean(x, dim=1, keepdim=True)
+    x = x - mean
+    return x
 
 
 class EGNN_dynamics_AD2_cat(nn.Module):

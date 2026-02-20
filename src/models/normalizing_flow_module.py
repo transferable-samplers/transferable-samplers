@@ -127,47 +127,24 @@ class NormalizingFlowLitModule(BaseLightningModule):
             x_recon, fwd_logdets = net(x_pred, _permutations, encodings=_encodings)
             fwd_logdets = fwd_logdets * data_dim  # rescale from mean to sum
 
-            # TODO refactor these all into metrics
             if log_metrics:
-                self.log("invert/mse", torch.mean((prior_samples - x_recon) ** 2), sync_dist=True)
-                self.log(
-                    "invert/max_abs",
-                    torch.max(abs(prior_samples - x_recon)),
-                    sync_dist=True,
-                )
-                self.log(
-                    "invert/mean_abs",
-                    torch.mean(abs(prior_samples - x_recon)),
-                    sync_dist=True,
-                )
-                self.log(
-                    "invert/median_abs",
-                    torch.median(abs(prior_samples - x_recon)),
-                    sync_dist=True,
-                )
-                cutoff = 0.01
-                self.log(
-                    f"invert/fail_count_{cutoff}",
-                    torch.sum(abs(prior_samples - x_recon) > cutoff).sum().float(),
-                    sync_dist=True,
-                )
-                self.log(
-                    f"invert/fail_count_sample_{cutoff}",
-                    (torch.sum(abs(prior_samples - x_recon) > cutoff, dim=1) > 0).sum().float(),
-                    sync_dist=True,
-                )
-                cutoff = 0.001
-                self.log(
-                    f"invert/fail_count_{cutoff}",
-                    torch.sum(abs(prior_samples - x_recon) > cutoff).sum().float(),
-                    sync_dist=True,
-                )
-                self.log(
-                    f"invert/fail_count_sample_{cutoff}",
-                    (torch.sum(abs(prior_samples - x_recon) > cutoff, dim=1) > 0).sum().float(),
-                    sync_dist=True,
-                )
+                self._invertibility_metrics(prior_samples, x_recon)
 
         log_q = prior_log_q.flatten() + fwd_logdets.flatten()
 
         return x_pred, log_q
+
+    def _invertibility_metrics(self, prior_samples: torch.Tensor, x_recon: torch.Tensor) -> None:
+        """Log invertibility metrics comparing prior samples to their reconstruction."""
+        diff = abs(prior_samples - x_recon)
+        self.log("invert/mse", torch.mean((prior_samples - x_recon) ** 2), sync_dist=True)
+        self.log("invert/max_abs", torch.max(diff), sync_dist=True)
+        self.log("invert/mean_abs", torch.mean(diff), sync_dist=True)
+        self.log("invert/median_abs", torch.median(diff), sync_dist=True)
+        for cutoff in (0.01, 0.001):
+            self.log(f"invert/fail_count_{cutoff}", torch.sum(diff > cutoff).sum().float(), sync_dist=True)
+            self.log(
+                f"invert/fail_count_sample_{cutoff}",
+                (torch.sum(diff > cutoff, dim=1) > 0).sum().float(),
+                sync_dist=True,
+            )

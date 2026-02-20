@@ -91,13 +91,7 @@ class SinglePeptideDataModule(BaseDataModule):
 
         :param stage: The stage to setup. Either `"fit"`, `"validate"`, `"test"`, or `"predict"`. Defaults to ``None``.
         """
-        # Divide batch size by the number of devices.
-        if self.hparams.batch_size % self.trainer.world_size != 0:
-            raise RuntimeError(
-                f"Batch size ({self.hparams.batch_size}) is not divisible by the number "
-                "of devices ({self.trainer.world_size})."
-            )
-        self.batch_size_per_device = self.hparams.batch_size // self.trainer.world_size
+        self._validate_and_set_batch_size()
 
         # Dummy val/test datasets — actual evaluation happens via prepare_eval + callbacks
         self.data_val = DummyDataset()
