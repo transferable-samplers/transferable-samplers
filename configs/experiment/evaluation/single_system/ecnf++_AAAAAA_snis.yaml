@@ -6,7 +6,7 @@ defaults:
   - override /data: single_system/AAAAAA
   - override /trainer: gpu
 
-state_dict_hf_path: single_system/ecnf++_AAAAAA_0.pth
+hf_state_dict_path: single_system/ecnf++_AAAAAA_0.pth
 
 model:
   net:

@@ -53,6 +53,14 @@ class BaseLightningModule(LightningModule):
 
         self.output_dir = output_dir
 
+        if self.hparams.use_distill_loss:
+            logger.info("Using distillation loss with weight {:.3f}".format(self.hparams.distill_weight))
+            logger.info("Copying net to teacher for distillation loss")
+            self.teacher = deepcopy(self.net)
+            for param in self.teacher.parameters():
+                param.requires_grad_(False)
+            self.teacher.eval()
+
     @abstractmethod
     def sample_proposal(
         self, net: torch.nn.Module, num_samples: int, system_cond: Optional[SystemCond], log_metrics: bool = True
@@ -78,14 +86,14 @@ class BaseLightningModule(LightningModule):
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         ...
 
-    def build_proposal_model(self, system_cond: Optional[SystemCond], use_ema: bool = False) -> ProposalModel:
+    def build_proposal_model(self, system_cond: Optional[SystemCond], use_ema_if_available: bool = False) -> ProposalModel:
         """Build a ProposalModel with system_cond and net pre-bound.
 
         Args:
             system_cond: Optional conditioning (permutations, encodings).
-            use_ema: If True, uses a detached copy of EMA weights (or plain net if no EMA callback).
+            use_ema_if_available: If True uses the EMA weights if present.
         """
-        net = self._build_ema_net_copy() if use_ema else self.net
+        net = self._build_net_copy(use_ema_if_available=use_ema_if_available)
         return ProposalModel(
             sample_proposal=partial(self.sample_proposal, net, system_cond=system_cond),
             proposal_energy=partial(self.proposal_energy, net, system_cond=system_cond),
@@ -121,7 +129,8 @@ class BaseLightningModule(LightningModule):
             )
 
     def configure_optimizers(self) -> dict[str, Any]:
-        optimizer = self.hparams.optimizer(params=self.trainer.model.parameters())
+        # Only parameters with requires_grad=True are passed to optimizer (e.g not self.teacher)
+        optimizer = self.hparams.optimizer(params = [p for p in self.parameters() if p.requires_grad])
         if self.hparams.scheduler is not None:
             scheduler_fn = self.hparams.scheduler
             scheduler_params = inspect.signature(scheduler_fn).parameters
@@ -150,28 +159,33 @@ class BaseLightningModule(LightningModule):
         "NOTE: these only exist for Lightning compatibility. All evaluation is handled by custom callbacks."
         return None
 
-    def _build_ema_net_copy(self):
-        """Return a detached copy of the EMA-averaged net (or plain net if no EMA callback)."""
+    def _has_ema_callback(self) -> bool:
+        """Check if an EMAWeightAveraging callback is present in the trainer."""
+        if self.trainer is None:
+            return False
         for cb in self.trainer.callbacks:
             if isinstance(cb, EMAWeightAveraging):
-                return deepcopy(cb._average_model.module.net)
+                return True
+        return False
+
+    def _build_net_copy(self, use_ema_if_available: bool = False) -> torch.nn.Module:
+        """Return a detached copy of the EMA-averaged net (or plain net if no EMA callback)."""
+        if use_ema_if_available:
+            for cb in self.trainer.callbacks:
+                if isinstance(cb, EMAWeightAveraging):
+                    return deepcopy(cb._average_model.module.net)
         return deepcopy(self.net)
-
-    def on_fit_start(self) -> None:
-        if self.hparams.use_distill_loss:
-            self.teacher = self._build_ema_net_copy()
-            for param in self.teacher.parameters():
-                param.requires_grad = False
-
-        if self.train_from_buffer:
-            assert self.sampler is not None, "train_from_buffer requires a sampler on the model."
-            self._populate_buffer()
 
     def on_train_epoch_start(self) -> None:
         logger.info("Train epoch start")
         self.train_metrics.reset()
 
-        if self.train_from_buffer and self.current_epoch > 0:
+        if self.hparams.use_distill_loss:
+            assert not self._has_ema_callback(), "EMAWeightAveraging callback should not be used with distillation loss."
+
+        if self.train_from_buffer:
+            assert not self._has_ema_callback(), "EMAWeightAveraging callback should not be used with train_from_buffer."
+            assert self.sampler is not None, "train_from_buffer requires a sampler on the model."
             self._populate_buffer()
 
     def on_train_epoch_end(self) -> None:
@@ -216,10 +230,6 @@ class BaseLightningModule(LightningModule):
         total_norm = total_norm ** (1.0 / 2)
         self.log_dict({"train/grad_norm": total_norm}, prog_bar=True)
 
-    def state_dict(self, *args, **kwargs):
-        sd = super().state_dict(*args, **kwargs)
-        return {k: v for k, v in sd.items() if not k.startswith("teacher.")}
-
     def _populate_buffer(self):
         """Generate new samples and store in the buffer for self-improvement training."""
         datamodule = self.trainer.datamodule
@@ -230,7 +240,7 @@ class BaseLightningModule(LightningModule):
         logger.info(f"Generating {self.sampler.num_samples} samples for self-consumption")
 
         eval_ctx = datamodule.prepare_eval(sequence, stage="test")
-        proposal_model = self.build_proposal_model(eval_ctx.system_cond, use_ema=True)
+        proposal_model = self.build_proposal_model(eval_ctx.system_cond, use_ema_if_available=True)
         dist_ops = self.build_dist_ops()
 
         with torch.no_grad():

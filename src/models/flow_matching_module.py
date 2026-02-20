@@ -51,6 +51,9 @@ class FlowMatchLitModule(BaseLightningModule):
         if self._buffer is not None:
             batch = self._buffer.sample(batch["x"].shape[0])
 
+        if self.hparams.use_distill_loss:
+            raise NotImplementedError("Distillation loss not implemented for flow matching.")
+
         assert len(batch["x"].shape) == 3, "molecules must be a pointcloud (batch_size, num_atoms, 3)"
 
         x1 = batch["x"]

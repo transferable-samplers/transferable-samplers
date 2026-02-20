@@ -239,7 +239,101 @@ All 7 tests pass:
 - `test_smc_mwe[cpu-prose_up_to_8aa_mala]`
 - `test_self_improve_mwe[cpu-prose_up_to_8aa_self_improve]`
 
-## Remaining Phases
+## Phase 9: Sampler Ownership — DONE
 
-- **Phase 9**: Sampler ownership → callbacks (see REFACTOR.md)
+Moved samplers from model to callbacks.
+
+- Removed `sampler` constructor parameter and `self.sampler` from `BaseLightningModule`
+- `SamplingEvaluationCallback` owns its sampler instance
+- Model's `_populate_buffer` uses the model's own sampler field (set only for self-improve configs)
+- Experiment configs specify samplers on callbacks, not model
+
+## Phase 10: Training Script + Init/Resume Utils — DONE
+
+### 10a. Created `src/utils/init_resume_utils.py`
+
+New utility module with:
+
+| Function | Purpose |
+|---|---|
+| `load_state_dict_from_ckpt(path)` | Extract `state_dict` from a `.ckpt` Lightning checkpoint |
+| `load_state_dict_from_file(path)` | Load raw state dict from a `.pth` file |
+| `load_state_dict_from_hf(hf_filepath, scratch_dir)` | Download from HuggingFace Hub, return state dict |
+| `resolve_init(init_ckpt_path, init_hf_state_dict_path, scratch_dir)` | Resolve init weights from checkpoint or HF (mutually exclusive), returns `Optional[dict]` |
+| `resolve_init_or_resume(resume_ckpt_path, init_ckpt_path, init_hf_state_dict_path, scratch_dir)` | Preemptible semantics: if resume checkpoint exists and is loadable, resume; otherwise delegate to `resolve_init`. Returns `(fit_ckpt_path, init_state_dict)` |
+| `augment_state_dict_for_teacher(sd)` | Copy `net.*` keys to `teacher.*` for distillation init from a student-only state dict |
+
+### 10b. Updated `src/train.py`
+
+- Config params renamed: `ckpt_path` → `resume_ckpt_path`, `init_state_dict_hf_path` → split into `init_hf_state_dict_path` + `init_ckpt_path`
+- Uses `resolve_init_or_resume()` → gets `(fit_ckpt_path, init_state_dict)`
+- If `init_state_dict` is returned, augments for teacher if model has one, then loads into model
+- Passes `fit_ckpt_path` to `trainer.fit()` for full Lightning resume
+- Preemptible: if `resume_ckpt_path` exists on disk and is loadable, ignores init weights and resumes
+
+### 10c. Updated `src/eval.py`
+
+- Uses `resolve_init()` with `cfg.get("ckpt_path")` and `cfg.get("hf_state_dict_path")`
+- XOR enforced by `resolve_init` assertion
+- Weights loaded into model before `trainer.validate()`/`trainer.test()`
+- Removed `os` import, replaced `download_weights` with `resolve_init`
+
+### 10d. Config changes
+
+**`configs/train.yaml`:**
+```yaml
+init_hf_state_dict_path: null
+init_ckpt_path: null
+resume_ckpt_path: null
+```
+
+**`configs/eval.yaml`:**
+```yaml
+ckpt_path: null
+hf_state_dict_path: null
+```
+
+### 10e. Renamed eval experiment config keys
+
+All 14 eval experiment configs: `state_dict_hf_path` → `hf_state_dict_path`
+
+### 10f. Updated self-improve config
+
+`configs/experiment/evaluation/transferable/prose_up_to_8aa_self_improve.yaml`: `init_state_dict_hf_path` → `init_hf_state_dict_path` (routes through `train.py`)
+
+### 10g. Updated `src/models/base_lightning_module.py`
+
+- Teacher created in `__init__` (not `on_fit_start`), so it's part of the model state from construction
+- Removed `state_dict()` override — teacher weights now persist in checkpoints (needed for `augment_state_dict_for_teacher` on init)
+- `_build_ema_net_copy` → `_build_net_copy(use_ema_if_available)` with proper fallback
+- `configure_optimizers` filters to `requires_grad=True` only (excludes frozen teacher)
+- `_populate_buffer` runs every epoch in `on_train_epoch_start` (not `on_fit_start`)
+- EMA assertions moved from `__init__` to `on_train_epoch_start` (trainer not available at construction)
+- `torch.no_grad()` → `torch.inference_mode()` for teacher forward pass
+
+### 10h. Bug fixes during implementation
+
+- Fixed `logger` vs `logging` naming mismatch in `init_resume_utils.py`
+- Fixed `logging.info` → `logger.info` in `train.py`
+- Fixed `_build_net_copy` returning `None` when `use_ema_if_available=True` but no EMA callback found
+- Fixed `_has_ema_callback` accessing `self.trainer` property (raises `RuntimeError`) during `__init__` — moved assertion to `on_train_epoch_start`
+
+### Verified
+
+All 6 integration tests pass:
+
+| Test | Status |
+|---|---|
+| `test_snis_mwe[cpu-tarflow_AAA_ula]` | PASS |
+| `test_snis_mwe[cpu-prose_up_to_8aa_snis]` | PASS |
+| `test_smc_mwe` (2 params) | PASS |
+| `test_self_improve_mwe[cpu-prose_up_to_8aa_self_improve]` | PASS |
+| `test_train_mwe[cpu-ecnf++_AAA]` | PASS |
+| `test_train_mwe[cpu-tarflow_AAA]` | PASS |
+
+---
+
+## All Phases Complete
+
+The refactor is finished. All original design goals from REFACTOR.md have been achieved.
 

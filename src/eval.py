@@ -2,7 +2,6 @@
 
 from typing import Any, Optional
 import logging
-import os
 
 
 import time
@@ -36,7 +35,7 @@ load_dotenv(override=True)
 # more info: https://github.com/ashleve/rootutils
 # ------------------------------------------------------------------------------------ #
 
-from src.utils.huggingface import download_weights
+from src.utils.init_resume_utils import resolve_init
 from src.utils.instantiators import instantiate_callbacks, instantiate_loggers
 from src.utils.logging_utils import log_hyperparameters
 from src.utils.pylogger import RankedLogger
@@ -102,38 +101,27 @@ def eval(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
         logger.info("Logging hyperparameters!")
         log_hyperparameters(object_dict)
 
-    ckpt_path = cfg.get("ckpt_path")
-    state_dict_hf_path = cfg.get("state_dict_hf_path")
+    init_state_dict = resolve_init(
+        init_ckpt_path=cfg.get("ckpt_path"),
+        init_hf_state_dict_path=cfg.get("hf_state_dict_path"),
+        scratch_dir=cfg.paths.scratch_dir,
+    )
 
-    # Ensure exactly one of ckpt_path or state_dict_hf_path is provided (XOR)
-    assert (ckpt_path is None) ^ (state_dict_hf_path is None), "You must provide one of ckpt_path or state_dict_hf_path"
-
-    if state_dict_hf_path is not None:
-        # Provided a remote state dict path
-        logger.info("Downloading weights from huggingface...")
-        dst_dir = os.path.join(cfg.paths.scratch_dir, "model-weights")
-        state_dict_path = download_weights(hf_filepath=state_dict_hf_path, destination_dir=dst_dir)
-
-        # Directly load the state dict into model
-        state_dict = torch.load(state_dict_path, map_location="cpu")
-        model.load_state_dict(state_dict)
+    if init_state_dict is not None:
+        model.load_state_dict(init_state_dict)
 
     assert cfg.get("val", False) or cfg.get("test", False), "At least one of validation or test must be enabled!"
 
     if cfg.get("val"):
         logger.info("Starting validation!")
-        trainer.validate(
-            model=model, datamodule=datamodule, ckpt_path=ckpt_path
-        )  # ckpt_path is None if using state_dict_hf_path
+        trainer.validate(model=model, datamodule=datamodule)
         val_metrics = trainer.callback_metrics
     else:
         val_metrics = {}
 
     if cfg.get("test"):
         logger.info("Starting testing!")
-        trainer.test(
-            model=model, datamodule=datamodule, ckpt_path=ckpt_path
-        )  # ckpt_path is None if using state_dict_hf_path
+        trainer.test(model=model, datamodule=datamodule)
         test_metrics = trainer.callback_metrics
     else:
         test_metrics = {}

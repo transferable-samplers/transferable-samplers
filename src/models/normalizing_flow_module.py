@@ -36,7 +36,7 @@ class NormalizingFlowLitModule(BaseLightningModule):
         self.log("train/mle_loss", loss.item(), prog_bar=True, sync_dist=True)
 
         if self.hparams.use_distill_loss:
-            with torch.no_grad():
+            with torch.inference_mode():
                 x0_teacher, dlogp_teacher = self.teacher(x1, permutations=permutations, encodings=encodings, mask=mask)
 
             prior_log_p = -self.prior.energy(x0_teacher, mask=mask)

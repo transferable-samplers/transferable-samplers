@@ -5,7 +5,7 @@ defaults:
   - override /data: transferable/up_to_4aa
   - override /trainer: gpu
 
-state_dict_hf_path: transferable/ecnf++_up_to_4aa.pth
+hf_state_dict_path: transferable/ecnf++_up_to_4aa.pth
 
 model:
   net:

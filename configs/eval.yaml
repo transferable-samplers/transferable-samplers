@@ -39,9 +39,9 @@ val: False
 # set to True if you want to evaluate on test dataset
 test: True
 
-# provide one of these to evaluate
+# provide one of these to evaluate (mutually exclusive)
 ckpt_path: null
-state_dict_hf_path: null
+hf_state_dict_path: null
 
 # globally set torch.set_num_threads a good default is 2
 torch_num_threads: 2

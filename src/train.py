@@ -1,5 +1,4 @@
 # ruff: noqa: E402, I001, S311
-import os
 import random
 import time
 from typing import Any, Optional
@@ -35,7 +34,7 @@ load_dotenv(override=True)
 # more info: https://github.com/ashleve/rootutils
 # ------------------------------------------------------------------------------------ #
 
-from src.utils.huggingface import download_weights
+from src.utils.init_resume_utils import resolve_init_or_resume, augment_state_dict_for_teacher
 from src.utils.instantiators import instantiate_callbacks, instantiate_loggers
 from src.utils.logging_utils import log_hyperparameters
 from src.utils.pylogger import RankedLogger
@@ -100,25 +99,27 @@ def train(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
         logger.info("Logging hyperparameters!")
         log_hyperparameters(object_dict)
 
-    # Load pretrained weights from HuggingFace if specified (e.g. for self-improvement / finetuning)
-    init_state_dict_hf_path = cfg.get("init_state_dict_hf_path")
-    if init_state_dict_hf_path is not None:
-        logger.info("Downloading weights from HuggingFace...")
-        dst_dir = os.path.join(cfg.paths.scratch_dir, "model-weights")
-        state_dict_path = download_weights(hf_filepath=init_state_dict_hf_path, destination_dir=dst_dir)
-        state_dict = torch.load(state_dict_path, map_location="cpu")
-        model.load_state_dict(state_dict)
+    # This returns fit_ckpt_path if we are resuming from an existing checkpoint.
+    # Otherwise, it returns None and optionally an init_state_dict if we are initializing the model from a checkpoint (e.g. for fine-tuning).
+    fit_ckpt_path, init_state_dict = resolve_init_or_resume(
+        resume_ckpt_path=cfg.get("resume_ckpt_path"),
+        init_ckpt_path=cfg.get("init_ckpt_path"),
+        init_hf_state_dict_path=cfg.get("init_hf_state_dict_path"),
+        scratch_dir=cfg.paths.scratch_dir,
+    )
+
+    if init_state_dict is not None:
+        assert fit_ckpt_path is None, (
+            "fit_ckpt_path must be None when init_state_dict is provided."
+        )
+        # If the model has a teacher (i.e. if we're using distillation loss), we need to augment the state dict before loading.
+        if hasattr(model, "teacher"):
+            init_state_dict = augment_state_dict_for_teacher(init_state_dict)
+        logger.info("Loading model state dict from init_state_dict")
+        model.load_state_dict(init_state_dict)
 
     logger.info("Starting training!")
-    ckpt_path = cfg.get("ckpt_path")
-    if ckpt_path:
-        if os.path.exists(ckpt_path):
-            logger.info(f"Resuming training from checkpoint: {ckpt_path}")
-        else:
-            logger.warning(f"Checkpoint path {ckpt_path} not found! Ignoring...")
-            ckpt_path = None
-
-    trainer.fit(model=model, datamodule=datamodule, ckpt_path=ckpt_path)
+    trainer.fit(model=model, datamodule=datamodule, ckpt_path=fit_ckpt_path)
 
     train_metrics = trainer.callback_metrics
 

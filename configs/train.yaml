@@ -36,8 +36,12 @@ task_name: "train"
 # overwrite from command line with `python train.py tags="[first_tag, second_tag]"`
 tags: ["dev"]
 
-# simply provide checkpoint path to resume training
-ckpt_path: null
+# provide weights for finetuning (mutually exclusive)
+init_hf_state_dict_path: null
+init_ckpt_path: null
+
+# provide checkpoint path to resume training (overrides init weights if exists)
+resume_ckpt_path: null
 
 # globally set torch.set_num_threads a good default is 2
 torch_num_threads: 2

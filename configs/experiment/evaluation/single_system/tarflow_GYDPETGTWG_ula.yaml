@@ -40,4 +40,4 @@ trainer:
   limit_test_batches: 1
   limit_val_batches: 1
 
-state_dict_hf_path: single_system/tarflow_GYDPETGTWG_0.pth
+hf_state_dict_path: single_system/tarflow_GYDPETGTWG_0.pth

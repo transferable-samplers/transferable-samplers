@@ -6,7 +6,7 @@ defaults:
   - override /data: transferable/up_to_8aa
   - override /trainer: gpu
 
-init_state_dict_hf_path: transferable/prose_up_to_8aa.pth
+init_hf_state_dict_path: transferable/prose_up_to_8aa.pth
 
 model:
   use_distill_loss: True
