@@ -6,6 +6,11 @@ from src.models.samplers.smc_utils import SMCParticles, merge_particles
 from src.utils.dataclasses import SourceEnergy, TargetEnergy
 
 
+def linear_interpolation(source: torch.Tensor, target: torch.Tensor, t) -> torch.Tensor:
+    """Linear interpolation: (1-t)*source + t*target."""
+    return (1 - t) * source + t * target
+
+
 def langevin_proposal(particles: SMCParticles, source: SourceEnergy, target: TargetEnergy, t, dt, sigma):
     """Langevin proposal step with SMC weight update.
 
@@ -30,7 +35,7 @@ def langevin_proposal(particles: SMCParticles, source: SourceEnergy, target: Tar
     Returns:
         SMCParticles with proposed x, updated logw, and energies/grads at proposed x.
     """
-    energy_grad_x = (1 - t) * particles.E_source_grad + t * particles.E_target_grad
+    energy_grad_x = linear_interpolation(particles.E_source_grad, particles.E_target_grad, t)
     dx = -(sigma**2 / 2) * dt * energy_grad_x + sigma * torch.sqrt(dt) * torch.randn_like(particles.x)
 
     delta = t - torch.max(torch.zeros_like(t), t - dt)
@@ -69,10 +74,10 @@ def metropolis_accept(current: SMCParticles, proposal: SMCParticles, t, dt, sigm
     Returns:
         (accepted: SMCParticles, acceptance_rate)
     """
-    energy_grad_x = (1 - t) * current.E_source_grad + t * current.E_target_grad
-    energy_grad_x_proposal = (1 - t) * proposal.E_source_grad + t * proposal.E_target_grad
-    E = (1 - t) * current.E_source + t * current.E_target
-    E_proposal = (1 - t) * proposal.E_source + t * proposal.E_target
+    energy_grad_x = linear_interpolation(current.E_source_grad, current.E_target_grad, t)
+    energy_grad_x_proposal = linear_interpolation(proposal.E_source_grad, proposal.E_target_grad, t)
+    E = linear_interpolation(current.E_source, current.E_target, t)
+    E_proposal = linear_interpolation(proposal.E_source, proposal.E_target, t)
 
     # TODO discuss the parameter h versus the paper.
     h = (sigma**2 / 2) * dt
