@@ -8,14 +8,21 @@ defaults:
 
 hf_state_dict_path: transferable/tarflow_up_to_8aa.pth
 
+model:
+  source_energy_config:
+    _target_: src.utils.dataclasses.SourceEnergyConfig
+    sample_batch_size: 5_000
+    energy_batch_size: 5_000
+    grad_batch_size: 5_000
+    use_com_adjustment: true
+
 callbacks:
   sampling_evaluation:
     sampler:
       _target_: src.models.samplers.snis_sampler.SNISSampler
       num_samples: 1_000_000
-      proposal_batch_size: 5_000
-      use_com_adjustment: true
-      logit_clip_filter: 0.002
+
+      logit_quantile_filter: 0.002
 
 data:
   batch_size: 128

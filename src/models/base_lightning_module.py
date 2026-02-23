@@ -13,7 +13,7 @@ from src.callbacks.ema_weight_averaging import EMAWeightAveraging
 from src.models.buffer import Buffer
 from src.models.samplers.base_sampler import BaseSampler
 from src.utils import pylogger
-from src.utils.dataclasses import DistOps, ProposalModel, SystemCond
+from src.utils.dataclasses import SourceEnergy, SourceEnergyConfig, SystemCond, TargetEnergy
 
 logger = pylogger.RankedLogger(__name__, rank_zero_only=False)
 
@@ -32,12 +32,13 @@ class BaseLightningModule(LightningModule):
         distill_weight: float = 0.5,
         output_dir: str = "",
         sampler: Optional[BaseSampler] = None,
+        source_energy_config: Optional[SourceEnergyConfig] = None,
         train_from_buffer: bool = False,
         *args,
         **kwargs,
     ) -> None:
         super().__init__()
-        self.save_hyperparameters(logger=False, ignore=["sampler"])
+        self.save_hyperparameters(logger=False, ignore=["sampler", "source_energy_config"])
         if args or kwargs:
             logger.warning(f"Unexpected arguments: {args}, {kwargs}")
 
@@ -46,6 +47,7 @@ class BaseLightningModule(LightningModule):
         self.prior = prior
 
         self.sampler = sampler
+        self.source_energy_config = source_energy_config
         self.train_from_buffer = train_from_buffer
         self._buffer: Optional[Buffer] = None
 
@@ -63,15 +65,14 @@ class BaseLightningModule(LightningModule):
 
     @abstractmethod
     def sample_proposal(
-        self, net: torch.nn.Module, num_samples: int, system_cond: Optional[SystemCond], log_metrics: bool = True
+        self, net: torch.nn.Module, num_samples: int, system_cond: Optional[SystemCond],
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Generate samples from the proposal distribution.
+        """Generate a single batch of samples from the proposal distribution.
 
         Args:
             net: The network to use for generation (may be EMA copy).
-            num_samples: Number of samples to generate.
+            num_samples: Number of samples to generate in this batch.
             system_cond: Optional conditioning (permutations, encodings).
-            log_metrics: Whether to log metrics via self.log().
 
         Returns:
             (samples, log_q) — samples in normalized space, log_q is the log proposal density.
@@ -80,39 +81,50 @@ class BaseLightningModule(LightningModule):
 
     @abstractmethod
     def proposal_energy(self, net: torch.nn.Module, x: torch.Tensor, system_cond: Optional[SystemCond]) -> torch.Tensor:
+        """Compute proposal energy (-log q) for a single batch.
+
+        Args:
+            net: The network to use.
+            x: Samples to evaluate (batch, atoms, 3).
+            system_cond: Optional conditioning.
+
+        Returns:
+            Energy tensor (batch,).
+        """
         ...
 
     @abstractmethod
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         ...
 
-    def build_proposal_model(self, system_cond: Optional[SystemCond], use_ema_if_available: bool = False) -> ProposalModel:
-        """Build a ProposalModel with system_cond and net pre-bound.
+    def build_source_energy(
+        self,
+        system_cond: Optional[SystemCond],
+        use_ema_if_available: bool = False,
+    ) -> SourceEnergy:
+        """Build a SourceEnergy with batched sample and energy callables.
 
         Args:
             system_cond: Optional conditioning (permutations, encodings).
             use_ema_if_available: If True uses the EMA weights if present.
         """
+        assert self.source_energy_config is not None, "source_energy_config must be set to build SourceEnergy."
         net = self._build_net_copy(use_ema_if_available=use_ema_if_available)
-        return ProposalModel(
-            sample_proposal=partial(self.sample_proposal, net, system_cond=system_cond),
-            proposal_energy=partial(self.proposal_energy, net, system_cond=system_cond),
+
+        return SourceEnergy(
+            sample_fn=partial(self.sample_proposal, net, system_cond=system_cond),
+            energy_fn=partial(self.proposal_energy, net, system_cond=system_cond),
+            sample_batch_size=self.source_energy_config.sample_batch_size,
+            energy_batch_size=self.source_energy_config.energy_batch_size,
+            grad_batch_size=self.source_energy_config.grad_batch_size,
+            use_com_adjustment=self.source_energy_config.use_com_adjustment,
         )
 
-    def build_dist_ops(self) -> DistOps:
-        """Build a DistOps with the current trainer's distributed state."""
-        return DistOps(
-            world_size=self.trainer.world_size if self.trainer else 1,
-            local_rank=self.local_rank if self.trainer else 0,
-            all_gather=self.all_gather,
-        )
-
-    def sample(self, system_cond, target_energy_fn, log_metrics: bool = True):
+    def sample(self, system_cond, target_energy: TargetEnergy):
         """Run the sampler. Delegates to self.sampler.sample()."""
         assert self.sampler is not None, "No sampler configured on this model."
-        proposal_model = self.build_proposal_model(system_cond)
-        dist_ops = self.build_dist_ops()
-        return self.sampler.sample(proposal_model, target_energy_fn, dist_ops=dist_ops, log_metrics=log_metrics)
+        source_energy = self.build_source_energy(system_cond)
+        return self.sampler.sample(source_energy, target_energy)
 
     def setup(self, stage: str) -> None:
         if self.hparams.compile and stage == "fit":
@@ -240,18 +252,19 @@ class BaseLightningModule(LightningModule):
         logger.info(f"Generating {self.sampler.num_samples} samples for self-consumption")
 
         eval_ctx = datamodule.prepare_eval(sequence, stage="test")
-        proposal_model = self.build_proposal_model(eval_ctx.system_cond, use_ema_if_available=True)
-        dist_ops = self.build_dist_ops()
+        source_energy = self.build_source_energy(eval_ctx.system_cond, use_ema_if_available=True)
 
         with torch.no_grad():
-            samples_dict = self.sampler.sample(
-                proposal_model, eval_ctx.target_energy_fn, dist_ops=dist_ops, log_metrics=False
+            samples_dict, _ = self.sampler.sample(
+                source_energy, eval_ctx.target_energy
             )
 
         batch_transform = getattr(datamodule, "buffer_transforms", None)
 
+        # SMC is much more costly, just assume we want to use it if present.
+        key = "smc" if "smc" in samples_dict else "resampled"
         self._buffer = Buffer(
-            samples=samples_dict["resampled"].samples,
+            samples=samples_dict[key].samples,
             normalization_std=datamodule.std,
             system_cond=eval_ctx.system_cond,
             batch_transform=batch_transform,

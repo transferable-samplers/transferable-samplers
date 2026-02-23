@@ -32,7 +32,7 @@ from src.data.transforms.center_of_mass import CenterOfMassTransform
 from src.data.transforms.padding import PaddingTransform
 from src.data.transforms.rotation import Random3DRotationTransform
 from src.data.transforms.standardize import StandardizeTransform
-from src.utils.dataclasses import EvalContext, SystemCond
+from src.utils.dataclasses import EvalContext, SamplesData, SystemCond, TargetEnergy
 from src.utils.huggingface import download_and_extract_pdb_tarfiles, download_evaluation_data
 
 
@@ -299,8 +299,8 @@ class ManyPeptidesDataModule(BaseDataModule):
         pdb = self._load_pdb(sequence, stage)
         topology = md.Topology.from_openmm(pdb.topology)
 
-        true_samples = normalize(true_samples, self.std)
         potential = self._setup_potential(pdb)
+        # energy_fn takes normalized samples — unnormalizes internally
         energy_fn = lambda x: potential.energy(unnormalize(x, self.std)).flatten()
 
         system_cond = None
@@ -312,10 +312,16 @@ class ManyPeptidesDataModule(BaseDataModule):
                 encodings=encodings,
             )
 
+        true_data = SamplesData(
+            samples=true_samples,
+            energy=potential.energy(true_samples).flatten(),
+        )
+
         return EvalContext(
-            true_samples=true_samples,
+            true_data=true_data,
+            target_energy=TargetEnergy(energy_fn=energy_fn),
+            normalization_std=self.std,
             system_cond=system_cond,
-            target_energy_fn=energy_fn,
             tica_model=tica_model,
             topology=topology,
         )

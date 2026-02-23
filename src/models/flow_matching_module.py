@@ -199,7 +199,7 @@ class FlowMatchLitModule(BaseLightningModule):
 
     def sample_proposal(
         self, net: torch.nn.Module, num_samples: int,
-        system_cond: Optional[SystemCond] = None, log_metrics: bool = True,
+        system_cond: Optional[SystemCond] = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         encodings = system_cond.encodings if system_cond else None
 

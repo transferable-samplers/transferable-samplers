@@ -9,6 +9,11 @@ defaults:
 hf_state_dict_path: single_system/ecnf++_Ace-AAA-Nme_0.pth
 
 model:
+  source_energy_config:
+    _target_: src.utils.dataclasses.SourceEnergyConfig
+    sample_batch_size: 8
+    energy_batch_size: 8
+    grad_batch_size: 8
   net:
     channels: 256
     num_layers: 5
@@ -18,7 +23,7 @@ callbacks:
     sampler:
       _target_: src.models.samplers.snis_sampler.SNISSampler
       num_samples: 10_000
-      proposal_batch_size: 8
+
 
 data:
   batch_size: 128

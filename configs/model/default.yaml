@@ -7,4 +7,5 @@ compile: false
 output_dir: ${paths.output_dir}
 
 sampler: null
+source_energy_config: null
 train_from_buffer: false

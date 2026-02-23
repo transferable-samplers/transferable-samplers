@@ -9,7 +9,6 @@ from src.utils.dataclasses import SystemCond
 class NormalizingFlowLitModule(BaseLightningModule):
     def __init__(
         self,
-        log_invertibility_error: bool = True,
         *args,
         **kwargs,
     ) -> None:
@@ -91,7 +90,7 @@ class NormalizingFlowLitModule(BaseLightningModule):
 
     def sample_proposal(
         self, net: torch.nn.Module, num_samples: int,
-        system_cond: Optional[SystemCond] = None, log_metrics: bool = True,
+        system_cond: Optional[SystemCond] = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         permutations = system_cond.permutations if system_cond else None
         encodings = system_cond.encodings if system_cond else None
@@ -127,24 +126,54 @@ class NormalizingFlowLitModule(BaseLightningModule):
             x_recon, fwd_logdets = net(x_pred, _permutations, encodings=_encodings)
             fwd_logdets = fwd_logdets * data_dim  # rescale from mean to sum
 
-            if log_metrics:
-                self._invertibility_metrics(prior_samples, x_recon)
-
         log_q = prior_log_q.flatten() + fwd_logdets.flatten()
 
         return x_pred, log_q
 
-    def _invertibility_metrics(self, prior_samples: torch.Tensor, x_recon: torch.Tensor) -> None:
-        """Log invertibility metrics comparing prior samples to their reconstruction."""
-        diff = abs(prior_samples - x_recon)
-        self.log("invert/mse", torch.mean((prior_samples - x_recon) ** 2), sync_dist=True)
-        self.log("invert/max_abs", torch.max(diff), sync_dist=True)
-        self.log("invert/mean_abs", torch.mean(diff), sync_dist=True)
-        self.log("invert/median_abs", torch.median(diff), sync_dist=True)
+    def run_model_diagnostics(self, prefix: str) -> dict:
+        """Sample from prior and return invertibility and logdet diagnostics.
+
+        Invertibility: checks that reverse(z) followed by forward gives back z.
+        Logdet: checks the network's logdet against the true Jacobian logdet (small batch).
+        """
+
+        num_samples_invert = 256
+        num_samples_logdet = 16
+
+        num_atoms = self.trainer.datamodule.hparams.num_atoms
+        data_dim = num_atoms * self.trainer.datamodule.hparams.num_dimensions
+        prior_samples = self.prior.sample(num_samples_invert, num_atoms, device=self.device)
+
+        with torch.no_grad():
+            x_pred = self.net.reverse(prior_samples)
+            x_recon, fwd_logdets = self.net(x_pred)
+            fwd_logdets = fwd_logdets * data_dim  # rescale from mean to sum
+
+        # ── Invertibility metrics ─────────────────────────────────────────
+        diff = (prior_samples - x_recon).abs()
+        metrics = {
+            f"{prefix}/diagnostic/invert/mse": torch.mean((prior_samples - x_recon) ** 2).item(),
+            f"{prefix}/diagnostic/invert/max_abs": torch.max(diff).item(),
+            f"{prefix}/diagnostic/invert/mean_abs": torch.mean(diff).item(),
+            f"{prefix}/diagnostic/invert/median_abs": torch.median(diff).item(),
+        }
         for cutoff in (0.01, 0.001):
-            self.log(f"invert/fail_count_{cutoff}", torch.sum(diff > cutoff).sum().float(), sync_dist=True)
-            self.log(
-                f"invert/fail_count_sample_{cutoff}",
-                (torch.sum(diff > cutoff, dim=1) > 0).sum().float(),
-                sync_dist=True,
+            metrics[f"{prefix}/diagnostic/invert/fail_count_{cutoff}"] = torch.sum(diff > cutoff).float().item()
+            metrics[f"{prefix}/diagnostic/invert/fail_count_sample_{cutoff}"] = (
+                (torch.sum(diff > cutoff, dim=1) > 0).sum().float().item()
             )
+
+        # ── Logdet check (small batch — Jacobian is expensive per sample) ───
+        logdet_batch = x_pred[:num_samples_logdet].detach()
+        fwd_func = lambda x: self.net.forward(x)[0]
+        logdet_diffs = []
+        for i in range(len(logdet_batch)):
+            x = logdet_batch[i].unsqueeze(0).float().requires_grad_(True)
+            with torch.enable_grad():
+                fwd_jac = torch.autograd.functional.jacobian(fwd_func, x, vectorize=True)
+                logdet_true = torch.logdet(fwd_jac.view(data_dim, data_dim))
+            logdet_diffs.append(abs(fwd_logdets[i] - logdet_true).item())
+        metrics[f"{prefix}/diagnostic/logdet/mean_diff"] = sum(logdet_diffs) / len(logdet_diffs)
+        metrics[f"{prefix}/diagnostic/logdet/max_diff"] = max(logdet_diffs)
+
+        return metrics

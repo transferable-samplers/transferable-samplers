@@ -19,7 +19,7 @@ from src.data.preprocessing.tica import get_tica_model
 from src.data.transforms.center_of_mass import CenterOfMassTransform
 from src.data.transforms.rotation import Random3DRotationTransform
 from src.data.transforms.standardize import StandardizeTransform
-from src.utils.dataclasses import EvalContext
+from src.utils.dataclasses import EvalContext, SamplesData, TargetEnergy
 
 class SinglePeptideDataModule(BaseDataModule):
     HF_REPO_ID = "transferable-samplers/sequential-boltzmann-generators-data"
@@ -219,14 +219,20 @@ class SinglePeptideDataModule(BaseDataModule):
 
         # Subsample the true trajectory
         true_samples = true_samples[:: len(true_samples) // self.hparams.num_eval_samples]
-        true_samples = normalize(true_samples, self.std)
 
         potential = self._setup_potential()
+        # energy_fn takes normalized samples — unnormalizes internally
         energy_fn = lambda x: potential.energy(unnormalize(x, self.std)).flatten()
 
+        true_data = SamplesData(
+            samples=true_samples,
+            energy=potential.energy(true_samples).flatten(),
+        )
+
         return EvalContext(
-            true_samples=true_samples,
-            target_energy_fn=energy_fn,
+            true_data=true_data,
+            target_energy=TargetEnergy(energy_fn=energy_fn),
+            normalization_std=self.std,
             system_cond=None,
             tica_model=tica_model,
             topology=self.topology,

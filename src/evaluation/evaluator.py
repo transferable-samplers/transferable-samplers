@@ -43,26 +43,20 @@ class Evaluator:
     @torch.no_grad()
     def evaluate(
         self,
-        sequence: str,
         samples_data_dict: dict[str, SamplesData],
         eval_context: EvalContext,
         log_image_fn=None,
         prefix: str = "",
-        normalization_std: torch.Tensor = None,
     ) -> dict[str, float]:
         """Evaluate generated samples against reference data.
 
         Args:
-            sequence: Peptide sequence string.
-            samples_data_dict: Dict mapping sample set names to SamplesData,
-                e.g. {"proposal": ..., "resampled": ..., "smc": ...}.
-                Samples are in normalized space; this method unnormalizes them
-                for metrics and plotting.
+            samples_data_dict: Dict mapping sample set names to SamplesData.
+                Generated samples are in normalized space; unnormalized using
+                eval_context.normalization_std.
             eval_context: EvalContext from datamodule.prepare_eval().
             log_image_fn: Optional image logging callable (img, title) -> None.
             prefix: String prefix for metric keys.
-            normalization_std: Normalization std tensor used to unnormalize
-                samples for metrics and plotting.
 
         Returns:
             Dict mapping metric names to computed values.
@@ -73,14 +67,10 @@ class Evaluator:
         metrics = {}
         topology = eval_context.topology
         tica_model = eval_context.tica_model
+        true_data = eval_context.true_data
+        normalization_std = eval_context.normalization_std
 
-        # Unnormalize true samples for metrics/plots
-        true_data = SamplesData(
-            unnormalize(eval_context.true_samples, normalization_std),
-            eval_context.target_energy_fn(eval_context.true_samples),
-        )
-
-        # Unnormalize all generated sample sets for metrics/plots
+        # Unnormalize generated sample sets for metrics/plots
         samples_data_dict = {
             name: SamplesData(
                 unnormalize(data.samples, normalization_std),

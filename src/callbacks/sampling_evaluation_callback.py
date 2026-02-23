@@ -1,4 +1,3 @@
-import inspect
 from functools import partial
 from typing import Optional
 
@@ -7,6 +6,7 @@ import torch
 import torch.utils._pytree as pytree
 from lightning import Callback
 
+from src.evaluation.diagnostics.smc_plots import plot_smc_diagnostics
 from src.evaluation.evaluator import Evaluator
 from src.models.samplers.base_sampler import BaseSampler
 from src.utils import pylogger
@@ -56,34 +56,33 @@ class SamplingEvaluationCallback(Callback):
             seq_prefix = f"{prefix}/{sequence}"
             log_image_fn = partial(base_log_image_fn, title_prefix=seq_prefix)
 
-            # ALL ranks must participate in sampling (all_gather)
-            proposal_model = pl_module.build_proposal_model(eval_ctx.system_cond)
-            dist_ops = pl_module.build_dist_ops()
-            sample_kwargs = {}
-            if "log_image_fn" in inspect.signature(self.sampler.sample).parameters:
-                sample_kwargs["log_image_fn"] = log_image_fn
-            samples_dict = self.sampler.sample(
-                proposal_model,
-                eval_ctx.target_energy_fn,
-                dist_ops=dist_ops,
-                **sample_kwargs,
+            # ALL ranks must participate in sampling (all_gather inside sampler)
+            source_energy = pl_module.build_source_energy(eval_ctx.system_cond)
+            samples_dict, diagnostics = self.sampler.sample(
+                source_energy,
+                eval_ctx.target_energy,
             )
 
             # Only rank 0: evaluate, plot, log per-sequence metrics
             if trainer.is_global_zero:
+                if diagnostics is not None:
+                    plot_smc_diagnostics(diagnostics, log_image_fn)
+
                 seq_metrics = self.evaluator.evaluate(
-                    sequence,
                     samples_dict,
                     eval_ctx,
                     log_image_fn=log_image_fn,
                     prefix=seq_prefix,
-                    normalization_std=datamodule.std,
                 )
                 # Had some graph retention issues
                 seq_metrics = pytree.tree_map(
                     lambda x: x.detach().cpu() if isinstance(x, torch.Tensor) else x,
                     seq_metrics,
                 )
+
+                if hasattr(pl_module, "run_model_diagnostics"):
+                    seq_metrics.update(pl_module.run_model_diagnostics(prefix=seq_prefix))
+
                 pl_module.log_dict(seq_metrics)
                 all_metrics.update(seq_metrics)
 

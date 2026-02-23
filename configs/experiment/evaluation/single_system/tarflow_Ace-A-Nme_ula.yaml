@@ -7,6 +7,11 @@ defaults:
   - override /trainer: gpu
 
 model:
+  source_energy_config:
+    _target_: src.utils.dataclasses.SourceEnergyConfig
+    sample_batch_size: 10_000
+    energy_batch_size: 10_000
+    grad_batch_size: 10_000
   net:
     in_channels: 1
     img_size: 66
@@ -18,19 +23,13 @@ callbacks:
     sampler:
       _target_: src.models.samplers.smc_sampler.SMCSampler
       num_samples: 10_000
-      proposal_batch_size: 10_000
-      kernel_type: ula
-      langevin_eps: 1e-7
+
+      init_sigma: 4.5e-3 # ≈ sqrt(2 * 1e-7 * 100) (conversion of old langevin_eps parameter)
       num_annealing_steps: 100
       ess_threshold: 0.5
-      systematic_resampling: false
-      warmup: 0.0
-      gradient_batch_size: 128
-      input_energy_filter_cutoff: 10.0
-      use_com_adjustment: true
-      logit_clip_filter: 0.002
-      do_energy_plots: true
-      log_freq: 1
+      resampling_method: multinomial
+      energy_cutoff_filter: 10.0
+      log_traj_freq: 1
 
 data:
   batch_size: 10_000

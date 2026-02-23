@@ -7,6 +7,12 @@ defaults:
   - override /trainer: gpu
 
 model:
+  source_energy_config:
+    _target_: src.utils.dataclasses.SourceEnergyConfig
+    sample_batch_size: 10_000
+    energy_batch_size: 10_000
+    grad_batch_size: 10_000
+    use_com_adjustment: true
   net:
     channels: 384
     img_size: 189
@@ -18,8 +24,6 @@ callbacks:
     sampler:
       _target_: src.models.samplers.snis_sampler.SNISSampler
       num_samples: 10_000
-      proposal_batch_size: 10_000
-      use_com_adjustment: true
 
 data:
   batch_size: 512
