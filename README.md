@@ -24,7 +24,7 @@ Welcome to the official codebase for the following works:
 ```
 conda create -n transferable-samplers python=3.11
 conda activate transferable-samplers
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 ```
 
 You must also populate `.env.example` and save as `.env`

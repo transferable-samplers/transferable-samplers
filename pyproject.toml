@@ -1,0 +1,99 @@
+[project]
+name = "transferable-samplers"
+version = "0.0.0"
+requires-python = ">= 3.11"
+
+# ----------------------------------------
+# Ruff configuration (migrated from ruff.toml)
+# ----------------------------------------
+[tool.ruff]
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+    "notebooks/",
+]
+
+line-length = 120
+indent-width = 4
+
+# Assume Python 3.11+
+target-version = "py311"
+
+# ----------------------------------------
+# Linting configuration
+# ----------------------------------------
+[tool.ruff.lint]
+select = [
+    # Core flake8
+    "E",      # pycodestyle errors
+    "F",      # pyflakes (logical issues)
+    "W",      # pycodestyle warnings
+
+    # Additional useful plugins
+    "B",      # flake8-bugbear (common bugs, recommended)
+    "I",      # isort (import sorting)
+    "UP",     # pyupgrade (modern Python syntax)
+    "N",      # pep8-naming
+    "S",      # bandit (security rules)
+    "D",      # pydocstyle (docstring linting)
+
+    # Ruff-native rules
+    "COM",    # flake8-commas
+    "ISC",    # implicit string concatenation
+    "PT",     # pytest style
+    "PTH",    # pathlib usage recommendations
+    "T10",    # debugger detection (replaces debug-statements hook)
+]
+
+ignore = [
+    "E203",  # whitespace before ':', black compatibility
+    "E731",  # assigning a lambda to a variable (stylistic preference)
+    "S101",  # use of assert (allowed in your code)
+]
+
+# Allow fix for all enabled rules (when `--fix` is passed).
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables if underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+))$"
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]
+"scripts/**" = ["D", "S"]
+
+# ----------------------------------------
+# Formatting (Black-compatible)
+# ----------------------------------------
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
