@@ -22,7 +22,7 @@ callbacks:
       _target_: src.models.samplers.snis_sampler.SNISSampler
       num_samples: 1_000_000
 
-      logit_quantile_filter: 0.002
+      logw_quantile_filter: 0.002
 
 data:
   batch_size: 128

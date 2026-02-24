@@ -23,7 +23,7 @@ model:
     _target_: src.models.samplers.snis_sampler.SNISSampler
     num_samples: 200_000
 
-    logit_quantile_filter: 0.002
+    logw_quantile_filter: 0.002
 
   optimizer:
     lr: 5.e-6
@@ -35,7 +35,7 @@ callbacks:
       _target_: src.models.samplers.snis_sampler.SNISSampler
       num_samples: 10_000
 
-      logit_quantile_filter: 0.002
+      logw_quantile_filter: 0.002
 
 data:
   batch_size: 32

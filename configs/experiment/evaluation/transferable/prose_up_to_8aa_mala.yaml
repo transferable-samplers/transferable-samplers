@@ -22,7 +22,7 @@ callbacks:
       num_samples: 10_000
 
       use_metropolis: true
-      init_sigma: 3e-2 # ≈ sqrt(2 * 1e-5 * 50) (conversion of old langevin_eps parameter)
+      init_eps: 5e-4
       num_annealing_steps: 50
       ess_threshold: 1.0
       adaptive_step_size: true

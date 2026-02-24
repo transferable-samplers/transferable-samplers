@@ -48,6 +48,10 @@ def cfg_test_self_improve_mwe(request: pytest.FixtureRequest, trainer_name_param
         cfg.trainer.max_epochs = 1
         cfg.trainer.limit_train_batches = 1
         cfg.model.sampler.num_samples = 16
+        if trainer_name_param == "cpu":
+            cfg.callbacks.sampling_evaluation.run_diagnostics_kwargs = {
+                "num_samples_invert": 8, "num_samples_logdet": 2,
+            }
         cfg.data.num_workers = 0  # avoid multiprocessing issues in tests
         cfg.data.batch_size = 4
         cfg.data.test_sequences = "AA"

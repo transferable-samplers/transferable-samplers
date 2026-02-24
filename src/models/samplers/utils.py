@@ -4,20 +4,20 @@ import torch
 
 
 def filter_by_energy_cutoff(
-    samples: torch.Tensor, log_q: torch.Tensor, target_E: torch.Tensor, cutoff: float
+    samples: torch.Tensor, E_source: torch.Tensor, E_target: torch.Tensor, cutoff: float
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Drop samples whose target energy exceeds cutoff."""
-    keep = target_E < cutoff
-    return samples[keep], log_q[keep], target_E[keep]
+    keep = E_target < cutoff
+    return samples[keep], E_source[keep], E_target[keep]
 
 
-def filter_by_logit_quantile(
-    samples: torch.Tensor, log_q: torch.Tensor, target_E: torch.Tensor, clip_fraction: float
+def filter_by_logw_quantile(
+    samples: torch.Tensor, E_source: torch.Tensor, E_target: torch.Tensor, clip_fraction: float
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Drop the top clip_fraction of samples by importance weight logit."""
-    logits = -target_E - log_q
-    keep = logits <= torch.quantile(logits, 1 - clip_fraction)
-    return samples[keep], log_q[keep], target_E[keep]
+    logw = -E_target - E_source
+    keep = logw <= torch.quantile(logw, 1 - clip_fraction)
+    return samples[keep], E_source[keep], E_target[keep]
 
 
 def resampling_idx(logw: torch.Tensor, method: str) -> torch.Tensor:

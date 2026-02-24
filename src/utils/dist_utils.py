@@ -40,13 +40,15 @@ def broadcast_tensor(tensor: torch.Tensor, src: int = 0) -> torch.Tensor:
     dist.broadcast(tensor, src=src)
     return tensor
 
+
 def shard_tensor(x):
-    """Shard x across DDP ranks, trimming to be evenly divisible first.
+    """Shard x across DDP ranks, asserts number of particles exactly divisible by world size.
 
     Works for any object supporting len() and slicing (tensors, SMCParticles, etc.).
     """
     world_size = get_world_size()
+    rank = get_rank()
+    assert len(x) % world_size == 0, f"Length of x ({len(x)}) must be divisible by world size ({world_size}) for sharding."
     n = (len(x) // world_size) * world_size
     chunk_size = n // world_size
-    rank = get_rank()
     return x[rank * chunk_size : (rank + 1) * chunk_size]

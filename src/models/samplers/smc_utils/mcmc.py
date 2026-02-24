@@ -1,4 +1,3 @@
-"""MCMC kernels for SMC annealing: Langevin proposal and Metropolis-Hastings acceptance."""
 
 import torch
 
@@ -7,36 +6,15 @@ from src.utils.dataclasses import SourceEnergy, TargetEnergy
 
 
 def linear_interpolation(source: torch.Tensor, target: torch.Tensor, t) -> torch.Tensor:
-    """Linear interpolation: (1-t)*source + t*target."""
+    """(1-t)*source + t*target."""
     return (1 - t) * source + t * target
 
 
-def langevin_proposal(particles: SMCParticles, source: SourceEnergy, target: TargetEnergy, t, dt, sigma):
-    """Langevin proposal step with SMC weight update.
-
-    Uses the standard Langevin SDE:
-        dx = -(sigma^2/2) * dt * grad_E + sigma * sqrt(dt) * dW
-
-    For linear interpolation E(t,x) = (1-t)*E_source + t*E_target:
-      - Spatial gradient: (1-t)*grad_source + t*grad_target
-      - Weight update: dE/dt = E_target - E_source (exact, no autograd needed)
-
-    Computes energies and gradients at the proposed x so the returned
-    SMCParticles is ready for a Metropolis-Hastings step.
-
-    Args:
-        particles: SMCParticles with positions, weights, energies, and gradients.
-        source: SourceEnergy with energy_and_grad callable.
-        target: TargetEnergy with energy_and_grad callable.
-        t: current SMC time (scalar tensor)
-        dt: time step size (scalar tensor)
-        sigma: Langevin diffusion coefficient (scalar)
-
-    Returns:
-        SMCParticles with proposed x, updated logw, and energies/grads at proposed x.
-    """
-    energy_grad_x = linear_interpolation(particles.E_source_grad, particles.E_target_grad, t)
-    dx = -(sigma**2 / 2) * dt * energy_grad_x + sigma * torch.sqrt(dt) * torch.randn_like(particles.x)
+def langevin_proposal(particles: SMCParticles, source: SourceEnergy, target: TargetEnergy, t, dt, eps):
+    """Langevin proposal + SMC weight update. Returns particles with energies/grads at x'."""
+    h = eps * dt
+    E_interp_grad = linear_interpolation(particles.E_source_grad, particles.E_target_grad, t)
+    dx = -h * E_interp_grad + torch.sqrt(2 * h) * torch.randn_like(particles.x)
 
     delta = t - torch.max(torch.zeros_like(t), t - dt)
     dlogw = -(particles.E_target - particles.E_source) * delta
@@ -57,40 +35,33 @@ def langevin_proposal(particles: SMCParticles, source: SourceEnergy, target: Tar
     )
 
 
-def metropolis_accept(current: SMCParticles, proposal: SMCParticles, t, dt, sigma):
-    """Metropolis-Hastings acceptance step for Langevin proposals.
+def metropolis_accept(current: SMCParticles, proposal: SMCParticles, t, dt, eps):
+    """MH accept/reject for a Langevin proposal, correcting for kernel asymmetry q(x'|x) vs q(x|x').
 
-    Computes the interpolated energies and gradients at both x and x_proposal,
-    then accepts/rejects based on the MH ratio accounting for the asymmetry
-    of the Langevin proposal kernel q(x'|x) vs q(x|x').
+    The log-acceptance ratio is:
 
-    Args:
-        current: SMCParticles at current x (with energies/grads).
-        proposal: SMCParticles at proposed x (with energies/grads).
-        t: current SMC time (scalar tensor)
-        sigma: Langevin diffusion coefficient (scalar)
-        dt: time step size (scalar tensor)
+        log α = -E_t(x') + E_t(x)
+              + log q(x|x') - log q(x'|x)
 
-    Returns:
-        (accepted: SMCParticles, acceptance_rate)
+    where q is the Langevin kernel N(x - h ∇E_t(x), 2hI) with h = eps * dt.
+    Weight update (logw) is set regardless of acceptance (it tracks the annealing schedule, not x).
     """
-    energy_grad_x = linear_interpolation(current.E_source_grad, current.E_target_grad, t)
-    energy_grad_x_proposal = linear_interpolation(proposal.E_source_grad, proposal.E_target_grad, t)
-    E = linear_interpolation(current.E_source, current.E_target, t)
-    E_proposal = linear_interpolation(proposal.E_source, proposal.E_target, t)
+    E_interp = linear_interpolation(current.E_source, current.E_target, t)
+    E_interp_proposal = linear_interpolation(proposal.E_source, proposal.E_target, t)
+    E_interp_grad = linear_interpolation(current.E_source_grad, current.E_target_grad, t)
+    E_interp_grad_proposal = linear_interpolation(proposal.E_source_grad, proposal.E_target_grad, t)
 
-    # TODO discuss the parameter h versus the paper.
-    h = (sigma**2 / 2) * dt
+    h = eps * dt
 
-    logp = -E_proposal + E
+    logp = -E_interp_proposal + E_interp
     logp += (
         -0.5
-        * torch.sum(((current.x - proposal.x + h * energy_grad_x_proposal) ** 2).reshape(current.x.shape[0], -1), dim=-1)
+        * torch.sum(((current.x - proposal.x + h * E_interp_grad_proposal) ** 2).reshape(current.x.shape[0], -1), dim=-1)
         / (2 * h)
     )
     logp -= (
         -0.5
-        * torch.sum(((proposal.x - current.x + h * energy_grad_x) ** 2).reshape(proposal.x.shape[0], -1), dim=-1)
+        * torch.sum(((proposal.x - current.x + h * E_interp_grad) ** 2).reshape(proposal.x.shape[0], -1), dim=-1)
         / (2 * h)
     )
 
@@ -109,26 +80,13 @@ def mcmc_kernel(
     particles: SMCParticles,
     source: SourceEnergy,
     target: TargetEnergy,
-    t, dt, sigma,
+    t, dt, eps,
     use_metropolis: bool = False,
 ):
-    """Run one MCMC kernel step: Langevin proposal + optional MH acceptance.
-
-    Args:
-        particles: SMCParticles with current state (energies/grads already computed).
-        source: SourceEnergy with energy_and_grad callable.
-        target: TargetEnergy with energy_and_grad callable.
-        t: current SMC time (scalar tensor)
-        dt: time step size (scalar tensor)
-        sigma: Langevin diffusion coefficient (scalar)
-        use_metropolis: whether to apply Metropolis-Hastings correction.
-
-    Returns:
-        (result: SMCParticles, acceptance_rate)
-    """
-    proposed = langevin_proposal(particles, source, target, t, dt, sigma)
+    """One MCMC step: Langevin proposal, optionally followed by MH correction."""
+    proposed = langevin_proposal(particles, source, target, t, dt, eps)
 
     if use_metropolis:
-        return metropolis_accept(particles, proposed, t, dt, sigma)
+        return metropolis_accept(particles, proposed, t, dt, eps)
 
     return proposed, torch.ones(1).mean()

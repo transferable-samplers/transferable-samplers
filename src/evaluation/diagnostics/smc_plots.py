@@ -27,7 +27,7 @@ def plot_smc_diagnostics(
 
     t_list = diagnostics["t"]
     ess_list = diagnostics["ess"]
-    sigma_list = diagnostics["sigma"]
+    sigma_list = diagnostics["eps"]
     acceptance_rate_list = diagnostics["acceptance_rate"]
 
     # Lineage survival from trajectory snapshots

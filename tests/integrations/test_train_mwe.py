@@ -58,6 +58,10 @@ def cfg_test_train_mwe(request: pytest.FixtureRequest, trainer_name_param: str, 
         cfg.trainer.limit_train_batches = 1
         cfg.data.num_workers = 0  # avoid multiprocessing issues in tests
         cfg.data.batch_size = 4
+        if trainer_name_param == "cpu":
+            cfg.callbacks.sampling_evaluation.run_diagnostics_kwargs = {
+                "num_samples_invert": 8, "num_samples_logdet": 2,
+            }
         cfg.tags = ["pytest", f"test_train_mwe_{trainer_name_param}"]
 
     yield cfg

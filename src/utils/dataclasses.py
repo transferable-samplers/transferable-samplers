@@ -87,7 +87,7 @@ class SourceEnergy:
         log_q = torch.cat(all_log_q, dim=0)
 
         if self.use_com_adjustment:
-            log_q = log_q + self._com_energy_adjustment(samples)
+            log_q = log_q + self.com_energy_adjustment(samples)
 
         return samples, log_q
 
@@ -100,7 +100,7 @@ class SourceEnergy:
             x_batch = x[i : i + bs]
             out_batch = self.energy_fn(x_batch)
             if self.use_com_adjustment:
-                out_batch = out_batch + self._com_energy_adjustment(x_batch)
+                out_batch = out_batch + self.com_energy_adjustment(x_batch)
             out[i : i + bs] = out_batch
         return out
 
@@ -116,7 +116,7 @@ class SourceEnergy:
             with torch.enable_grad():
                 e_batch = self.energy_fn(x_batch)
                 if self.use_com_adjustment:
-                    e_batch = e_batch + self._com_energy_adjustment(x_batch)
+                    e_batch = e_batch + self.com_energy_adjustment(x_batch)
                 g_batch = torch.autograd.grad(e_batch.sum(), x_batch)[0]
             e_out[i : i + bs] = e_batch.detach()
             g_out[i : i + bs] = g_batch.detach()
@@ -143,12 +143,12 @@ class EvalContext:
 class SamplesData:
     samples: torch.Tensor
     energy: torch.Tensor
-    logits: torch.Tensor = None
+    logw: torch.Tensor = None
 
     def __post_init__(self):
         assert len(self.samples) == len(self.energy)
-        if self.logits is not None:
-            assert len(self.samples) == len(self.logits)
+        if self.logw is not None:
+            assert len(self.samples) == len(self.logw)
 
     def __len__(self):
         return len(self.samples)
@@ -157,5 +157,5 @@ class SamplesData:
         return SamplesData(
             self.samples[index],
             self.energy[index],
-            self.logits[index] if self.logits is not None else None,
+            self.logw[index] if self.logw is not None else None,
         )

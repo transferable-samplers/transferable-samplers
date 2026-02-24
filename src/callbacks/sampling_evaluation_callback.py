@@ -26,10 +26,16 @@ class SamplingEvaluationCallback(Callback):
     EMA weight swapping is handled by the EMAWeightAveraging callback.
     """
 
-    def __init__(self, evaluator: Evaluator, sampler: Optional[BaseSampler] = None):
+    def __init__(
+        self,
+        evaluator: Evaluator,
+        sampler: Optional[BaseSampler] = None,
+        run_diagnostics_kwargs: Optional[dict] = None,
+    ):
         super().__init__()
         self.evaluator = evaluator
         self.sampler = sampler
+        self.run_diagnostics_kwargs = run_diagnostics_kwargs or {}
 
     def on_validation_epoch_end(self, trainer, pl_module):
         self.evaluate(trainer, pl_module, "val")
@@ -81,7 +87,11 @@ class SamplingEvaluationCallback(Callback):
                 )
 
                 if hasattr(pl_module, "run_model_diagnostics"):
-                    seq_metrics.update(pl_module.run_model_diagnostics(prefix=seq_prefix))
+                    seq_metrics.update(pl_module.run_model_diagnostics(
+                        prefix=seq_prefix,
+                        system_cond=eval_ctx.system_cond,
+                        **self.run_diagnostics_kwargs,
+                    ))
 
                 pl_module.log_dict(seq_metrics)
                 all_metrics.update(seq_metrics)

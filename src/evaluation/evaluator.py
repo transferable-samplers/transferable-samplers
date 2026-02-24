@@ -75,7 +75,7 @@ class Evaluator:
             name: SamplesData(
                 unnormalize(data.samples, normalization_std),
                 data.energy,
-                logits=data.logits,
+                logw=data.logw,
             )
             for name, data in samples_data_dict.items()
             if data is not None
@@ -175,8 +175,8 @@ class Evaluator:
         metrics[f"{prefix}/num_eval_samples"] = min(num_eval_samples, len(pred_data))
 
         # Compute effective sample size
-        if pred_data.logits is not None:
-            ess = normalized_ess(pred_data.logits)
+        if pred_data.logw is not None:
+            ess = normalized_ess(pred_data.logw)
             metrics[f"{prefix}/effective_sample_size"] = ess
 
         metrics[f"{prefix}/mean_energy"] = pred_data.energy.mean().cpu()
@@ -199,7 +199,7 @@ class Evaluator:
 
     def _fix_chirality(
         self,
-        proposal_data: SamplesData,
+        pred_data: SamplesData,
         true_data: SamplesData,
         topology,
         prefix: str,
@@ -211,7 +211,7 @@ class Evaluator:
         If drop_unfixable_symmetry is True, removes samples that can't be fixed.
 
         Args:
-            proposal_data: Generated samples (unnormalized).
+            pred_data: Predicted samples (unnormalized).
             true_data: Reference samples (unnormalized).
             topology: mdtraj topology.
             prefix: Metric key prefix.
@@ -221,7 +221,7 @@ class Evaluator:
         """
         metrics = {}
 
-        samples = proposal_data.samples.clone()
+        samples = pred_data.samples.clone()
 
         first_symmetry_change = get_symmetry_change(
             true_data.samples,
@@ -248,15 +248,15 @@ class Evaluator:
 
         if self.fix_symmetry:
             samples[first_symmetry_change] *= -1
-            energy = proposal_data.energy
-            logits = proposal_data.logits
+            energy = pred_data.energy
+            logw = pred_data.logw
 
             if self.drop_unfixable_symmetry:
                 keep_mask = ~second_symmetry_change
                 samples = samples[keep_mask]
                 energy = energy[keep_mask]
-                logits = logits[keep_mask] if logits is not None else None
+                logw = logw[keep_mask] if logw is not None else None
 
-            proposal_data = SamplesData(samples, energy, logits=logits)
+            pred_data = SamplesData(samples, energy, logw=logw)
 
-        return proposal_data, metrics
+        return pred_data, metrics

@@ -83,7 +83,7 @@ def merge_particles(mask: torch.Tensor, true_particles: SMCParticles, false_part
     )
 
 
-def all_gather_cat_particles(particles: SMCParticles) -> SMCParticles:
+def all_gather_particles(particles: SMCParticles) -> SMCParticles:
     """All-gather every field of SMCParticles across DDP ranks."""
     return SMCParticles(
         x=all_gather_cat(particles.x),

@@ -130,23 +130,52 @@ class NormalizingFlowLitModule(BaseLightningModule):
 
         return x_pred, log_q
 
-    def run_model_diagnostics(self, prefix: str) -> dict:
+    def run_model_diagnostics(
+        self,
+        prefix: str,
+        system_cond: Optional["SystemCond"] = None,
+        num_samples_invert: int = 256,
+        num_samples_logdet: int = 16,
+    ) -> dict:
         """Sample from prior and return invertibility and logdet diagnostics.
 
         Invertibility: checks that reverse(z) followed by forward gives back z.
         Logdet: checks the network's logdet against the true Jacobian logdet (small batch).
+
+        Args:
+            prefix: Metric key prefix.
+            system_cond: Optional conditioning (permutations, encodings) for transferable models.
+            num_samples_invert: Number of samples for invertibility check.
+            num_samples_logdet: Number of samples for logdet check.
         """
+        permutations = system_cond.permutations if system_cond else None
+        encodings = system_cond.encodings if system_cond else None
 
-        num_samples_invert = 256
-        num_samples_logdet = 16
+        if encodings is None:
+            num_atoms = self.trainer.datamodule.hparams.num_atoms
+        else:
+            num_atoms = encodings["atom_type"].size(0)
 
-        num_atoms = self.trainer.datamodule.hparams.num_atoms
         data_dim = num_atoms * self.trainer.datamodule.hparams.num_dimensions
         prior_samples = self.prior.sample(num_samples_invert, num_atoms, device=self.device)
 
+        _permutations = None
+        if permutations is not None:
+            _permutations = {
+                subkey: tensor.unsqueeze(0).repeat(num_samples_invert, 1).to(self.device)
+                for subkey, tensor in permutations.items()
+            }
+
+        _encodings = None
+        if encodings is not None:
+            _encodings = {
+                key: tensor.unsqueeze(0).repeat(num_samples_invert, 1).to(self.device)
+                for key, tensor in encodings.items()
+            }
+
         with torch.no_grad():
-            x_pred = self.net.reverse(prior_samples)
-            x_recon, fwd_logdets = self.net(x_pred)
+            x_pred = self.net.reverse(prior_samples, _permutations, encodings=_encodings)
+            x_recon, fwd_logdets = self.net(x_pred, _permutations, encodings=_encodings)
             fwd_logdets = fwd_logdets * data_dim  # rescale from mean to sum
 
         # ── Invertibility metrics ─────────────────────────────────────────
@@ -165,7 +194,16 @@ class NormalizingFlowLitModule(BaseLightningModule):
 
         # ── Logdet check (small batch — Jacobian is expensive per sample) ───
         logdet_batch = x_pred[:num_samples_logdet].detach()
-        fwd_func = lambda x: self.net.forward(x)[0]
+
+        # Build single-sample permutations/encodings for Jacobian computation
+        _perm_single = None
+        if _permutations is not None:
+            _perm_single = {k: v[:1] for k, v in _permutations.items()}
+        _enc_single = None
+        if _encodings is not None:
+            _enc_single = {k: v[:1] for k, v in _encodings.items()}
+
+        fwd_func = lambda x: self.net.forward(x, _perm_single, encodings=_enc_single)[0]
         logdet_diffs = []
         for i in range(len(logdet_batch)):
             x = logdet_batch[i].unsqueeze(0).float().requires_grad_(True)

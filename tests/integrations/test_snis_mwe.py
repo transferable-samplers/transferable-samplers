@@ -74,13 +74,16 @@ def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, t
         cfg.paths.log_dir = str(tmp_path)
         cfg.paths.work_dir = os.getcwd()
         cfg.callbacks.sampling_evaluation.sampler.num_samples = 25
+        if trainer_name_param == "cpu":
+            cfg.callbacks.sampling_evaluation.run_diagnostics_kwargs = {
+                "num_samples_invert": 8, "num_samples_logdet": 2,
+            }
         if "ula" in experiment_name or "mala" in experiment_name:
             # Replace SMC sampler with SNIS for this test — we only test weight loading here.
             # TODO probably indicative that the tests should be refactored.
             cfg.callbacks.sampling_evaluation.sampler = OmegaConf.create({
                 "_target_": "src.models.samplers.snis_sampler.SNISSampler",
                 "num_samples": 25,
-                "proposal_batch_size": 25,
             })
         if "transferable" in experiment_name:
             cfg.data.test_sequences = "AA"
