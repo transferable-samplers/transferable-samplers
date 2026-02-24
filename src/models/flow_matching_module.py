@@ -23,7 +23,7 @@ class FlowMatchingModule(BaseLightningModule):
         scheduler: torch.optim.lr_scheduler,
         prior,
         sigma: float = 0.0,
-        logp_tol_scale: float = 1.0,
+        dlogp_tol_scale: float = 1.0,
         atol: float = 1e-5,
         rtol: float = 1e-5,
         mean_free_prior: bool = True,
@@ -47,7 +47,7 @@ class FlowMatchingModule(BaseLightningModule):
             train_from_buffer=train_from_buffer,
         )
         self.sigma = sigma
-        self.logp_tol_scale = logp_tol_scale
+        self.dlogp_tol_scale = dlogp_tol_scale
         self.atol = atol
         self.rtol = rtol
         self.nfe = 0
@@ -113,7 +113,6 @@ class FlowMatchingModule(BaseLightningModule):
         self.log_dict(batch_value, prog_bar=True)
         return loss
 
-    @torch.no_grad()
     def _integrate(self, net: torch.nn.Module, x: torch.Tensor, encodings=None, reverse=False, compute_dlogp=True) -> torch.Tensor:
         batch_size = x.shape[0]
         num_atoms = x.shape[1]
@@ -128,7 +127,7 @@ class FlowMatchingModule(BaseLightningModule):
         wrapped_net = TorchDynWrapper(
             eval_fn,
             compute_dlogp=compute_dlogp,
-            logp_tol_scale=self.logp_tol_scale,
+            dlogp_tol_scale=self.dlogp_tol_scale,
         )
 
         node = NeuralODE(
@@ -146,7 +145,7 @@ class FlowMatchingModule(BaseLightningModule):
         self.num_integrations += 1
         wrapped_net.nfe = 0
         if compute_dlogp:
-            dlogp_out = x[..., -1] * self.logp_tol_scale
+            dlogp_out = x[..., -1] * self.dlogp_tol_scale
             x = x[..., :-1]
         else:
             dlogp_out = dlogp_init.squeeze(-1)
@@ -157,6 +156,11 @@ class FlowMatchingModule(BaseLightningModule):
     def proposal_energy(
         self, net: torch.nn.Module, x: torch.Tensor, system_cond: Optional[SystemCond] = None,
     ) -> torch.Tensor:
+        if torch.is_grad_enabled() and x.requires_grad:
+            logger.warning(
+                "We have not tested differentiation of FlowMatchingModule.proposal_energy()."
+                "Please test well if using this in a differentiable context!"
+            )
         encodings = system_cond.encodings if system_cond else None
         z_pred, dlogp_rev = self._integrate(net, x, encodings=encodings, reverse=True)
         # dlogp_rev is log|det(dx/dz)| = -log|det(dz/dx)|, so logq = logp_z - dlogp_rev
@@ -183,8 +187,7 @@ class FlowMatchingModule(BaseLightningModule):
                 for key, tensor in encodings.items()
             }
 
-        with torch.no_grad():
-            x_pred, dlogp = self._integrate(net, z, encodings=encodings, reverse=False)
+        x_pred, dlogp = self._integrate(net, z, encodings=encodings, reverse=False)
 
         logq = logp_z + dlogp
 

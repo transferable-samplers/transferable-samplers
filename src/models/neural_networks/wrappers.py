@@ -8,12 +8,12 @@ class TorchDynWrapper(torch.nn.Module):
     and computes the exact log-density change via Jacobian trace.
     """
 
-    def __init__(self, model, compute_dlogp=True, logp_tol_scale=1.0):
+    def __init__(self, model, compute_dlogp=True, dlogp_tol_scale=1.0):
         super().__init__()
         self.model = model
         self.nfe = 0
         self.compute_dlogp = compute_dlogp
-        self.logp_tol_scale = logp_tol_scale
+        self.dlogp_tol_scale = dlogp_tol_scale
 
     def _divergence(self, t, x):
         def vecfield(y):
@@ -36,4 +36,4 @@ class TorchDynWrapper(torch.nn.Module):
         )
 
         self.nfe += 1
-        return torch.cat([dx, dlogp[:, None] / self.logp_tol_scale], dim=-1).detach()
+        return torch.cat([dx, dlogp[:, None] / self.dlogp_tol_scale], dim=-1).detach()

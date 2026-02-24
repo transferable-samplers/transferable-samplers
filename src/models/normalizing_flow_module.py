@@ -158,8 +158,7 @@ class NormalizingFlowModule(BaseLightningModule):
                 for key, tensor in encodings.items()
             }
 
-        with torch.no_grad():
-            x_pred, dlogp_rev = net.reverse(z, _permutations, encodings=_encodings)
+        x_pred, dlogp_rev = net.reverse(z, _permutations, encodings=_encodings)
 
         # dlogp_rev is log|det(dx/dz)| = -log|det(dz/dx)|, so logq = logp_z - dlogp_rev
         logq = logp_z - dlogp_rev
@@ -209,7 +208,7 @@ class NormalizingFlowModule(BaseLightningModule):
                 for key, tensor in encodings.items()
             }
 
-        with torch.no_grad():
+        with torch.no_grad():  # diagnostics only, no gradient needed
             x_pred, _ = self.net.reverse(z, _permutations, encodings=_encodings)
             z_recon, dlogp = self.net(x_pred, _permutations, encodings=_encodings)
 

@@ -212,7 +212,7 @@ class MetaBlock(torch.nn.Module):
 
         pair_emb = None
         if self.use_attn_pair_bias:
-            with torch.no_grad():  # don't want to backprop through this
+            with torch.no_grad():  # distance is a fixed geometric input; pair_proj outside gets gradients
                 # pairwise distance matrix
                 dist_matrix = torch.cdist(x_in, x_in)[..., None]
             pair_emb = self.pair_proj(dist_matrix)
@@ -283,7 +283,7 @@ class MetaBlock(torch.nn.Module):
         pair_emb = None
         if self.use_attn_pair_bias:
             # pairwise distance row
-            with torch.no_grad():  # don't want to backprop through this
+            with torch.no_grad():  # distance is a fixed geometric input; pair_proj outside gets gradients
                 dist_matrix = torch.cdist(x_in[:, : i + 1], x_in[:, : i + 1])[..., None]
                 dist_row = dist_matrix[:, i : i + 1]
             pair_emb = self.pair_proj(dist_row)

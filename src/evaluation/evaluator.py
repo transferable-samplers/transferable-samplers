@@ -38,7 +38,7 @@ class PeptideEnsembleEvaluator:
         self.num_eval_samples = num_eval_samples
         self.do_plots = do_plots
 
-    @torch.no_grad()
+    @torch.no_grad()  # eval-only: metric computation, no training
     def evaluate(
         self,
         samples_data_dict: dict[str, SamplesData],

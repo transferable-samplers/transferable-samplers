@@ -50,10 +50,9 @@ class PopulateBufferCallback(Callback):
         eval_ctx = datamodule.prepare_eval(sequence, stage="test")
         source_energy = pl_module.build_source_energy(eval_ctx.system_cond, use_ema_if_available=True)
 
-        with torch.no_grad():
-            samples_dict, diagnostics = self.sampler.sample(
-                source_energy, eval_ctx.target_energy
-            )
+        samples_dict, _ = self.sampler.sample(
+            source_energy, eval_ctx.target_energy
+        )
 
         # Evaluate samples if evaluator is configured
         if self.evaluator is not None and trainer.is_global_zero:

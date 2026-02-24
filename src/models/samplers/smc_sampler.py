@@ -76,7 +76,7 @@ class SMCSampler(BaseSampler):
         self.adaptive_step_size = adaptive_step_size
         self.log_traj_freq = log_traj_freq
 
-    @torch.no_grad()
+    @torch.no_grad()  # sampling path, no training gradients needed
     def sample(
         self,
         source_energy: SourceEnergy,

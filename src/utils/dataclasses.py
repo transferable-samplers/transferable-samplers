@@ -102,7 +102,6 @@ class SourceEnergy:
 
         return samples, E_source
 
-    @torch.no_grad()
     def energy(self, x: torch.Tensor, batch_size: Optional[int] = None) -> torch.Tensor:
         """Compute energy in batches.
                 If use_com_adjustment is True, applies a CoM energy adjustment
