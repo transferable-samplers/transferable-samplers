@@ -3,9 +3,9 @@ from lightning import Callback
 from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
 
-from src.utils import pylogger
+from src.utils.pylogger import RankedLogger
 
-logger = pylogger.RankedLogger(__name__, rank_zero_only=True)
+logger = RankedLogger(__name__, rank_zero_only=False)
 
 
 def instantiate_callbacks(callbacks_cfg: DictConfig) -> list[Callback]:

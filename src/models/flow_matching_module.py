@@ -7,10 +7,10 @@ from torchdyn.core import NeuralODE
 
 from src.models.base_lightning_module import BaseLightningModule
 from src.models.neural_networks.wrappers import TorchdynWrapper, torch_wrapper
-from src.utils import pylogger
 from src.utils.dataclasses import SystemCond
+from src.utils.pylogger import RankedLogger
 
-logger = pylogger.RankedLogger(__name__, rank_zero_only=False)
+logger = RankedLogger(__name__, rank_zero_only=False)
 
 
 class FlowMatchLitModule(BaseLightningModule):

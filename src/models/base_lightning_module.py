@@ -11,10 +11,10 @@ from torchmetrics import MeanMetric
 
 from src.callbacks.ema_weight_averaging import EMAWeightAveraging
 from src.models.buffer import Buffer
-from src.utils import pylogger
 from src.utils.dataclasses import SourceEnergy, SourceEnergyConfig, SystemCond
+from src.utils.pylogger import RankedLogger
 
-logger = pylogger.RankedLogger(__name__, rank_zero_only=False)
+logger = RankedLogger(__name__, rank_zero_only=False)
 
 
 class BaseLightningModule(LightningModule):

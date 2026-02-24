@@ -1,5 +1,3 @@
-import logging
-
 import torch
 
 from src.data.normalization import unnormalize
@@ -15,11 +13,11 @@ from src.evaluation.plots.plot_com_norms import plot_com_norms
 from src.evaluation.plots.plot_energies import plot_energies
 from src.evaluation.plots.plot_ramachandran import plot_ramachandran
 from src.evaluation.plots.plot_tica import plot_tica
-from src.utils import pylogger
 from src.utils.chirality import get_symmetry_change
 from src.utils.dataclasses import EvalContext, SamplesData
+from src.utils.pylogger import RankedLogger
 
-logger = pylogger.RankedLogger(__name__, rank_zero_only=False)
+logger = RankedLogger(__name__, rank_zero_only=False)
 
 
 class PeptideEnsembleEvaluator:
@@ -166,7 +164,7 @@ class PeptideEnsembleEvaluator:
         num_eval_samples = self.num_eval_samples
 
         if len(pred_data) < 0.9 * num_eval_samples:
-            logging.warning(r"Less than 90% of required eval samples supplied.")
+            logger.warning(r"Less than 90% of required eval samples supplied.")
 
         # Slice data to subset
         num_eval_samples = min(num_eval_samples, len(pred_data), len(true_data))
@@ -183,17 +181,17 @@ class PeptideEnsembleEvaluator:
         metrics[f"{prefix}/median_energy"] = pred_data.energy.median().cpu()
 
         metrics.update(energy_wasserstein(true_data.energy, pred_data.energy, prefix=prefix))
-        logging.info("Energy wasserstein computed")
+        logger.info("Energy wasserstein computed")
 
         metrics.update(torus_wasserstein(true_data.samples, pred_data.samples, topology, prefix=prefix))
-        logging.info("Torus wasserstein computed")
+        logger.info("Torus wasserstein computed")
 
         metrics.update(tica_wasserstein(true_data.samples, pred_data.samples, topology, tica_model, prefix=prefix))
-        logging.info("TICA wasserstein computed")
+        logger.info("TICA wasserstein computed")
 
         metrics.update(tica_kmeans_jsd(true_data.samples, pred_data.samples, topology, tica_model=tica_model, prefix=prefix))
         metrics.update(torus_kmeans_jsd(true_data.samples, pred_data.samples, topology, prefix=prefix))
-        logging.info("kMeans JSD computed")
+        logger.info("kMeans JSD computed")
 
         return metrics
 

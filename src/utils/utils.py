@@ -4,9 +4,10 @@ from typing import Any, Callable, Optional
 
 from omegaconf import DictConfig
 
-from src.utils import pylogger, rich_utils
+from src.utils import rich_utils
+from src.utils.pylogger import RankedLogger
 
-logger = pylogger.RankedLogger(__name__, rank_zero_only=True)
+logger = RankedLogger(__name__, rank_zero_only=False)
 
 
 def extras(cfg: DictConfig) -> None:

@@ -9,10 +9,10 @@ from lightning import Callback
 from src.evaluation.diagnostics.smc_plots import plot_smc_diagnostics
 from src.evaluation.evaluator import PeptideEnsembleEvaluator
 from src.models.samplers.base_sampler import BaseSampler
-from src.utils import pylogger
 from src.utils.logging_utils import compute_mean_metrics, make_log_image_fn
+from src.utils.pylogger import RankedLogger
 
-logger = pylogger.RankedLogger(__name__, rank_zero_only=False)
+logger = RankedLogger(__name__, rank_zero_only=False)
 
 
 class SamplingEvaluationCallback(Callback):

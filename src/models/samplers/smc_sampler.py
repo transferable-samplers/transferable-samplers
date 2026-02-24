@@ -36,10 +36,10 @@ from src.models.samplers.smc_utils.mcmc import mcmc_kernel
 from src.models.samplers.smc_utils.smc_particles import SMCParticles, all_gather_particles
 from src.models.samplers.utils import filter_by_energy_cutoff, filter_by_logw_quantile, resampling_idx
 from src.utils.dist_utils import all_gather_cat, broadcast_tensor, get_rank, get_world_size, shard_tensor
-from src.utils import pylogger
 from src.utils.dataclasses import SamplesData, SourceEnergy, TargetEnergy
+from src.utils.pylogger import RankedLogger
 
-logger = pylogger.RankedLogger(__name__, rank_zero_only=False)
+logger = RankedLogger(__name__, rank_zero_only=False)
 
 
 class SMCSampler(BaseSampler):
