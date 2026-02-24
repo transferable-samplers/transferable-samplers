@@ -72,7 +72,7 @@ class BaseLightningModule(LightningModule):
             system_cond: Optional conditioning (permutations, encodings).
 
         Returns:
-            (samples, log_q) — samples in normalized space, log_q is the log proposal density.
+            (samples, E_source) — samples in normalized space, E_source is the proposal energy (-logq).
         """
         ...
 

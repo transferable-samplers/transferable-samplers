@@ -50,7 +50,7 @@ def cfg_test_self_improve_mwe(request: pytest.FixtureRequest, trainer_name_param
         cfg.callbacks.populate_buffer.sampler.num_samples = 16
         if trainer_name_param == "cpu":
             cfg.callbacks.sampling_evaluation.run_diagnostics_kwargs = {
-                "num_samples_invert": 8, "num_samples_logdet": 2,
+                "num_samples_invert": 8, "num_samples_dlogp": 2,
             }
         cfg.data.num_workers = 0  # avoid multiprocessing issues in tests
         cfg.data.batch_size = 4

@@ -83,15 +83,15 @@ class TorchdynWrapper(torch.nn.Module):
             with torch.enable_grad():
                 x = x.requires_grad_(True)
                 dx = self.model(t, x)
-                dlog_p = -self.div_fn(dx, x)
+                dlogp = -self.div_fn(dx, x)
         else:
             dx = self.model(t, x)
-            dlog_p = -torch.vmap(self.div_fn, in_dims=(None, 0), randomness="different")(
+            dlogp = -torch.vmap(self.div_fn, in_dims=(None, 0), randomness="different")(
                 torch.tensor([t], device=x.device), x
             )
 
         self.nfe += 1
-        return torch.cat([dx, dlog_p[:, None] / self.logp_tol_scale], dim=-1).detach()
+        return torch.cat([dx, dlogp[:, None] / self.logp_tol_scale], dim=-1).detach()
 
 
 class torch_wrapper(torch.nn.Module):

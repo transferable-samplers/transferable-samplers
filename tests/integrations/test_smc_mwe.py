@@ -61,7 +61,7 @@ def cfg_test_smc_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tm
         cfg.callbacks.sampling_evaluation.sampler.num_annealing_steps = 10
         if trainer_name_param == "cpu":
             cfg.callbacks.sampling_evaluation.run_diagnostics_kwargs = {
-                "num_samples_invert": 8, "num_samples_logdet": 2,
+                "num_samples_invert": 8, "num_samples_dlogp": 2,
             }
         cfg.data.num_workers = 0  # avoid multiprocessing issues in tests
         if "transferable" in experiment_name:

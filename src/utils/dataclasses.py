@@ -51,7 +51,7 @@ class SourceEnergy:
     Created via BaseLightningModule.build_source_energy(). Handles batching
     internally for sample, energy, and energy_and_grad.
     """
-    sample_fn: Callable        # (num_samples) -> (samples, log_q)
+    sample_fn: Callable        # (num_samples) -> (samples, E_source)
     energy_fn: Callable        # (x) -> energy (batch,)
     sample_batch_size: int
     energy_batch_size: int
@@ -63,7 +63,7 @@ class SourceEnergy:
         """CoM energy adjustment with std = 1/sqrt(num_atoms).
 
         Introduced in Prop. 1 of https://arxiv.org/pdf/2502.18462.
-        x: (batch, num_atoms, 3) -> adjustment (batch,) to add to log_q / energy.
+        x: (batch, num_atoms, 3) -> energy adjustment (batch,) to add to E_source.
 
         NOTE: need to benchmark / implement the fixed version from https://arxiv.org/pdf/2602.03729
         """
@@ -83,29 +83,29 @@ class SourceEnergy:
     def sample(self, num_samples: int, **kwargs) -> Tuple[torch.Tensor, torch.Tensor]:
         """Generate num_samples proposals in batches.
 
-        If use_com_adjustment is True, applies a CoM energy adjustment to log_q
+        If use_com_adjustment is True, applies a CoM energy adjustment
         using std = 1/sqrt(num_atoms), as per Prop. 1 of https://arxiv.org/pdf/2502.18462.
         """
-        all_samples, all_log_q = [], []
+        all_samples, all_E = [], []
         remaining = num_samples
         while remaining > 0:
             n = min(self.sample_batch_size, remaining)
-            s, lq = self.sample_fn(n, **kwargs)
+            s, e = self.sample_fn(n, **kwargs)
             all_samples.append(s)
-            all_log_q.append(lq)
+            all_E.append(e)
             remaining -= n
         samples = torch.cat(all_samples, dim=0)
-        log_q = torch.cat(all_log_q, dim=0)
+        E_source = torch.cat(all_E, dim=0)
 
         if self.use_com_adjustment:
-            log_q = log_q + self.com_energy_adjustment(samples)
+            E_source = E_source + self.com_energy_adjustment(samples)
 
-        return samples, log_q
+        return samples, E_source
 
     @torch.no_grad()
     def energy(self, x: torch.Tensor, batch_size: Optional[int] = None) -> torch.Tensor:
         """Compute energy in batches.
-                If use_com_adjustment is True, applies a CoM energy adjustment to log_q
+                If use_com_adjustment is True, applies a CoM energy adjustment
         using std = 1/sqrt(num_atoms), as per Prop. 1 of https://arxiv.org/pdf/2502.18462.
         """
         bs = batch_size or self.energy_batch_size
@@ -123,7 +123,7 @@ class SourceEnergy:
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Compute energy and gradient in batches.
-        If use_com_adjustment is True, applies a CoM energy adjustment to log_q
+        If use_com_adjustment is True, applies a CoM energy adjustment
         using std = 1/sqrt(num_atoms), as per Prop. 1 of https://arxiv.org/pdf/2502.18462.
         """
         if torch.is_grad_enabled():

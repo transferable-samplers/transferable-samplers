@@ -29,20 +29,19 @@ class NormalizingFlowLitModule(BaseLightningModule):
         permutations = batch.get("permutations")
         mask = batch.get("mask")
 
-        x0, dlogp = self.net(x1, permutations=permutations, encodings=encodings, mask=mask)
-
-        loss = self.prior.energy(x0, mask=mask).mean() - dlogp.mean()
+        z_pred, dlogp = self.net(x1, permutations=permutations, encodings=encodings, mask=mask)
+        loss = self.prior.energy(z_pred, mask=mask).mean() - dlogp.mean()
 
         self.log("train/mle_loss", loss.item(), prog_bar=True, sync_dist=True)
 
         if self.hparams.use_distill_loss:
             with torch.inference_mode():
-                x0_teacher, dlogp_teacher = self.teacher(x1, permutations=permutations, encodings=encodings, mask=mask)
+                z_pred_teacher, dlogp_teacher = self.teacher(x1, permutations=permutations, encodings=encodings, mask=mask)
 
-            prior_log_p = -self.prior.energy(x0_teacher, mask=mask)
-            logq_teacher = prior_log_p + dlogp_teacher
+            logp_z_pred_teacher = -self.prior.energy(z_pred_teacher, mask=mask)
+            logq_teacher = logp_z_pred_teacher + dlogp_teacher
 
-            logq = -self.prior.energy(x0, mask=mask) + dlogp
+            logq = -self.prior.energy(z_pred, mask=mask) + dlogp
             distill_loss = (logq - logq_teacher).pow(2).mean()
             loss = loss + self.hparams.distill_weight * distill_loss
             self.log("finetune/distill_loss", distill_loss.item(), prog_bar=True, sync_dist=True)
@@ -79,15 +78,13 @@ class NormalizingFlowLitModule(BaseLightningModule):
         else:
             _permutations = None
 
-        # TODO need to figure out x_pred / recon names - maybe use z going forwards
-        x_pred, fwd_logdets = net(x, _permutations, encodings=_encodings)
+        z_pred, dlogp = net(x, _permutations, encodings=_encodings)
 
-        fwd_logdets = fwd_logdets.view(-1) * data_dim  # rescale from mean to sum
-        prior_energy = self.prior.energy(x_pred).view(-1) * data_dim  # rescale from mean to sum
+        dlogp = dlogp.view(-1) * data_dim  # rescale from mean to sum
+        logp_z_pred = - self.prior.energy(z_pred).view(-1) * data_dim  # rescale from mean to sum
 
-        energy = prior_energy - fwd_logdets
-
-        return energy
+        logq = logp_z_pred + dlogp
+        return -logq  # energy is negative log probability
 
     def sample_proposal(
         self, net: torch.nn.Module, num_samples: int,
@@ -103,10 +100,10 @@ class NormalizingFlowLitModule(BaseLightningModule):
 
         data_dim = num_atoms * self.trainer.datamodule.hparams.num_dimensions
 
-        prior_samples = self.prior.sample(num_samples, num_atoms, device=self.device)
+        z = self.prior.sample(num_samples, num_atoms, device=self.device)
 
         # need to rescale to the "sum" of the log p (the prior returns the position-wise mean)
-        prior_log_q = -self.prior.energy(prior_samples) * data_dim
+        logp_z = -self.prior.energy(z) * data_dim
 
         _permutations = None
         if permutations is not None:
@@ -123,31 +120,31 @@ class NormalizingFlowLitModule(BaseLightningModule):
             }
 
         with torch.no_grad():
-            x_pred = net.reverse(prior_samples, _permutations, encodings=_encodings)
-            x_recon, fwd_logdets = net(x_pred, _permutations, encodings=_encodings)
-            fwd_logdets = fwd_logdets * data_dim  # rescale from mean to sum
+            x_pred = net.reverse(z, _permutations, encodings=_encodings)
+            _, dlogp = net(x_pred, _permutations, encodings=_encodings)
+            dlogp = dlogp * data_dim  # rescale from mean to sum
 
-        log_q = prior_log_q.flatten() + fwd_logdets.flatten()
+        logq = logp_z.flatten() + dlogp.flatten()
 
-        return x_pred, log_q
+        return x_pred, -logq
 
     def run_model_diagnostics(
         self,
         prefix: str,
         system_cond: Optional["SystemCond"] = None,
         num_samples_invert: int = 256,
-        num_samples_logdet: int = 16,
+        num_samples_dlogp: int = 16,
     ) -> dict:
-        """Sample from prior and return invertibility and logdet diagnostics.
+        """Sample from prior and return invertibility and dlogp diagnostics.
 
         Invertibility: checks that reverse(z) followed by forward gives back z.
-        Logdet: checks the network's logdet against the true Jacobian logdet (small batch).
+        dlogp: checks the network's dlogp against the true Jacobian dlogp (small batch).
 
         Args:
             prefix: Metric key prefix.
             system_cond: Optional conditioning (permutations, encodings) for transferable models.
             num_samples_invert: Number of samples for invertibility check.
-            num_samples_logdet: Number of samples for logdet check.
+            num_samples_dlogp: Number of samples for dlogp check.
         """
         permutations = system_cond.permutations if system_cond else None
         encodings = system_cond.encodings if system_cond else None
@@ -158,7 +155,7 @@ class NormalizingFlowLitModule(BaseLightningModule):
             num_atoms = encodings["atom_type"].size(0)
 
         data_dim = num_atoms * self.trainer.datamodule.hparams.num_dimensions
-        prior_samples = self.prior.sample(num_samples_invert, num_atoms, device=self.device)
+        z = self.prior.sample(num_samples_invert, num_atoms, device=self.device)
 
         _permutations = None
         if permutations is not None:
@@ -175,14 +172,14 @@ class NormalizingFlowLitModule(BaseLightningModule):
             }
 
         with torch.no_grad():
-            x_pred = self.net.reverse(prior_samples, _permutations, encodings=_encodings)
-            x_recon, fwd_logdets = self.net(x_pred, _permutations, encodings=_encodings)
-            fwd_logdets = fwd_logdets * data_dim  # rescale from mean to sum
+            x_pred = self.net.reverse(z, _permutations, encodings=_encodings)
+            z_recon, dlogp = self.net(x_pred, _permutations, encodings=_encodings)
+            dlogp = dlogp * data_dim  # rescale from mean to sum
 
         # ── Invertibility metrics ─────────────────────────────────────────
-        diff = (prior_samples - x_recon).abs()
+        diff = (z - z_recon).abs()
         metrics = {
-            f"{prefix}/diagnostic/invert/mse": torch.mean((prior_samples - x_recon) ** 2).item(),
+            f"{prefix}/diagnostic/invert/mse": torch.mean((z - z_recon) ** 2).item(),
             f"{prefix}/diagnostic/invert/max_abs": torch.max(diff).item(),
             f"{prefix}/diagnostic/invert/mean_abs": torch.mean(diff).item(),
             f"{prefix}/diagnostic/invert/median_abs": torch.median(diff).item(),
@@ -193,8 +190,8 @@ class NormalizingFlowLitModule(BaseLightningModule):
                 (torch.sum(diff > cutoff, dim=1) > 0).sum().float().item()
             )
 
-        # ── Logdet check (small batch — Jacobian is expensive per sample) ───
-        logdet_batch = x_pred[:num_samples_logdet].detach()
+        # ── dlogp check (small batch — Jacobian is expensive per sample) ───
+        dlogp_batch = x_pred[:num_samples_dlogp].detach()
 
         # Build single-sample permutations/encodings for Jacobian computation
         _perm_single = None
@@ -205,14 +202,14 @@ class NormalizingFlowLitModule(BaseLightningModule):
             _enc_single = {k: v[:1] for k, v in _encodings.items()}
 
         fwd_func = lambda x: self.net.forward(x, _perm_single, encodings=_enc_single)[0]
-        logdet_diffs = []
-        for i in range(len(logdet_batch)):
-            x = logdet_batch[i].unsqueeze(0).float().requires_grad_(True)
+        dlogp_diffs = []
+        for i in range(len(dlogp_batch)):
+            x = dlogp_batch[i].unsqueeze(0).float().requires_grad_(True)
             with torch.enable_grad():
                 fwd_jac = torch.autograd.functional.jacobian(fwd_func, x, vectorize=True)
-                logdet_true = torch.logdet(fwd_jac.view(data_dim, data_dim))
-            logdet_diffs.append(abs(fwd_logdets[i] - logdet_true).item())
-        metrics[f"{prefix}/diagnostic/logdet/mean_diff"] = sum(logdet_diffs) / len(logdet_diffs)
-        metrics[f"{prefix}/diagnostic/logdet/max_diff"] = max(logdet_diffs)
+                dlogp_true = torch.logdet(fwd_jac.view(data_dim, data_dim))
+            dlogp_diffs.append(abs(dlogp[i] - dlogp_true).item())
+        metrics[f"{prefix}/diagnostic/dlogp/mean_diff"] = sum(dlogp_diffs) / len(dlogp_diffs)
+        metrics[f"{prefix}/diagnostic/dlogp/max_diff"] = max(dlogp_diffs)
 
         return metrics

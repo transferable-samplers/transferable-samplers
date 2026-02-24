@@ -65,13 +65,13 @@ class FlowMatchLitModule(BaseLightningModule):
         mask = batch.get("mask", None)
 
         t = torch.rand(num_samples, 1, device=x1.device)
-        prior_samples = self.prior.sample(num_samples, num_tokens, mask, device=x1.device)
+        z = self.prior.sample(num_samples, num_tokens, mask, device=x1.device)
 
         x1 = x1.flatten(start_dim=1)
-        prior_samples = prior_samples.flatten(start_dim=1)
+        z = z.flatten(start_dim=1)
 
-        xt = self.get_xt(prior_samples, x1, t, mask)
-        vt_flow = self.get_flow_targets(prior_samples, x1)
+        xt = self.get_xt(z, x1, t, mask)
+        vt_flow = self.get_flow_targets(z, x1)
 
         vt_pred = self.forward(t, xt, encodings=encodings, mask=mask)
 
@@ -94,14 +94,16 @@ class FlowMatchLitModule(BaseLightningModule):
 
         x = x.reshape(batch_size, -1)  # Ensure x is 2D
 
-        dlog_p = torch.zeros((x.shape[0], 1), device=x.device)
+        dlogp = torch.zeros((x.shape[0], 1), device=x.device)
         t_span = torch.linspace(1, 0, 2) if reverse else torch.linspace(0, 1, 2)
 
         eval_fn = partial(copy.deepcopy(net), encodings=encodings)
 
         if self.hparams.div_estimator == "ito":
-            x_ito, dlog_p_ito = self.sde_integrate(x, reverse=reverse)
-            return x_ito, dlog_p_ito
+            x_ito, dlogp_ito = self.sde_integrate(x, reverse=reverse)
+            if reverse:
+                dlogp_ito = -dlogp_ito
+            return x_ito, dlogp_ito
 
         if dummy_ll:
             wrapped_net = torch_wrapper(eval_fn)
@@ -123,18 +125,20 @@ class FlowMatchLitModule(BaseLightningModule):
             sensitivity="adjoint",
         )
         if not dummy_ll:
-            x = torch.cat([x, dlog_p], dim=-1)
+            x = torch.cat([x, dlogp], dim=-1)
         x = node.trajectory(x, t_span=t_span)[-1]
         logger.info(f"nfe: {wrapped_net.nfe}")
         self.nfe += wrapped_net.nfe
         self.num_integrations += 1
         wrapped_net.nfe = 0
         if not dummy_ll:
-            dlog_p = x[..., -1] * self.hparams.logp_tol_scale
+            dlogp = x[..., -1] * self.hparams.logp_tol_scale
+            if reverse:
+                dlogp = -dlogp  # negate so dlogp always has forward-direction sign
             x = x[..., :-1]
         x = x.reshape(batch_size, num_atoms, -1)
 
-        return x, dlog_p
+        return x, dlogp
 
     def euler_maruyama_step(
         self,
@@ -194,8 +198,9 @@ class FlowMatchLitModule(BaseLightningModule):
         self, net: torch.nn.Module, x: torch.Tensor, system_cond: Optional[SystemCond] = None,
     ) -> torch.Tensor:
         encodings = system_cond.encodings if system_cond else None
-        x, dlogp = self.flow(net, x, encodings=encodings, reverse=True)
-        return -(-self.prior.energy(x).view(-1) - dlogp.view(-1))
+        z_pred, dlogp = self.flow(net, x, encodings=encodings, reverse=True)
+        logq = -self.prior.energy(z_pred).view(-1) + dlogp.view(-1)  # logp_z + dlogp
+        return -logq  # energy is negative log probability
 
     def sample_proposal(
         self, net: torch.nn.Module, num_samples: int,
@@ -210,8 +215,8 @@ class FlowMatchLitModule(BaseLightningModule):
 
         data_dim = num_atoms * self.trainer.datamodule.hparams.num_atoms
 
-        prior_samples = self.prior.sample(num_samples, num_atoms, device=self.device)
-        prior_log_p = -self.prior.energy(prior_samples) * data_dim
+        z = self.prior.sample(num_samples, num_atoms, device=self.device)
+        logp_z = -self.prior.energy(z) * data_dim
 
         if encodings is not None:
             encodings = {
@@ -220,8 +225,8 @@ class FlowMatchLitModule(BaseLightningModule):
             }
 
         with torch.no_grad():
-            samples, dlog_p = self.flow(net, prior_samples, encodings=encodings, reverse=False)
+            x_pred, dlogp = self.flow(net, z, encodings=encodings, reverse=False)
 
-        log_p = prior_log_p.flatten() + dlog_p.flatten()
+        logq = logp_z.flatten() + dlogp.flatten()
 
-        return samples, log_p
+        return x_pred, -logq

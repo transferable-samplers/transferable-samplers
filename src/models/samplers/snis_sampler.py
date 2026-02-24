@@ -55,7 +55,7 @@ class SNISSampler(BaseSampler):
             logger.info("Clipped proposal logw for SMC initialisation")
 
         # Compute importance weights on all ranks
-        logw = -E_target - E_source
+        logw = E_source - E_target
 
         # Only resample on rank 0, then broadcast to all ranks
         if get_rank() == 0:

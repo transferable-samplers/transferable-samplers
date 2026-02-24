@@ -15,7 +15,7 @@ def filter_by_logw_quantile(
     samples: torch.Tensor, E_source: torch.Tensor, E_target: torch.Tensor, clip_fraction: float
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Drop the top clip_fraction of samples by importance weight logit."""
-    logw = -E_target - E_source
+    logw = E_source - E_target
     keep = logw <= torch.quantile(logw, 1 - clip_fraction)
     return samples[keep], E_source[keep], E_target[keep]
 
