@@ -84,7 +84,6 @@ class NormalizingFlowLitModule(BaseLightningModule):
 
         z_pred, dlogp = net(x, _permutations, encodings=_encodings)
 
-        dlogp = dlogp
         logp_z_pred = self.prior.logp(z_pred)
 
         logq = logp_z_pred + dlogp
