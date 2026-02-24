@@ -64,6 +64,7 @@ class SMCSampler(BaseSampler):
         log_traj_freq: int = 10,
     ):
         super().__init__(num_samples)
+        logger.warning("init_eps has replaced langevin_eps, and has been reparameterized such that langevin_eps = init_eps * dt")
 
         self.energy_cutoff_filter = energy_cutoff_filter
         self.logw_quantile_filter = logw_quantile_filter
