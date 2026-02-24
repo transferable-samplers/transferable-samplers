@@ -61,9 +61,13 @@ class OpenMMEnergy:
         platform = Platform.getPlatformByName(platform_name)
         properties = {}
         if platform_name == "CPU":
-            properties["Threads"] = str(os.cpu_count())
-        elif platform_name == "CUDA" and device_index is not None:
-            properties["DeviceIndex"] = str(device_index)
+            local_world_size = int(os.environ.get("LOCAL_WORLD_SIZE", 1))
+            properties["Threads"] = str(os.cpu_count() // local_world_size)
+            properties["Precision"] = "mixed"
+        elif platform_name == "CUDA":
+            properties["Precision"] = "mixed"
+            if device_index is not None:
+                properties["DeviceIndex"] = str(device_index)
 
         self._context = Context(system, integrator, platform, properties)
 
