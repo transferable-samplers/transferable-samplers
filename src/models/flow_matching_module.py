@@ -13,7 +13,7 @@ from src.utils.pylogger import RankedLogger
 logger = RankedLogger(__name__, rank_zero_only=False)
 
 
-class FlowMatchLitModule(BaseLightningModule):
+class FlowMatchingModule(BaseLightningModule):
     """Flow matching model."""
 
     def __init__(self, sigma=0.0, *args, **kwargs) -> None:
@@ -27,7 +27,7 @@ class FlowMatchLitModule(BaseLightningModule):
     def forward(self, t: torch.Tensor, x: torch.Tensor, encodings, mask) -> torch.Tensor:
         return self.net(t, x, encodings=encodings, node_mask=mask)
 
-    def get_xt(self, x0, x1, t, mask=None):
+    def _get_xt(self, x0, x1, t, mask=None):
         mu_t = (1.0 - t) * x0 + t * x1
 
         if not self.hparams.sigma == 0.0:
@@ -43,7 +43,7 @@ class FlowMatchLitModule(BaseLightningModule):
 
         return xt
 
-    def get_flow_targets(self, x0, x1):
+    def _get_flow_targets(self, x0, x1):
         vt_flow = x1 - x0
         return vt_flow
 
@@ -70,8 +70,8 @@ class FlowMatchLitModule(BaseLightningModule):
         x1 = x1.flatten(start_dim=1)
         z = z.flatten(start_dim=1)
 
-        xt = self.get_xt(z, x1, t, mask)
-        vt_flow = self.get_flow_targets(z, x1)
+        xt = self._get_xt(z, x1, t, mask)
+        vt_flow = self._get_flow_targets(z, x1)
 
         vt_pred = self.forward(t, xt, encodings=encodings, mask=mask)
 
@@ -88,7 +88,7 @@ class FlowMatchLitModule(BaseLightningModule):
         return loss
 
     @torch.no_grad()
-    def flow(self, net: torch.nn.Module, x: torch.Tensor, encodings=None, reverse=False, dummy_ll=False) -> torch.Tensor:
+    def _integrate(self, net: torch.nn.Module, x: torch.Tensor, encodings=None, reverse=False, dummy_ll=False) -> torch.Tensor:
         batch_size = x.shape[0]
         num_atoms = x.shape[1]
 
@@ -194,12 +194,12 @@ class FlowMatchLitModule(BaseLightningModule):
         self, net: torch.nn.Module, x: torch.Tensor, system_cond: Optional[SystemCond] = None,
     ) -> torch.Tensor:
         encodings = system_cond.encodings if system_cond else None
-        z_pred, dlogp_rev = self.flow(net, x, encodings=encodings, reverse=True)
+        z_pred, dlogp_rev = self._integrate(net, x, encodings=encodings, reverse=True)
         # dlogp_rev is log|det(dx/dz)| = -log|det(dz/dx)|, so logq = logp_z - dlogp_rev
         logq = self.prior.logp(z_pred) - dlogp_rev
         return -logq  # energy is negative log probability
 
-    def sample_proposal(
+    def generate_proposal(
         self, net: torch.nn.Module, num_samples: int,
         system_cond: Optional[SystemCond] = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -220,7 +220,7 @@ class FlowMatchLitModule(BaseLightningModule):
             }
 
         with torch.no_grad():
-            x_pred, dlogp = self.flow(net, z, encodings=encodings, reverse=False)
+            x_pred, dlogp = self._integrate(net, z, encodings=encodings, reverse=False)
 
         logq = logp_z + dlogp
 

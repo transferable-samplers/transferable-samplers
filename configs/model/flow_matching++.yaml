@@ -3,7 +3,7 @@ defaults:
   - net: egnn_dynamics_transferable_md
   - scheduler: cosine
 
-_target_: src.models.flow_matching_module.FlowMatchLitModule
+_target_: src.models.flow_matching_module.FlowMatchingModule
 mean_free_prior: True
 atol: 1e-4
 rtol: 1e-4

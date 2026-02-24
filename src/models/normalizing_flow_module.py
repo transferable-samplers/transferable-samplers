@@ -6,7 +6,7 @@ from src.models.base_lightning_module import BaseLightningModule
 from src.utils.dataclasses import SystemCond
 
 
-class NormalizingFlowLitModule(BaseLightningModule):
+class NormalizingFlowModule(BaseLightningModule):
     def __init__(
         self,
         *args,
@@ -89,7 +89,7 @@ class NormalizingFlowLitModule(BaseLightningModule):
         logq = logp_z_pred + dlogp
         return -logq  # energy is negative log probability
 
-    def sample_proposal(
+    def generate_proposal(
         self, net: torch.nn.Module, num_samples: int,
         system_cond: Optional[SystemCond] = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:

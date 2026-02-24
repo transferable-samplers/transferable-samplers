@@ -61,7 +61,7 @@ class BaseLightningModule(LightningModule):
             self.teacher.eval()
 
     @abstractmethod
-    def sample_proposal(
+    def generate_proposal(
         self, net: torch.nn.Module, num_samples: int, system_cond: Optional[SystemCond],
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Generate a single batch of samples from the proposal distribution.
@@ -109,7 +109,7 @@ class BaseLightningModule(LightningModule):
         net = self._build_net_copy(use_ema_if_available=use_ema_if_available)
 
         return SourceEnergy(
-            sample_fn=partial(self.sample_proposal, net, system_cond=system_cond),
+            sample_fn=partial(self.generate_proposal, net, system_cond=system_cond),
             energy_fn=partial(self.proposal_energy, net, system_cond=system_cond),
             sample_batch_size=self.source_energy_config.sample_batch_size,
             energy_batch_size=self.source_energy_config.energy_batch_size,

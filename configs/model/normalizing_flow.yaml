@@ -3,7 +3,7 @@ defaults:
   - net: tarflow
   - scheduler: cosine
 
-_target_: src.models.normalizing_flow_module.NormalizingFlowLitModule
+_target_: src.models.normalizing_flow_module.NormalizingFlowModule
 mean_free_prior: False
 
 prior:
