@@ -7,8 +7,8 @@ import yaml
 from tqdm import tqdm
 
 
-# Load a YAML file and return its contents as a dictionary
 def load_yaml_as_dict(path: str | Path) -> dict:
+    """Load a YAML file and return its contents as a dictionary."""
     path = Path(path)
     with path.open("r") as f:
         return yaml.safe_load(f)

@@ -22,17 +22,14 @@ class FlowMatchingModule(BaseLightningModule):
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
         prior,
+        compile_net: bool = False,
+        source_energy_config=None,
+        train_from_buffer: bool = False,
+        mean_free_prior: bool = True,
         sigma: float = 0.0,
         dlogp_tol_scale: float = 1.0,
         atol: float = 1e-5,
         rtol: float = 1e-5,
-        mean_free_prior: bool = True,
-        compile_net: bool = False,
-        fix_symmetry: bool = True,
-        drop_unfixable_symmetry: bool = False,
-        output_dir: str = "",
-        source_energy_config=None,
-        train_from_buffer: bool = False,
     ) -> None:
         super().__init__(
             net=net,
@@ -40,41 +37,20 @@ class FlowMatchingModule(BaseLightningModule):
             scheduler=scheduler,
             prior=prior,
             compile_net=compile_net,
-            fix_symmetry=fix_symmetry,
-            drop_unfixable_symmetry=drop_unfixable_symmetry,
-            output_dir=output_dir,
             source_energy_config=source_energy_config,
             train_from_buffer=train_from_buffer,
+            mean_free_prior=mean_free_prior,
         )
+
+        # store hyperparams/config
         self.sigma = sigma
         self.dlogp_tol_scale = dlogp_tol_scale
         self.atol = atol
         self.rtol = rtol
+
+        # set runtime state
         self.nfe = 0
         self.num_integrations = 0
-
-    def forward(self, t: torch.Tensor, x: torch.Tensor, encodings, mask) -> torch.Tensor:
-        return self.net(t, x, encodings=encodings, node_mask=mask)
-
-    def _get_xt(self, x0, x1, t, mask=None):
-        mu_t = (1.0 - t) * x0 + t * x1
-
-        if not self.sigma == 0.0:
-            num_samples = x1.shape[0]
-            num_tokens = x1.shape[1] // self.trainer.datamodule.num_dimensions
-            noise = self.prior.sample(num_samples, num_tokens, mask=None, device=x1.device).flatten(start_dim=1)
-            xt = mu_t + self.sigma * noise
-            if mask is not None:
-                xt = xt.view(num_samples, num_tokens, -1) * mask[..., None]
-                xt = xt.view(num_samples, -1)
-        else:
-            xt = mu_t
-
-        return xt
-
-    def _get_flow_targets(self, x0, x1):
-        vt_flow = x1 - x0
-        return vt_flow
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         if self.train_from_buffer:
@@ -112,6 +88,49 @@ class FlowMatchingModule(BaseLightningModule):
         batch_value = self.train_metrics(loss)
         self.log_dict(batch_value, prog_bar=True)
         return loss
+
+    def generate_proposal(
+        self, net: torch.nn.Module, num_samples: int,
+        system_cond: Optional[SystemCond] = None,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        encodings = system_cond.encodings if system_cond else None
+
+        if encodings is None:
+            num_atoms = self.trainer.datamodule.num_atoms
+        else:
+            num_atoms = encodings["atom_type"].size(0)
+
+        z = self.prior.sample(num_samples, num_atoms, device=self.device)
+        logp_z = self.prior.logp(z)
+
+        if encodings is not None:
+            encodings = {
+                key: tensor.unsqueeze(0).repeat(num_samples, 1).to(self.device)
+                for key, tensor in encodings.items()
+            }
+
+        x_pred, dlogp = self._integrate(net, z, encodings=encodings, reverse=False)
+
+        logq = logp_z + dlogp
+
+        return x_pred, -logq
+
+    def proposal_energy(
+        self, net: torch.nn.Module, x: torch.Tensor, system_cond: Optional[SystemCond] = None,
+    ) -> torch.Tensor:
+        if torch.is_grad_enabled() and x.requires_grad:
+            logger.warning(
+                "We have not tested differentiation of FlowMatchingModule.proposal_energy()."
+                "Please test well if using this in a differentiable context!"
+            )
+        encodings = system_cond.encodings if system_cond else None
+        z_pred, dlogp_rev = self._integrate(net, x, encodings=encodings, reverse=True)
+        # dlogp_rev is log|det(dx/dz)| = -log|det(dz/dx)|, so logq = logp_z - dlogp_rev
+        logq = self.prior.logp(z_pred) - dlogp_rev
+        return -logq  # energy is negative log probability
+
+    def forward(self, t: torch.Tensor, x: torch.Tensor, encodings, mask) -> torch.Tensor:
+        return self.net(t, x, encodings=encodings, node_mask=mask)
 
     def _integrate(self, net: torch.nn.Module, x: torch.Tensor, encodings=None, reverse=False, compute_dlogp=True) -> torch.Tensor:
         batch_size = x.shape[0]
@@ -153,42 +172,22 @@ class FlowMatchingModule(BaseLightningModule):
 
         return x, dlogp_out.view(-1)
 
-    def proposal_energy(
-        self, net: torch.nn.Module, x: torch.Tensor, system_cond: Optional[SystemCond] = None,
-    ) -> torch.Tensor:
-        if torch.is_grad_enabled() and x.requires_grad:
-            logger.warning(
-                "We have not tested differentiation of FlowMatchingModule.proposal_energy()."
-                "Please test well if using this in a differentiable context!"
-            )
-        encodings = system_cond.encodings if system_cond else None
-        z_pred, dlogp_rev = self._integrate(net, x, encodings=encodings, reverse=True)
-        # dlogp_rev is log|det(dx/dz)| = -log|det(dz/dx)|, so logq = logp_z - dlogp_rev
-        logq = self.prior.logp(z_pred) - dlogp_rev
-        return -logq  # energy is negative log probability
+    def _get_xt(self, x0, x1, t, mask=None):
+        mu_t = (1.0 - t) * x0 + t * x1
 
-    def generate_proposal(
-        self, net: torch.nn.Module, num_samples: int,
-        system_cond: Optional[SystemCond] = None,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        encodings = system_cond.encodings if system_cond else None
-
-        if encodings is None:
-            num_atoms = self.trainer.datamodule.num_atoms
+        if not self.sigma == 0.0:
+            num_samples = x1.shape[0]
+            num_tokens = x1.shape[1] // self.trainer.datamodule.num_dimensions
+            noise = self.prior.sample(num_samples, num_tokens, mask=None, device=x1.device).flatten(start_dim=1)
+            xt = mu_t + self.sigma * noise
+            if mask is not None:
+                xt = xt.view(num_samples, num_tokens, -1) * mask[..., None]
+                xt = xt.view(num_samples, -1)
         else:
-            num_atoms = encodings["atom_type"].size(0)
+            xt = mu_t
 
-        z = self.prior.sample(num_samples, num_atoms, device=self.device)
-        logp_z = self.prior.logp(z)
+        return xt
 
-        if encodings is not None:
-            encodings = {
-                key: tensor.unsqueeze(0).repeat(num_samples, 1).to(self.device)
-                for key, tensor in encodings.items()
-            }
-
-        x_pred, dlogp = self._integrate(net, z, encodings=encodings, reverse=False)
-
-        logq = logp_z + dlogp
-
-        return x_pred, -logq
+    def _get_flow_targets(self, x0, x1):
+        vt_flow = x1 - x0
+        return vt_flow

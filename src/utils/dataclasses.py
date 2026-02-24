@@ -8,14 +8,6 @@ import torch
 from src.utils.standardization import destandardize_coords
 
 
-@dataclass(frozen=True)
-class SourceEnergyConfig:
-    """Configuration for SourceEnergy batch sizes. Passed via Hydra configs."""
-    sample_batch_size: int
-    energy_batch_size: int
-    grad_batch_size: int
-    use_com_adjustment: bool = False
-
 
 @dataclass
 class TargetEnergy:
@@ -42,6 +34,15 @@ class TargetEnergy:
             e = self.energy_fn(destandardize_coords(x, self.normalization_std))
             g = torch.autograd.grad(e.sum(), x)[0]
         return e.detach(), g.detach()
+
+
+@dataclass(frozen=True)
+class SourceEnergyConfig:
+    """Configuration for SourceEnergy batch sizes. Passed via Hydra configs."""
+    sample_batch_size: int
+    energy_batch_size: int
+    grad_batch_size: int
+    use_com_adjustment: bool = False
 
 
 @dataclass
@@ -153,23 +154,13 @@ class SystemCond:
 
 
 @dataclass
-class EvalContext:
-    true_data: "SamplesData"
-    target_energy: TargetEnergy
-    normalization_std: torch.Tensor
-    system_cond: Optional[SystemCond]
-    tica_model: Optional[object] = None
-    topology: Optional[object] = None
-
-
-@dataclass
 class SamplesData:
     samples: torch.Tensor
-    energy: torch.Tensor
+    E_target: torch.Tensor
     logw: torch.Tensor = None
 
     def __post_init__(self):
-        assert len(self.samples) == len(self.energy)
+        assert len(self.samples) == len(self.E_target)
         if self.logw is not None:
             assert len(self.samples) == len(self.logw)
 
@@ -179,6 +170,16 @@ class SamplesData:
     def __getitem__(self, index):
         return SamplesData(
             self.samples[index],
-            self.energy[index],
+            self.E_target[index],
             self.logw[index] if self.logw is not None else None,
         )
+
+
+@dataclass
+class EvalContext:
+    true_data: "SamplesData"
+    target_energy: TargetEnergy
+    normalization_std: torch.Tensor
+    system_cond: Optional[SystemCond]
+    tica_model: Optional[object] = None
+    topology: Optional[object] = None

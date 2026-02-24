@@ -1,14 +1,13 @@
 """Utilities for resolving checkpoint / init-weight loading at training time."""
 
 import os
+from copy import deepcopy
 from typing import Optional
 
 import torch
 
 from src.utils.huggingface import download_weights
 from src.utils.pylogger import RankedLogger
-
-from copy import deepcopy
 
 logger = RankedLogger(__name__, rank_zero_only=False)
 
@@ -60,6 +59,27 @@ def load_state_dict_from_hf(hf_filepath: str, scratch_dir: str) -> dict:
     dst_dir = os.path.join(scratch_dir, "model-weights")
     local_path = download_weights(hf_filepath=hf_filepath, destination_dir=dst_dir)
     return load_state_dict_from_file(local_path)
+
+
+def augment_state_dict_for_teacher(sd: dict, student_prefix="net.", teacher_prefix="teacher."):
+    """
+    If teacher keys are missing but student keys exist, synthesize teacher keys
+    by copying tensors from the student keys. Returns a NEW dict.
+    """
+    has_student = any(k.startswith(student_prefix) for k in sd.keys())
+    assert has_student, "Expected student keys in state dict when calling augment_state_dict_for_teacher."
+
+    has_teacher = any(k.startswith(teacher_prefix) for k in sd.keys())
+    assert not has_teacher, "Expected no teacher keys in state dict when calling augment_state_dict_for_teacher."
+
+    logger.info("Augmenting state dict for teacher by copying student parameters.")
+
+    new_sd = deepcopy(sd)
+    for k, v in sd.items():
+        if k.startswith(student_prefix):
+            teacher_k = k.replace(student_prefix, teacher_prefix, 1)
+            new_sd[teacher_k] = v
+    return new_sd
 
 
 def resolve_init(
@@ -163,23 +183,3 @@ def resolve_init_or_resume(
         )
 
     return None, init_state_dict
-
-def augment_state_dict_for_teacher(sd: dict, student_prefix="net.", teacher_prefix="teacher."):
-    """
-    If teacher keys are missing but student keys exist, synthesize teacher keys
-    by copying tensors from the student keys. Returns a NEW dict.
-    """
-    has_student = any(k.startswith(student_prefix) for k in sd.keys())
-    assert has_student, "Expected student keys in state dict when calling augment_state_dict_for_teacher."
-
-    has_teacher = any(k.startswith(teacher_prefix) for k in sd.keys())
-    assert not has_teacher, "Expected no teacher keys in state dict when calling augment_state_dict_for_teacher."
-
-    logger.info("Augmenting state dict for teacher by copying student parameters.")
-
-    new_sd = deepcopy(sd)
-    for k, v in sd.items():
-        if k.startswith(student_prefix):
-            teacher_k = k.replace(student_prefix, teacher_prefix, 1)
-            new_sd[teacher_k] = v
-    return new_sd

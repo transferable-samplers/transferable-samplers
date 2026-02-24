@@ -50,7 +50,7 @@ class SNISSampler(BaseSampler):
         # Store for evaluation / plotting
         proposal_data = SamplesData(samples, E_target)
 
-        # ── Clip by logit quantile ────────────────────────────────────────
+        # Clip by logit quantile (all ranks do same filtering to maintain same shape)
         if self.logw_quantile_filter is not None:
             samples, E_source, E_target = filter_by_logw_quantile(samples, E_source, E_target, self.logw_quantile_filter)
             logger.info("Clipped proposal logw for SMC initialisation")

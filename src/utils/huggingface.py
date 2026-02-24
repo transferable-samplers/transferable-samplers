@@ -136,6 +136,24 @@ TICA_MEAN_SHAPES = {
 }
 
 
+def safe_extract_tar(tar_path, extraction_path):
+    """
+    Safely extracts a tar archive to the given path.
+
+    Args:
+        tar_path (str): Path to the tar archive.
+        extraction_path (str): Directory to extract files into.
+    """
+    abs_path = os.path.abspath(extraction_path)
+
+    with tarfile.open(tar_path) as tar:
+        for member in tar.getmembers():
+            member_path = os.path.abspath(os.path.join(extraction_path, member.name))
+            if not member_path.startswith(abs_path + os.sep):
+                raise Exception(f"Blocked path traversal attempt: {member.name}")
+        tar.extractall(extraction_path)  # noqa: S202 - safe, paths validated above
+
+
 def download_weights(destination_dir: str, hf_filepath: str) -> str:
     """
     Downloads the model weights from Hugging Face Hub.
@@ -154,24 +172,6 @@ def download_weights(destination_dir: str, hf_filepath: str) -> str:
         return local_path
     except Exception as e:
         print(f"Failed to download model weights: {e}")
-
-
-def safe_extract_tar(tar_path, extraction_path):
-    """
-    Safely extracts a tar archive to the given path.
-
-    Args:
-        tar_path (str): Path to the tar archive.
-        extraction_path (str): Directory to extract files into.
-    """
-    abs_path = os.path.abspath(extraction_path)
-
-    with tarfile.open(tar_path) as tar:
-        for member in tar.getmembers():
-            member_path = os.path.abspath(os.path.join(extraction_path, member.name))
-            if not member_path.startswith(abs_path + os.sep):
-                raise Exception(f"Blocked path traversal attempt: {member.name}")
-        tar.extractall(extraction_path)  # noqa: S202 - safe, paths validated above
 
 
 def download_and_extract_pdb_tarfiles(data_dir: str):
@@ -234,24 +234,27 @@ def download_evaluation_data(data_dir: str):
     # Check TICA shapes for all downloaded files
     logging.info("Checking TICA model shapes...")
 
-    # for subset_key in TICA_MEAN_SHAPES.keys():
-    #     for sequence in TICA_MEAN_SHAPES[subset_key].keys():
-    #         # Construct file path from dict keys
-    #         file_path = os.path.join(
-    #             data_dir, "trajectories_subsampled", subset_key, f"{len(sequence)}AA", f"{sequence}_subsampled.npz"
-    #         )
-    #         data = np.load(file_path)
-    #         tica_mean = data["tica_mean"]
-    #         tica_mean_shape = tica_mean.shape[0]
-    #         expected_shape = TICA_MEAN_SHAPES[subset_key][sequence]
+    # TODO
+    logging.warning("You have not uncommented the TICA checks")
 
-    #         error_message = (
-    #             f"TICA mean shape for {sequence} is {tica_mean_shape}, but expected {expected_shape}\n"
-    #             f"File: {file_path}\n"
-    #             "This is likely due to the change in the TICA model implementation.\n"
-    #             "See https://huggingface.co/datasets/transferable-samplers/many-peptides-md for further details."
-    #         )
+    # for subset_key in TICA_MEAN_SHAPES.keys():
+    #     for sequence in TICA_MEAN_SHAPES[subset_key].keys():
+    #         # Construct file path from dict keys
+    #         file_path = os.path.join(
+    #             data_dir, "trajectories_subsampled", subset_key, f"{len(sequence)}AA", f"{sequence}_subsampled.npz"
+    #         )
+    #         data = np.load(file_path)
+    #         tica_mean = data["tica_mean"]
+    #         tica_mean_shape = tica_mean.shape[0]
+    #         expected_shape = TICA_MEAN_SHAPES[subset_key][sequence]
 
-    #         assert tica_mean_shape == expected_shape, error_message
+    #         error_message = (
+    #             f"TICA mean shape for {sequence} is {tica_mean_shape}, but expected {expected_shape}\n"
+    #             f"File: {file_path}\n"
+    #             "This is likely due to the change in the TICA model implementation.\n"
+    #             "See https://huggingface.co/datasets/transferable-samplers/many-peptides-md for further details."
+    #         )
 
-    # logging.info("TICA model shape checks completed successfully.")
+    #         assert tica_mean_shape == expected_shape, error_message
+
+    # logging.info("TICA model shape checks completed successfully.")

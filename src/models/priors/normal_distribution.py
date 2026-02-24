@@ -9,8 +9,9 @@ class NormalDistribution(Prior):
         self.num_dimensions = num_dimensions
         self.mean = mean
         self.std = std
-        self.distribution = Normal(mean, std)
         self.mean_free = mean_free
+
+        self.distribution = Normal(mean, std)
 
     def sample(self, num_samples: int, num_atoms: int, mask: torch.Tensor | None = None, device="cpu") -> torch.Tensor:
         x = self.distribution.sample((num_samples, num_atoms, self.num_dimensions)).to(device)

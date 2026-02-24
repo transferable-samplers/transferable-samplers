@@ -2,34 +2,7 @@ import numpy as np
 import torch
 
 
-def create_adjacency_list(distance_matrix, atom_types):
-    adjacency_list = []
-
-    # Iterate through the distance matrix
-    num_nodes = len(distance_matrix)
-    for i in range(num_nodes):
-        for j in range(i + 1, num_nodes):  # Avoid duplicate pairs
-            distance = distance_matrix[i][j]
-            element_i = atom_types[i]
-            element_j = atom_types[j]
-            if 1 in (element_i, element_j):
-                distance_cutoff = 0.14
-            elif 4 in (element_i, element_j):
-                distance_cutoff = 0.22
-            elif 0 in (element_i, element_j):
-                distance_cutoff = 0.18
-            else:
-                # elements should not be bonded
-                distance_cutoff = 0.0
-
-            # Add edge if distance is below the cutoff
-            if distance < distance_cutoff:
-                adjacency_list.append([i, j])
-
-    return adjacency_list
-
-
-def get_atom_types(topology):
+def _get_atom_types(topology):
     atom_dict = {"C": 0, "H": 1, "N": 2, "O": 3, "S": 4}
     atom_types = []
     for atom_name in topology.atoms:
@@ -39,7 +12,7 @@ def get_atom_types(topology):
     return atom_types
 
 
-def get_adj_list(topology):
+def _get_adj_list(topology):
     adj_list = torch.from_numpy(
         np.array(
             [(b.atom1.index, b.atom2.index) for b in topology.bonds],
@@ -49,7 +22,7 @@ def get_adj_list(topology):
     return adj_list
 
 
-def find_chirality_centers(adj_list: torch.Tensor, atom_types: torch.Tensor, num_h_atoms: int = 2) -> torch.Tensor:
+def _find_chirality_centers(adj_list: torch.Tensor, atom_types: torch.Tensor, num_h_atoms: int = 2) -> torch.Tensor:
     """
     Return the chirality centers for a peptide, e.g. carbon alpha atoms and their bonds.
 
@@ -73,7 +46,7 @@ def find_chirality_centers(adj_list: torch.Tensor, atom_types: torch.Tensor, num
     return torch.tensor(chirality_centers).to(adj_list).long()
 
 
-def compute_chirality_sign(coords: torch.Tensor, chirality_centers: torch.Tensor) -> torch.Tensor:
+def _compute_chirality_sign(coords: torch.Tensor, chirality_centers: torch.Tensor) -> torch.Tensor:
     """
     Compute indicator signs for a given configuration.
     If the signs for two configurations are different for the same center, the chirality changed.
@@ -95,7 +68,7 @@ def compute_chirality_sign(coords: torch.Tensor, chirality_centers: torch.Tensor
     return torch.sign(perm_sign)
 
 
-def check_symmetry_change(true_coords: torch.Tensor, pred_coords: torch.Tensor, adj_list, atom_types) -> torch.Tensor:
+def _check_symmetry_change(true_coords: torch.Tensor, pred_coords: torch.Tensor, adj_list, atom_types) -> torch.Tensor:
     """
     Check for a batch if the chirality changed wrt to some reference reference_signs.
     If the signs for two configurations are different for the same center, the chirality changed.
@@ -106,18 +79,18 @@ def check_symmetry_change(true_coords: torch.Tensor, pred_coords: torch.Tensor, 
     Returns:
         Mask, where changes are True
     """
-    chirality_centers = find_chirality_centers(adj_list, atom_types)
+    chirality_centers = _find_chirality_centers(adj_list, atom_types)
 
-    reference_signs = compute_chirality_sign(true_coords[[1]], chirality_centers)
-    perm_sign = compute_chirality_sign(pred_coords, chirality_centers)
+    reference_signs = _compute_chirality_sign(true_coords[[1]], chirality_centers)
+    perm_sign = _compute_chirality_sign(pred_coords, chirality_centers)
     return (perm_sign != reference_signs.to(pred_coords)).any(dim=-1)
 
 
 def get_symmetry_change(true_samples, pred_samples, topology):
     true_samples = true_samples[: len(pred_samples)]
 
-    adj_list = get_adj_list(topology)
-    atom_types = get_atom_types(topology)
+    adj_list = _get_adj_list(topology)
+    atom_types = _get_atom_types(topology)
 
-    symmetry_change = check_symmetry_change(true_samples, pred_samples, adj_list, atom_types)
+    symmetry_change = _check_symmetry_change(true_samples, pred_samples, adj_list, atom_types)
     return symmetry_change

@@ -15,14 +15,6 @@ class TorchDynWrapper(torch.nn.Module):
         self.compute_dlogp = compute_dlogp
         self.dlogp_tol_scale = dlogp_tol_scale
 
-    def _divergence(self, t, x):
-        def vecfield(y):
-            y = y.view(1, -1)  # batch dims required by EGNN architecture
-            return self.model(t, y).flatten()
-
-        J = torch.func.jacrev(vecfield)
-        return torch.trace(J(x))
-
     def forward(self, t, x, *args, **kwargs):
         if not self.compute_dlogp:
             self.nfe += 1
@@ -37,3 +29,11 @@ class TorchDynWrapper(torch.nn.Module):
 
         self.nfe += 1
         return torch.cat([dx, dlogp[:, None] / self.dlogp_tol_scale], dim=-1).detach()
+
+    def _divergence(self, t, x):
+        def vecfield(y):
+            y = y.view(1, -1)  # batch dims required by EGNN architecture
+            return self.model(t, y).flatten()
+
+        J = torch.func.jacrev(vecfield)
+        return torch.trace(J(x))

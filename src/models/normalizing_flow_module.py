@@ -17,29 +17,24 @@ class NormalizingFlowModule(BaseLightningModule):
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
         prior,
-        mean_free_prior: bool = False,
-        teacher_regularize_weight: float = 0.0,
         compile_net: bool = False,
-        fix_symmetry: bool = True,
-        drop_unfixable_symmetry: bool = False,
-        output_dir: str = "",
         source_energy_config=None,
         train_from_buffer: bool = False,
+        mean_free_prior: bool = False,
+        teacher_regularize_weight: float = 0.0,
     ) -> None:
+        assert not mean_free_prior, "Mean free prior is not supported for normalizing flows"
+
         super().__init__(
             net=net,
             optimizer=optimizer,
             scheduler=scheduler,
             prior=prior,
             compile_net=compile_net,
-            fix_symmetry=fix_symmetry,
-            drop_unfixable_symmetry=drop_unfixable_symmetry,
-            output_dir=output_dir,
             source_energy_config=source_energy_config,
             train_from_buffer=train_from_buffer,
+            mean_free_prior=mean_free_prior,
         )
-        self.mean_free_prior = mean_free_prior
-        assert not self.mean_free_prior, "Mean free prior is not supported for normalizing flows"
 
         self.teacher_regularize_weight = teacher_regularize_weight
 
@@ -49,13 +44,6 @@ class NormalizingFlowModule(BaseLightningModule):
             for param in self.teacher.parameters():
                 param.requires_grad_(False)
             self.teacher.eval()
-
-        self.eval_ctx = None
-
-    def on_train_epoch_start(self) -> None:
-        super().on_train_epoch_start()
-        if self.teacher_regularize_weight > 0:
-            assert not self._has_ema_callback(), "EMAWeightAveraging callback should not be used with teacher regularization."
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         if self.train_from_buffer:
@@ -96,39 +84,6 @@ class NormalizingFlowModule(BaseLightningModule):
         self.log_dict(batch_value, prog_bar=True)
         return loss
 
-    def proposal_energy(
-        self, net: torch.nn.Module, x: torch.Tensor, system_cond: Optional[SystemCond] = None,
-    ) -> torch.Tensor:
-        permutations = system_cond.permutations if system_cond else None
-        encodings = system_cond.encodings if system_cond else None
-
-        if encodings is not None:
-            _encodings = {}
-            for k, v in encodings.items():
-                # ensure encodings is broadcasted to batch if we pass
-                # in a single peptide
-                if v.ndim == 1 and x.ndim > 2:
-                    v = v[None, ...].repeat(x.shape[0], *([1] * v.ndim))
-
-                _encodings[k] = v.to(x.device)
-        else:
-            _encodings = None
-
-        if permutations is not None:
-            _permutations = {
-                subkey: tensor.unsqueeze(0).repeat(x.shape[0], 1).to(self.device)
-                for subkey, tensor in permutations.items()
-            }
-        else:
-            _permutations = None
-
-        z_pred, dlogp = net(x, _permutations, encodings=_encodings)
-
-        logp_z_pred = self.prior.logp(z_pred)
-
-        logq = logp_z_pred + dlogp
-        return -logq  # energy is negative log probability
-
     def generate_proposal(
         self, net: torch.nn.Module, num_samples: int,
         system_cond: Optional[SystemCond] = None,
@@ -164,6 +119,48 @@ class NormalizingFlowModule(BaseLightningModule):
         logq = logp_z - dlogp_rev
 
         return x_pred, -logq
+
+    def proposal_energy(
+        self, net: torch.nn.Module, x: torch.Tensor, system_cond: Optional[SystemCond] = None,
+    ) -> torch.Tensor:
+        permutations = system_cond.permutations if system_cond else None
+        encodings = system_cond.encodings if system_cond else None
+
+        if encodings is not None:
+            _encodings = {}
+            for k, v in encodings.items():
+                # ensure encodings is broadcasted to batch if we pass
+                # in a single peptide
+                if v.ndim == 1 and x.ndim > 2:
+                    v = v[None, ...].repeat(x.shape[0], *([1] * v.ndim))
+
+                _encodings[k] = v.to(x.device)
+        else:
+            _encodings = None
+
+        if permutations is not None:
+            _permutations = {
+                subkey: tensor.unsqueeze(0).repeat(x.shape[0], 1).to(self.device)
+                for subkey, tensor in permutations.items()
+            }
+        else:
+            _permutations = None
+
+        z_pred, dlogp = net(x, _permutations, encodings=_encodings)
+
+        logp_z_pred = self.prior.logp(z_pred)
+
+        logq = logp_z_pred + dlogp
+        return -logq  # energy is negative log probability
+
+    def on_train_epoch_start(self) -> None:
+        super().on_train_epoch_start()
+        if self.teacher_regularize_weight > 0:
+            assert not self._has_ema_callback(), "EMAWeightAveraging callback should not be used with teacher regularization."
+
+    # =====================================================================
+    # Additional methods (not in base class)
+    # =====================================================================
 
     def run_model_diagnostics(
         self,
@@ -212,7 +209,6 @@ class NormalizingFlowModule(BaseLightningModule):
             x_pred, _ = self.net.reverse(z, _permutations, encodings=_encodings)
             z_recon, dlogp = self.net(x_pred, _permutations, encodings=_encodings)
 
-        # ── Invertibility metrics ─────────────────────────────────────────
         diff = (z - z_recon).abs()
         metrics = {
             f"{prefix}/diagnostic/invert/mse": torch.mean((z - z_recon) ** 2).item(),
@@ -226,7 +222,6 @@ class NormalizingFlowModule(BaseLightningModule):
                 (torch.sum(diff > cutoff, dim=1) > 0).sum().float().item()
             )
 
-        # ── dlogp check (small batch — Jacobian is expensive per sample) ───
         dlogp_batch = x_pred[:num_samples_dlogp].detach()
 
         # Build single-sample permutations/encodings for Jacobian computation

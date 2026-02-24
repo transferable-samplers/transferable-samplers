@@ -12,29 +12,44 @@ from src.utils.dataclasses import EvalContext
 class BaseDataModule(LightningDataModule, ABC):
     def __init__(
         self,
+        data_dir: str,
+        num_dimensions: int,
+        num_atoms: int,
         batch_size: int = 64,
         num_workers: int = 0,
         persistent_workers: bool = False,
         pin_memory: bool = False,
+        com_augmentation: bool = False,
+        num_eval_samples: int = 10_000,
+        train_from_buffer: bool = False,
     ) -> None:
         """Initialize a `BaseDataModule`.
 
-        :param data_dir: The data directory. Defaults to `"data/"`.
-        :param train_val_test_split: The train, validation and test split. Defaults to `(55_000, 5_000, 10_000)`.
+        :param data_dir: The data directory.
+        :param num_dimensions: Number of spatial dimensions (e.g. 3).
+        :param num_atoms: Number of atoms per molecule.
         :param batch_size: The batch size. Defaults to `64`.
         :param num_workers: The number of workers. Defaults to `0`.
+        :param persistent_workers: Whether to keep workers alive between epochs. Defaults to `False`.
         :param pin_memory: Whether to pin memory. Defaults to `False`.
+        :param com_augmentation: Whether to apply center-of-mass augmentation. Defaults to `False`.
+        :param num_eval_samples: Number of samples for evaluation. Defaults to `10_000`.
+        :param train_from_buffer: Whether to train from a replay buffer. Defaults to `False`.
         """
         super().__init__()
 
-        # this line allows to access init params with 'self.hparams' attribute
-        # also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=False)
 
+        self.data_dir = data_dir
+        self.num_dimensions = num_dimensions
+        self.num_atoms = num_atoms
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.persistent_workers = persistent_workers
         self.pin_memory = pin_memory
+        self.com_augmentation = com_augmentation
+        self.num_eval_samples = num_eval_samples
+        self.train_from_buffer = train_from_buffer
 
     @abstractmethod
     def prepare_data(self) -> None:

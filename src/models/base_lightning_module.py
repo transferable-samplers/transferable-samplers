@@ -25,30 +25,29 @@ class BaseLightningModule(LightningModule):
         scheduler: torch.optim.lr_scheduler,
         prior,
         compile_net: bool = False,
-        fix_symmetry: bool = True,
-        drop_unfixable_symmetry: bool = False,
-        output_dir: str = "",
         source_energy_config: Optional[SourceEnergyConfig] = None,
         train_from_buffer: bool = False,
+        mean_free_prior: bool = False,
     ) -> None:
         super().__init__()
+
         self.save_hyperparameters(logger=False, ignore=["source_energy_config"])
 
         self.net = net
-
-        self.prior = prior
-
-        self.compile_net = compile_net
         self.optimizer_fn = optimizer
         self.scheduler_fn = scheduler
-
+        self.prior = prior
+        self.compile_net = compile_net
         self.source_energy_config = source_energy_config
         self.train_from_buffer = train_from_buffer
-        self._buffer = None # buffer can be set by set_buffer() (from callback)
+        self.mean_free_prior = mean_free_prior
 
+        self._buffer = None
         self.train_metrics = torchmetrics.MetricCollection({"loss": MeanMetric()}, prefix="train/")
 
-        self.output_dir = output_dir
+    @abstractmethod
+    def training_step(self, batch, batch_idx: int) -> torch.Tensor:
+        ...
 
     @abstractmethod
     def generate_proposal(
@@ -79,37 +78,6 @@ class BaseLightningModule(LightningModule):
             Energy tensor (batch,).
         """
         ...
-
-    @abstractmethod
-    def training_step(self, batch, batch_idx: int) -> torch.Tensor:
-        ...
-
-    def build_source_energy(
-        self,
-        system_cond: Optional[SystemCond],
-        use_ema_if_available: bool = False,
-    ) -> SourceEnergy:
-        """Build a SourceEnergy with batched sample and energy callables.
-
-        Args:
-            system_cond: Optional conditioning (permutations, encodings).
-            use_ema_if_available: If True uses the EMA weights if present.
-        """
-        assert self.source_energy_config is not None, "source_energy_config must be set to build SourceEnergy."
-        net = self._build_net_copy(use_ema_if_available=use_ema_if_available)
-
-        return SourceEnergy(
-            sample_fn=partial(self.generate_proposal, net, system_cond=system_cond),
-            energy_fn=partial(self.proposal_energy, net, system_cond=system_cond),
-            sample_batch_size=self.source_energy_config.sample_batch_size,
-            energy_batch_size=self.source_energy_config.energy_batch_size,
-            grad_batch_size=self.source_energy_config.grad_batch_size,
-            use_com_adjustment=self.source_energy_config.use_com_adjustment,
-        )
-
-    def set_buffer(self, buffer: Buffer) -> None:
-        """Set the sample buffer for self-improvement training."""
-        self._buffer = buffer
 
     def setup(self, stage: str) -> None:
         if self.compile_net and stage == "fit":
@@ -148,13 +116,6 @@ class BaseLightningModule(LightningModule):
             }
         return {"optimizer": optimizer}
 
-    def validation_step(self, batch, batch_idx):
-        "NOTE: these only exist for Lightning compatibility. All evaluation is handled by custom callbacks."
-        return None
-
-    def test_step(self, batch, batch_idx):
-        "NOTE: these only exist for Lightning compatibility. All evaluation is handled by custom callbacks."
-        return None
 
     def _has_ema_callback(self) -> bool:
         """Check if an EMAWeightAveraging callback is present in the trainer."""
@@ -173,6 +134,33 @@ class BaseLightningModule(LightningModule):
                     return deepcopy(cb._average_model.module.net)
         return deepcopy(self.net)
 
+    def build_source_energy(
+        self,
+        system_cond: Optional[SystemCond],
+        use_ema_if_available: bool = False,
+    ) -> SourceEnergy:
+        """Build a SourceEnergy with batched sample and energy callables.
+
+        Args:
+            system_cond: Optional conditioning (permutations, encodings).
+            use_ema_if_available: If True uses the EMA weights if present.
+        """
+        assert self.source_energy_config is not None, "source_energy_config must be set to build SourceEnergy."
+        net = self._build_net_copy(use_ema_if_available=use_ema_if_available)
+
+        return SourceEnergy(
+            sample_fn=partial(self.generate_proposal, net, system_cond=system_cond),
+            energy_fn=partial(self.proposal_energy, net, system_cond=system_cond),
+            sample_batch_size=self.source_energy_config.sample_batch_size,
+            energy_batch_size=self.source_energy_config.energy_batch_size,
+            grad_batch_size=self.source_energy_config.grad_batch_size,
+            use_com_adjustment=self.source_energy_config.use_com_adjustment,
+        )
+
+    def set_buffer(self, buffer: Buffer) -> None:
+        """Set the sample buffer for self-improvement training."""
+        self._buffer = buffer
+
     def on_train_epoch_start(self) -> None:
         logger.info("Train epoch start")
         self.train_metrics.reset()
@@ -180,35 +168,6 @@ class BaseLightningModule(LightningModule):
     def on_train_epoch_end(self) -> None:
         self.train_metrics.reset()
         logger.info("Train epoch end")
-
-    def on_validation_epoch_start(self) -> None:
-        logger.info("Validation epoch start")
-
-    def on_validation_epoch_end(self) -> None:
-        logger.info("Validation epoch end")
-
-    def on_test_epoch_start(self) -> None:
-        logger.info("Test epoch start")
-
-    def on_test_epoch_end(self) -> None:
-        logger.info("Test epoch end")
-
-    def on_after_backward(self) -> None:
-        valid_gradients = True
-        flat_grads = torch.cat([p.grad.view(-1) for p in self.parameters() if p.grad is not None])
-        global_norm = torch.norm(flat_grads, p=2)
-        for _name, param in self.named_parameters():
-            if param.grad is not None:
-                valid_gradients = not (torch.isnan(param.grad).any() or torch.isinf(param.grad).any())
-
-                if not valid_gradients:
-                    break
-
-        self.log("global_gradient_norm", global_norm, on_step=True, prog_bar=True)
-        if not valid_gradients:
-            logger.warning("detected inf or nan values in gradients. not updating model parameters")
-            self.zero_grad()
-            return
 
     def on_before_optimizer_step(self, optimizer, *args, **kwargs) -> None:
         total_norm = 0.0
@@ -219,3 +178,23 @@ class BaseLightningModule(LightningModule):
         total_norm = total_norm ** (1.0 / 2)
         self.log_dict({"train/grad_norm": total_norm}, prog_bar=True)
 
+
+    def on_validation_epoch_start(self) -> None:
+        logger.info("Validation epoch start")
+
+    def on_validation_epoch_end(self) -> None:
+        logger.info("Validation epoch end")
+
+    def validation_step(self, batch, batch_idx):
+        "NOTE: these only exist for Lightning compatibility. All evaluation is handled by custom callbacks."
+        return None
+
+    def on_test_epoch_start(self) -> None:
+        logger.info("Test epoch start")
+
+    def on_test_epoch_end(self) -> None:
+        logger.info("Test epoch end")
+
+    def test_step(self, batch, batch_idx):
+        "NOTE: these only exist for Lightning compatibility. All evaluation is handled by custom callbacks."
+        return None

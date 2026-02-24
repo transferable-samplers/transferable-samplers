@@ -26,34 +26,37 @@ class SinglePeptideDataModule(BaseDataModule):
     def __init__(
         self,
         data_dir: str,
-        sequence: str,
-        temperature: float,
         num_dimensions: int,
         num_atoms: int,
-        com_augmentation: bool = False,
-        num_eval_samples: int = 10_000,
-        train_from_buffer: bool = False,
         batch_size: int = 64,
         num_workers: int = 0,
         persistent_workers: bool = False,
         pin_memory: bool = False,
+        com_augmentation: bool = False,
+        num_eval_samples: int = 10_000,
+        train_from_buffer: bool = False,
+        sequence: str = "",
+        temperature: float = 310.0,
     ):
-        super().__init__(batch_size=batch_size, num_workers=num_workers, persistent_workers=persistent_workers,  pin_memory=pin_memory)
+        super().__init__(
+            data_dir=data_dir,
+            num_dimensions=num_dimensions,
+            num_atoms=num_atoms,
+            batch_size=batch_size,
+            num_workers=num_workers,
+            persistent_workers=persistent_workers,
+            pin_memory=pin_memory,
+            com_augmentation=com_augmentation,
+            num_eval_samples=num_eval_samples,
+            train_from_buffer=train_from_buffer,
+        )
 
         self.sequence = sequence
         self.temperature = temperature
-        self.data_dir = data_dir
-        self.num_dimensions = num_dimensions
-        self.num_atoms = num_atoms
-        self.com_augmentation = com_augmentation
-        self.num_eval_samples = num_eval_samples
 
+        # Construct derived paths
         self.repo_name = self.HF_REPO_ID.split("/")[-1]
         self.trajectory_name = f"{self.sequence}_{self.temperature}K"
-
-        self.train_from_buffer = train_from_buffer
-
-        # Setup paths
         self.trajectory_data_dir = f"{data_dir}/{self.repo_name}/{self.trajectory_name}"
         self.train_data_path = f"{self.trajectory_data_dir}/{self.trajectory_name}_train.npy"
         self.val_data_path = f"{self.trajectory_data_dir}/{self.trajectory_name}_val.npy"
@@ -139,7 +142,7 @@ class SinglePeptideDataModule(BaseDataModule):
 
             # Placeholder dataset; model owns the buffer and samples from it
             assert isinstance(self.trainer.limit_train_batches, int), (
-                "trainer.limit_train_batches must be set to an integer when using " 
+                "trainer.limit_train_batches must be set to an integer when using "
                 "train_from_buffer (the model needs to know how many batches to sample from the buffer each epoch)."
             )
             limit = self.trainer.limit_train_batches
@@ -152,6 +155,49 @@ class SinglePeptideDataModule(BaseDataModule):
             )
 
         logging.info(f"Train dataset size: {len(self.data_train)}")
+
+    def prepare_eval(self, sequence: str, stage: str) -> EvalContext:
+        """
+        Prepare evaluation data and energy function for validation or test trajectories.
+        """
+        assert sequence == self.sequence, f"Requested eval sequence '{sequence}' does not match datamodule sequence '{self.sequence}'"
+        if stage == "test":
+            true_samples = torch.from_numpy(np.load(self.test_data_path))
+        elif stage == "val":
+            true_samples = torch.from_numpy(np.load(self.val_data_path))
+        else:
+            raise ValueError(f"Unknown stage: {stage}. Use 'val' or 'test'.")
+
+        # Load PDB/topology if not already loaded (e.g. eval-only runs)
+        if not hasattr(self, "pdb"):
+            self.pdb = openmm.app.PDBFile(self.pdb_path)
+        if not hasattr(self, "topology"):
+            self.topology = md.load_topology(self.pdb_path)
+        if not hasattr(self, "std"):
+            data_train = torch.from_numpy(np.load(self.train_data_path))
+            self.std = (data_train - data_train.mean(dim=1, keepdim=True)).std()
+
+        tica_model = get_tica_model(true_samples, self.topology)
+
+        # Subsample the true trajectory
+        true_samples = true_samples[:: len(true_samples) // self.num_eval_samples]
+
+        potential = self._setup_potential()
+        energy_fn = lambda x: potential(x)
+
+        true_data = SamplesData(
+            samples=true_samples,
+            E_target=potential(true_samples),
+        )
+
+        return EvalContext(
+            true_data=true_data,
+            target_energy=TargetEnergy(energy_fn=energy_fn, normalization_std=self.std),
+            normalization_std=self.std,
+            system_cond=None,
+            tica_model=tica_model,
+            topology=self.topology,
+        )
 
     def _setup_potential(self):
         """
@@ -202,46 +248,3 @@ class SinglePeptideDataModule(BaseDataModule):
             potential = OpenMMEnergy(system, integrator, platform_name=platform_name, device_index=device_index)
 
         return potential
-
-    def prepare_eval(self, sequence: str, stage: str) -> EvalContext:
-        """
-        Prepare evaluation data and energy function for validation or test trajectories.
-        """
-        assert sequence == self.sequence, f"Requested eval sequence '{sequence}' does not match datamodule sequence '{self.sequence}'"
-        if stage == "test":
-            true_samples = torch.from_numpy(np.load(self.test_data_path))
-        elif stage == "val":
-            true_samples = torch.from_numpy(np.load(self.val_data_path))
-        else:
-            raise ValueError(f"Unknown stage: {stage}. Use 'val' or 'test'.")
-
-        # Load PDB/topology if not already loaded (e.g. eval-only runs)
-        if not hasattr(self, "pdb"):
-            self.pdb = openmm.app.PDBFile(self.pdb_path)
-        if not hasattr(self, "topology"):
-            self.topology = md.load_topology(self.pdb_path)
-        if not hasattr(self, "std"):
-            data_train = torch.from_numpy(np.load(self.train_data_path))
-            self.std = (data_train - data_train.mean(dim=1, keepdim=True)).std()
-
-        tica_model = get_tica_model(true_samples, self.topology)
-
-        # Subsample the true trajectory
-        true_samples = true_samples[:: len(true_samples) // self.num_eval_samples]
-
-        potential = self._setup_potential()
-        energy_fn = lambda x: potential(x)
-
-        true_data = SamplesData(
-            samples=true_samples,
-            energy=potential(true_samples),
-        )
-
-        return EvalContext(
-            true_data=true_data,
-            target_energy=TargetEnergy(energy_fn=energy_fn, normalization_std=self.std),
-            normalization_std=self.std,
-            system_cond=None,
-            tica_model=tica_model,
-            topology=self.topology,
-        )

@@ -1,8 +1,7 @@
 import torch
 from tqdm import tqdm
 
-"""Start encodings from 1 to leave 0 for zero padding"""
-
+# Start encodings from 1 to leave 0 for zero padding.
 ATOM_TYPE_encodings_DICT = {
     "C": 1,
     "CA": 2,

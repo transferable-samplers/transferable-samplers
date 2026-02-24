@@ -4,7 +4,5 @@ defaults:
 # compile model for faster training with pytorch 2.0
 compile_net: false
 
-output_dir: ${paths.output_dir}
-
 source_energy_config: null
 train_from_buffer: false

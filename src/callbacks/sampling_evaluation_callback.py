@@ -1,3 +1,4 @@
+import os
 from functools import partial
 from typing import Optional
 
@@ -21,7 +22,8 @@ class SamplingEvaluationCallback(Callback):
     On validation/test epoch end:
     1. Loops over sequences, generating samples via self.sampler (all ranks)
     2. Global zero only: evaluates samples, plots, logs per-sequence metrics
-    3. Global zero only: aggregates and logs mean metrics across sequences
+    3. Global zero only: saves samples and diagnostics to disk
+    4. Global zero only: aggregates and logs mean metrics across sequences
 
     EMA weight swapping is handled by the EMAWeightAveraging callback.
     """
@@ -31,11 +33,13 @@ class SamplingEvaluationCallback(Callback):
         evaluator: PeptideEnsembleEvaluator,
         sampler: Optional[BaseSampler] = None,
         run_diagnostics_kwargs: Optional[dict] = None,
+        output_dir: str = "",
     ):
         super().__init__()
         self.evaluator = evaluator
         self.sampler = sampler
         self.run_diagnostics_kwargs = run_diagnostics_kwargs or {}
+        self.output_dir = output_dir
 
     def on_validation_epoch_end(self, trainer, pl_module):
         self.evaluate(trainer, pl_module, "val")
@@ -69,10 +73,12 @@ class SamplingEvaluationCallback(Callback):
                 eval_ctx.target_energy,
             )
 
-            # Only rank 0: evaluate, plot, log per-sequence metrics
+            # Only rank 0: evaluate, plot, save, log per-sequence metrics
             if trainer.is_global_zero:
                 if diagnostics is not None:
                     plot_smc_diagnostics(diagnostics, log_image_fn)
+
+                self._save_samples(seq_prefix, samples_dict, diagnostics)
 
                 seq_metrics = self.evaluator.evaluate(
                     samples_dict,
@@ -100,3 +106,18 @@ class SamplingEvaluationCallback(Callback):
             plt.close("all")
             mean_metrics = compute_mean_metrics(all_metrics, prefix=prefix)
             pl_module.log_dict(mean_metrics)
+
+    def _save_samples(self, seq_prefix: str, samples_dict: dict, diagnostics) -> None:
+        """Save samples_dict and diagnostics to disk under output_dir/seq_prefix/."""
+        if not self.output_dir:
+            return
+
+        save_dir = os.path.join(self.output_dir, seq_prefix)
+        os.makedirs(save_dir, exist_ok=True)
+
+        torch.save(samples_dict, os.path.join(save_dir, "samples_dict.pt"))
+        logger.info(f"Saved samples_dict to {save_dir}/samples_dict.pt")
+
+        if diagnostics is not None:
+            torch.save(diagnostics, os.path.join(save_dir, "diagnostics.pt"))
+            logger.info(f"Saved diagnostics to {save_dir}/diagnostics.pt")

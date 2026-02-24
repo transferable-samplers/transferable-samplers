@@ -72,7 +72,7 @@ class PeptideEnsembleEvaluator:
         samples_data_dict = {
             name: SamplesData(
                 destandardize_coords(data.samples, normalization_std),
-                data.energy,
+                data.E_target,
                 logw=data.logw,
             )
             for name, data in samples_data_dict.items()
@@ -133,8 +133,8 @@ class PeptideEnsembleEvaluator:
 
             plot_energies(
                 log_image_fn,
-                true_plot.energy,
-                {name: data.energy for name, data in plot_dict.items()},
+                true_plot.E_target,
+                {name: data.E_target for name, data in plot_dict.items()},
                 prefix=prefix,
             )
             plot_atom_distances(
@@ -177,10 +177,10 @@ class PeptideEnsembleEvaluator:
             ess = normalized_ess(pred_data.logw)
             metrics[f"{prefix}/effective_sample_size"] = ess
 
-        metrics[f"{prefix}/mean_energy"] = pred_data.energy.mean().cpu()
-        metrics[f"{prefix}/median_energy"] = pred_data.energy.median().cpu()
+        metrics[f"{prefix}/mean_energy"] = pred_data.E_target.mean().cpu()
+        metrics[f"{prefix}/median_energy"] = pred_data.E_target.median().cpu()
 
-        metrics.update(energy_wasserstein(true_data.energy, pred_data.energy, prefix=prefix))
+        metrics.update(energy_wasserstein(true_data.E_target, pred_data.E_target, prefix=prefix))
         logger.info("Energy wasserstein computed")
 
         metrics.update(torus_wasserstein(true_data.samples, pred_data.samples, topology, prefix=prefix))
@@ -246,7 +246,7 @@ class PeptideEnsembleEvaluator:
 
         if self.fix_symmetry:
             samples[first_symmetry_change] *= -1
-            energy = pred_data.energy
+            energy = pred_data.E_target
             logw = pred_data.logw
 
             if self.drop_unfixable_symmetry:

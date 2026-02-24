@@ -51,13 +51,11 @@ class OpenMMEnergy:
         from openmm import Context, Platform, unit
 
         self._system = system
-
-        # Conversion factor: energy in kJ/mol -> dimensionless kT units
         self._unit_reciprocal = 1.0 / (
             integrator.getTemperature() * unit.MOLAR_GAS_CONSTANT_R
         ).value_in_unit(unit.kilojoule_per_mole)
 
-        # Create OpenMM context
+        # Construct platform and context
         platform = Platform.getPlatformByName(platform_name)
         properties = {}
         if platform_name == "CPU":

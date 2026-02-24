@@ -30,14 +30,14 @@ from typing import Optional
 
 import torch
 
-from src.evaluation.metrics.ess import normalized_ess
 from src.samplers.base_sampler import BaseSampler
-from src.samplers.smc.mcmc import mcmc_kernel
-from src.samplers.smc.smc_particles import SMCParticles, all_gather_particles
 from src.samplers.filtering import filter_by_energy_cutoff, filter_by_logw_quantile
 from src.samplers.resampling import resampling_idx
-from src.utils.dist_utils import all_gather_cat, broadcast_tensor, get_rank, get_world_size, shard_tensor
+from src.samplers.smc.mcmc import mcmc_kernel
+from src.samplers.smc.smc_particles import SMCParticles, all_gather_particles
+from src.evaluation.metrics.ess import normalized_ess
 from src.utils.dataclasses import SamplesData, SourceEnergy, TargetEnergy
+from src.utils.dist_utils import all_gather_cat, broadcast_tensor, get_rank, get_world_size, shard_tensor
 from src.utils.pylogger import RankedLogger
 
 logger = RankedLogger(__name__, rank_zero_only=False)
@@ -57,9 +57,9 @@ class SMCSampler(BaseSampler):
         init_eps: float = 1e-7,
         use_metropolis: bool = False,
         num_annealing_steps: int = 100,
+        adaptive_step_size: bool = False,
         ess_threshold: float = -1.0,
         resampling_method: str = "multinomial",
-        adaptive_step_size: bool = False,
         energy_cutoff_filter: Optional[float] = None,
         logw_quantile_filter: Optional[float] = None,
         log_traj_freq: int = 10,
@@ -67,14 +67,14 @@ class SMCSampler(BaseSampler):
         super().__init__(num_samples)
         logger.warning("init_eps has replaced langevin_eps, and has been reparameterized such that langevin_eps = init_eps * dt")
 
-        self.energy_cutoff_filter = energy_cutoff_filter
-        self.logw_quantile_filter = logw_quantile_filter
         self.init_eps = init_eps
         self.use_metropolis = use_metropolis
         self.num_annealing_steps = num_annealing_steps
+        self.adaptive_step_size = adaptive_step_size
         self.ess_threshold = ess_threshold
         self.resampling_method = resampling_method
-        self.adaptive_step_size = adaptive_step_size
+        self.energy_cutoff_filter = energy_cutoff_filter
+        self.logw_quantile_filter = logw_quantile_filter
         self.log_traj_freq = log_traj_freq
 
     @torch.no_grad()  # sampling path, no training gradients needed
@@ -100,23 +100,23 @@ class SMCSampler(BaseSampler):
         # Store for evaluation / plotting
         proposal_data = SamplesData(samples, E_target)
 
-        # ── Filter by energy cutoff (all ranks do same filtering to maintain alignment) ───────────────────────────────
+        # Filter by energy cutoff (all ranks do same filtering to maintain same shape)
         if self.energy_cutoff_filter is not None:
             samples, E_source, E_target = filter_by_energy_cutoff(samples, E_source, E_target, self.energy_cutoff_filter)
             logger.info("Clipping energies")
 
-        # ── Clip by logit quantile ────────────────────────────────────────
+        # Clip by logit quantile (all ranks do same filtering to maintain same shape)
         if self.logw_quantile_filter is not None:
             samples, E_source, E_target = filter_by_logw_quantile(samples, E_source, E_target, self.logw_quantile_filter)
             logger.info("Clipped proposal logw for SMC initialisation")
 
-        # ── Shard across DDP ranks (no-op if single GPU) ─────────────────
+        # Shard across DDP ranks (no-op otherwise)
         n_total = (len(samples) // world_size) * world_size # trim to be divisible
         lineage = torch.arange(n_total, device=samples.device) # track original sample indices for diagnostics
         X = shard_tensor(samples[:n_total])
         loc_lineage = shard_tensor(lineage)
 
-        # ── Initialize particles ──────────────────────────────────────────
+        # Initialize SMCParticles with local samples and energies
         loc_E_source, loc_E_source_grad = source_energy.energy_and_grad(X)
         loc_E_target, loc_E_target_grad = target_energy.energy_and_grad(X)
         loc_particles = SMCParticles(
@@ -134,7 +134,7 @@ class SMCSampler(BaseSampler):
             "t": [], "ess": [], "eps": [], "acceptance_rate": [],
         }
 
-        # ── Annealing loop ────────────────────────────────────────────────
+        # Main loop
         t_previous = 0.0
         for j, t in enumerate(timesteps[:-1]):
 
@@ -191,8 +191,6 @@ class SMCSampler(BaseSampler):
 
         smc_data = SamplesData(loc_particles.x, loc_particles.E_target, logw=loc_particles.logw)
         return {"proposal": proposal_data, "smc": smc_data}, {"trajectory": trajectory, "diagnostics": diagnostics}
-
-    # ── Step size scheduling ─────────────────────────────────────────────
 
     @staticmethod
     def _adapt_eps(eps, acceptance_rate):

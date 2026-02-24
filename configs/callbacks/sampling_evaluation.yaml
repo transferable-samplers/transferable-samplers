@@ -3,3 +3,4 @@ sampling_evaluation:
   sampler: null
   evaluator:
     _target_: src.evaluation.evaluator.PeptideEnsembleEvaluator
+  output_dir: ${paths.output_dir}

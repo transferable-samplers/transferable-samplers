@@ -18,7 +18,6 @@ from dotenv import load_dotenv
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 load_dotenv(override=True)
 
-# ------------------------------------------------------------------------------------ #
 # the setup_root above is equivalent to:
 # - adding project root dir to PYTHONPATH
 #       (so you don't need to force user to install project as a package)
@@ -33,7 +32,6 @@ load_dotenv(override=True)
 # 2. set `root_dir` to "." in "configs/paths/default.yaml"
 #
 # more info: https://github.com/ashleve/rootutils
-# ------------------------------------------------------------------------------------ #
 
 from src.utils.init_resume_utils import resolve_init
 from src.utils.instantiators import instantiate_callbacks, instantiate_loggers
