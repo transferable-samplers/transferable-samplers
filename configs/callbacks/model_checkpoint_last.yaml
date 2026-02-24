@@ -3,7 +3,7 @@ model_checkpoint_last:
   dirpath: ${paths.output_dir}/checkpoints
   verbose: True
   save_last: True
-  save_top_k: 1          # save no "best" checkpoints
-  monitor: null          # no metric required
-  every_n_epochs: 1      # <-- this is the trigger that guarantees saving
+  save_top_k: 1 # save no "best" checkpoints
+  monitor: null # no metric required
+  every_n_epochs: 1 # <-- this is the trigger that guarantees saving
   save_on_train_epoch_end: True

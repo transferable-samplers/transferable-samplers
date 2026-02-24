@@ -1,6 +1,5 @@
 import logging
-import os
-from typing import Optional
+from pathlib import Path
 
 import mdtraj as md
 import numpy as np
@@ -19,6 +18,7 @@ from transferable_samplers.data.transforms.center_of_mass import CenterOfMassTra
 from transferable_samplers.data.transforms.rotation import Random3DRotationTransform
 from transferable_samplers.data.transforms.standardize import StandardizeTransform
 from transferable_samplers.utils.dataclasses import EvalContext, SamplesData, TargetEnergy
+
 
 class SinglePeptideDataModule(BaseDataModule):
     HF_REPO_ID = "transferable-samplers/sequential-boltzmann-generators-data"
@@ -76,11 +76,11 @@ class SinglePeptideDataModule(BaseDataModule):
         Do not use it to assign state (self.x = y).
         """
         required_files = [self.train_data_path, self.val_data_path, self.test_data_path, self.pdb_path]
-        if all(os.path.exists(f) for f in required_files):
+        if all(Path(f).exists() for f in required_files):
             logging.info(f"All required files already exist for {self.trajectory_name}, skipping download.")
             return
 
-        os.makedirs(f"{self.data_dir}/{self.repo_name}", exist_ok=True)
+        Path(f"{self.data_dir}/{self.repo_name}").mkdir(parents=True, exist_ok=True)
 
         local_dir = snapshot_download(
             repo_id=self.HF_REPO_ID,
@@ -91,7 +91,7 @@ class SinglePeptideDataModule(BaseDataModule):
         )
         logging.info(f"Downloaded dataset to {local_dir}")
 
-    def setup(self, stage: Optional[str] = None) -> None:
+    def setup(self, stage: str | None = None) -> None:
         """Load data. Set variables: `self.data_train`, `self.data_val`, `self.data_test`.
 
         This method is called by Lightning before `trainer.fit()`, `trainer.validate()`, `trainer.test()`, and
@@ -127,10 +127,12 @@ class SinglePeptideDataModule(BaseDataModule):
         self.topology_dict = {self.sequence: self.topology}
 
         transform_list = [
+            # pyrefly: ignore [bad-argument-type]
             StandardizeTransform(self.std),
             Random3DRotationTransform(),
         ]
         if self.com_augmentation:
+            # pyrefly: ignore [bad-argument-type]
             transform_list.append(CenterOfMassTransform())
         train_transforms = torchvision.transforms.Compose(transform_list)
 
@@ -138,9 +140,11 @@ class SinglePeptideDataModule(BaseDataModule):
             # Buffer transforms are the same as train transforms for single peptide
             # (no encoding/permutation lookups or padding needed)
             # Stored to be accessed by the model for buffer sampling.
+            # pyrefly: ignore [missing-attribute]
             self.buffer_transforms = self.train_transforms
 
             # Placeholder dataset; model owns the buffer and samples from it
+            # pyrefly: ignore [missing-attribute]
             assert isinstance(self.trainer.limit_train_batches, int), (
                 "trainer.limit_train_batches must be set to an integer when using "
                 "train_from_buffer (the model needs to know how many batches to sample from the buffer each epoch)."
@@ -149,6 +153,7 @@ class SinglePeptideDataModule(BaseDataModule):
             dummy_size = limit * self.batch_size_per_device
             self.data_train = DummyDataset(size=dummy_size)
         else:
+            # pyrefly: ignore [bad-assignment]
             self.data_train = TensorDataset(
                 data=data_train,
                 transform=train_transforms,
@@ -160,7 +165,9 @@ class SinglePeptideDataModule(BaseDataModule):
         """
         Prepare evaluation data and energy function for validation or test trajectories.
         """
-        assert sequence == self.sequence, f"Requested eval sequence '{sequence}' does not match datamodule sequence '{self.sequence}'"
+        assert sequence == self.sequence, (
+            f"Requested eval sequence '{sequence}' does not match datamodule sequence '{self.sequence}'"
+        )
         if stage == "test":
             true_samples = torch.from_numpy(np.load(self.test_data_path))
         elif stage == "val":
@@ -212,15 +219,18 @@ class SinglePeptideDataModule(BaseDataModule):
             system = forcefield.createSystem(
                 self.pdb.topology,
                 nonbondedMethod=openmm.app.NoCutoff,
+                # pyrefly: ignore [implicit-import, missing-attribute]
                 nonbondedCutoff=0.9 * openmm.unit.nanometer,
                 constraints=None,
             )
             temperature = 300
+            # pyrefly: ignore [missing-attribute]
             integrator = openmm.LangevinMiddleIntegrator(
+                # pyrefly: ignore [implicit-import, unsupported-operation]
                 temperature * openmm.unit.kelvin,
-                0.3 / openmm.unit.picosecond
-                if self.sequence == "Ace-AAA-Nme"
-                else 1.0 / openmm.unit.picosecond,
+                # pyrefly: ignore [implicit-import, missing-attribute]
+                0.3 / openmm.unit.picosecond if self.sequence == "Ace-AAA-Nme" else 1.0 / openmm.unit.picosecond,
+                # pyrefly: ignore [implicit-import, missing-attribute]
                 1.0 * openmm.unit.femtosecond,
             )
             platform_name = "CUDA" if torch.cuda.is_available() else "CPU"
@@ -233,12 +243,17 @@ class SinglePeptideDataModule(BaseDataModule):
             system = forcefield.createSystem(
                 self.pdb.topology,
                 nonbondedMethod=openmm.app.CutoffNonPeriodic,
+                # pyrefly: ignore [implicit-import, missing-attribute]
                 nonbondedCutoff=2.0 * openmm.unit.nanometer,
                 constraints=None,
             )
+            # pyrefly: ignore [missing-attribute]
             integrator = openmm.LangevinMiddleIntegrator(
+                # pyrefly: ignore [implicit-import, unsupported-operation]
                 temperature * openmm.unit.kelvin,
+                # pyrefly: ignore [implicit-import, missing-attribute]
                 0.3 / openmm.unit.picosecond,
+                # pyrefly: ignore [implicit-import, missing-attribute]
                 1.0 * openmm.unit.femtosecond,
             )
 

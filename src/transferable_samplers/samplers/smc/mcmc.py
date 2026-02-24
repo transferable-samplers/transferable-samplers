@@ -1,4 +1,3 @@
-
 import torch
 
 from transferable_samplers.samplers.smc.smc_particles import SMCParticles, merge_particles
@@ -56,7 +55,9 @@ def metropolis_accept(current: SMCParticles, proposal: SMCParticles, t, dt, eps)
     logp = -E_interp_proposal + E_interp
     logp += (
         -0.5
-        * torch.sum(((current.x - proposal.x + h * E_interp_grad_proposal) ** 2).reshape(current.x.shape[0], -1), dim=-1)
+        * torch.sum(
+            ((current.x - proposal.x + h * E_interp_grad_proposal) ** 2).reshape(current.x.shape[0], -1), dim=-1
+        )
         / (2 * h)
     )
     logp -= (
@@ -80,7 +81,9 @@ def mcmc_kernel(
     particles: SMCParticles,
     source: SourceEnergy,
     target: TargetEnergy,
-    t, dt, eps,
+    t,
+    dt,
+    eps,
     use_metropolis: bool = False,
 ):
     """One MCMC step: Langevin proposal, optionally followed by MH correction."""

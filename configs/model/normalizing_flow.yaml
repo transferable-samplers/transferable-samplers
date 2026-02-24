@@ -2,15 +2,12 @@ defaults:
   - default
   - net: tarflow
   - scheduler: cosine
-
 _target_: transferable_samplers.models.normalizing_flow_module.NormalizingFlowModule
 mean_free_prior: False
-
 prior:
   _target_: transferable_samplers.models.priors.normal_distribution.NormalDistribution
   num_dimensions: ${data.num_dimensions}
   mean_free: false
-
 optimizer:
   lr: 1e-4
   betas:

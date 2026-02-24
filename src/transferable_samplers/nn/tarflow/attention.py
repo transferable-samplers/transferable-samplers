@@ -115,6 +115,7 @@ class Attention(torch.nn.Module):
         # if provided, project pair from (B, seq_len, seq_len, C) to (B, seq_len, seq_len, num_heads)
         # and then rearrange to (B, num_heads, seq_len, seq_len).
         # if not provided, set bias to 0.0
+        # pyrefly: ignore [bad-argument-type]
         bias = rearrange(pair, "b ... h -> b h ...") if (exists(pair) and self.use_attn_pair_bias) else 0.0
         q, k, v = map(lambda t: rearrange(t, "b ... (h d) -> b h ... d", h=self.num_heads), (q, k, v))
 
@@ -137,6 +138,7 @@ class Attention(torch.nn.Module):
                 attn_mask.masked_fill_(mask.logical_not(), float("-inf"))
                 mask = attn_mask + bias
             else:
+                # pyrefly: ignore [bad-assignment]
                 mask = bias
 
         x = torch.nn.functional.scaled_dot_product_attention(
@@ -163,6 +165,7 @@ class Attention(torch.nn.Module):
         q = self.q_layer_norm(q)
         k = self.k_layer_norm(k)
 
+        # pyrefly: ignore [bad-argument-type]
         bias = rearrange(pair, "b ... h -> b h ...") if (exists(pair) and self.use_attn_pair_bias) else 0.0
 
         q, k, v = map(lambda t: rearrange(t, "b ... (h d) -> b h ... d", h=self.num_heads), (q, k, v))
@@ -189,6 +192,7 @@ class Attention(torch.nn.Module):
         sim = einsum("b h i d, b h j d -> b h i j", q, k) * scale
         sim += bias
         if exists(mask):
+            # pyrefly: ignore [missing-attribute]
             mask = mask.bool()
             attn_mask = torch.zeros_like(mask, dtype=q.dtype)
             attn_mask.masked_fill_(mask.logical_not(), max_neg_value(sim))

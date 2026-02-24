@@ -1,13 +1,12 @@
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional, Tuple
 
 import scipy.special
 import torch
 import torch.utils._pytree as pytree
 
 from transferable_samplers.utils.standardization import destandardize_coords
-
 
 
 @dataclass
@@ -17,13 +16,14 @@ class TargetEnergy:
     Handles unnormalization internally: callers pass normalized samples,
     and the energy function receives unnormalized positions.
     """
+
     energy_fn: Callable  # (x_unnormalized) -> energy (batch,)
     normalization_std: torch.Tensor
 
     def energy(self, x: torch.Tensor) -> torch.Tensor:
         return self.energy_fn(destandardize_coords(x, self.normalization_std))
 
-    def energy_and_grad(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def energy_and_grad(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         if torch.is_grad_enabled():
             raise RuntimeError(
                 "TargetEnergy.energy_and_grad() is non-differentiable by design."
@@ -40,6 +40,7 @@ class TargetEnergy:
 @dataclass(frozen=True)
 class SourceEnergyConfig:
     """Configuration for SourceEnergy batch sizes. Passed via Hydra configs."""
+
     sample_batch_size: int
     energy_batch_size: int
     grad_batch_size: int
@@ -53,8 +54,9 @@ class SourceEnergy:
     Created via BaseLightningModule.build_source_energy(). Handles batching
     internally for sample, energy, and energy_and_grad.
     """
-    sample_fn: Callable        # (num_samples) -> (samples, E_source)
-    energy_fn: Callable        # (x) -> energy (batch,)
+
+    sample_fn: Callable  # (num_samples) -> (samples, E_source)
+    energy_fn: Callable  # (x) -> energy (batch,)
     sample_batch_size: int
     energy_batch_size: int
     grad_batch_size: int
@@ -77,12 +79,11 @@ class SourceEnergy:
         # Compute the Norms of the CoM for each sample in the batch.
         com_norms = x.mean(dim=1).norm(dim=-1)
 
-        return (
-            com_norms ** 2 / (2 * com_std_analytic ** 2)
-            - torch.log(com_norms**2 / (math.sqrt(2) * com_std_analytic**3 * scipy.special.gamma(1.5)))
+        return com_norms**2 / (2 * com_std_analytic**2) - torch.log(
+            com_norms**2 / (math.sqrt(2) * com_std_analytic**3 * scipy.special.gamma(1.5))
         )
 
-    def sample(self, num_samples: int, **kwargs) -> Tuple[torch.Tensor, torch.Tensor]:
+    def sample(self, num_samples: int, **kwargs) -> tuple[torch.Tensor, torch.Tensor]:
         """Generate num_samples proposals in batches.
 
         If use_com_adjustment is True, applies a CoM energy adjustment
@@ -104,7 +105,7 @@ class SourceEnergy:
 
         return samples, E_source
 
-    def energy(self, x: torch.Tensor, batch_size: Optional[int] = None) -> torch.Tensor:
+    def energy(self, x: torch.Tensor, batch_size: int | None = None) -> torch.Tensor:
         """Compute energy in batches.
                 If use_com_adjustment is True, applies a CoM energy adjustment
         using std = 1/sqrt(num_atoms), as per Prop. 1 of https://arxiv.org/pdf/2502.18462.
@@ -119,9 +120,7 @@ class SourceEnergy:
             out[i : i + bs] = out_batch
         return out
 
-    def energy_and_grad(
-        self, x: torch.Tensor, batch_size: Optional[int] = None
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    def energy_and_grad(self, x: torch.Tensor, batch_size: int | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Compute energy and gradient in batches.
         If use_com_adjustment is True, applies a CoM energy adjustment
@@ -129,8 +128,9 @@ class SourceEnergy:
         """
         if torch.is_grad_enabled():
             raise RuntimeError(
-                "SourceEnergy.energy_and_grad() is non-differentiable by convention with TargetEnergy.energy_and_grad()."
-                "Use SourceEnergy.energy() for differentiable energy evaluations."
+                "SourceEnergy.energy_and_grad() is non-differentiable by convention "
+                "with TargetEnergy.energy_and_grad(). "
+                "Use SourceEnergy.energy() for differentiable energy evaluations. "
                 "Take care to test well if removing this!"
             )
         bs = batch_size or self.grad_batch_size
@@ -154,14 +154,17 @@ class SystemCond:
 
     Stores unbatched conditioning tensors. Use for_batch() to expand to batch size.
     """
-    permutations: Optional[dict] = None
-    encodings: Optional[dict] = None
+
+    permutations: dict | None = None
+    encodings: dict | None = None
 
     def for_batch(self, batch_size: int, device=None) -> "SystemCond":
         """Expand unbatched conditioning tensors to batch_size and move to device."""
+
         def expand(v):
             v = v.unsqueeze(0).expand(batch_size, *v.shape)
             return v.to(device) if device is not None else v
+
         return SystemCond(
             encodings=pytree.tree_map(expand, self.encodings) if self.encodings else None,
             permutations=pytree.tree_map(expand, self.permutations) if self.permutations else None,
@@ -172,6 +175,7 @@ class SystemCond:
 class SamplesData:
     samples: torch.Tensor
     E_target: torch.Tensor
+    # pyrefly: ignore [bad-assignment]
     logw: torch.Tensor = None
 
     def __post_init__(self):
@@ -186,6 +190,7 @@ class SamplesData:
         return SamplesData(
             self.samples[index],
             self.E_target[index],
+            # pyrefly: ignore [bad-argument-type]
             self.logw[index] if self.logw is not None else None,
         )
 
@@ -195,6 +200,6 @@ class EvalContext:
     true_data: "SamplesData"
     target_energy: TargetEnergy
     normalization_std: torch.Tensor
-    system_cond: Optional[SystemCond]
-    tica_model: Optional[object] = None
-    topology: Optional[object] = None
+    system_cond: SystemCond | None
+    tica_model: object | None = None
+    topology: object | None = None

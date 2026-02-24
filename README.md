@@ -1,14 +1,14 @@
 > [!IMPORTANT]
 > **Critical Dataset Update**
-> 
+>
 > The original 8AA TICA models within `https://huggingface.co/datasets/transferable-samplers/many-peptides-md/subsampled_trajectories/*/8AA/*.npz` employed a CA-only atom selection. **These models are not valid for comparison to results in our paper.**
-> 
+>
 > **Updated files (uploaded 15/12/2025)** now contain corrected models. If you previously downloaded this dataset, please re-download to ensure accurate results.
 >
 > Note: Codebase references to `tica_features_ca` must now be replaced with `tica_features`. **This was resolved in our codebase by [PR #26](https://github.com/transferable-samplers/transferable-samplers/pull/26).**
 >
 > Note: Unguarded `snapshot_download` calls will automatically redownload the relevant files when it detects a change in the repo.
-> 
+>
 > We sincerely apologize for any inconvenience this may have caused.
 
 # Transferable Samplers
@@ -75,7 +75,7 @@ We would like to thank Hugging Face for hosting our large ManyPeptidesMD dataset
 
 ## License
 
-The core of this repository is licensed under the MIT License (see [LICENSE](./LICENSE)).  
-Some files include adaptation of third-party code under other licenses (Apple, Meta, NVIDIA, Klein & Noé).  
+The core of this repository is licensed under the MIT License (see [LICENSE](./LICENSE)).
+Some files include adaptation of third-party code under other licenses (Apple, Meta, NVIDIA, Klein & Noé).
 In some cases, these thrid-party licenses are **non-commerical**.
 See [NOTICE](./NOTICE) for details.

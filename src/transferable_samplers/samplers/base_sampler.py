@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any
 
 from transferable_samplers.utils.dataclasses import SamplesData, SourceEnergy, TargetEnergy
 
@@ -20,7 +20,7 @@ class BaseSampler(ABC):
         self,
         source_energy: SourceEnergy,
         target_energy: TargetEnergy,
-    ) -> tuple[dict[str, SamplesData], Optional[Any]]:
+    ) -> tuple[dict[str, SamplesData], Any | None]:
         """Run the full sampling pipeline.
 
         Args:

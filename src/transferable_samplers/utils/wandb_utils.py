@@ -1,6 +1,7 @@
 import statistics as stats
 from collections import defaultdict
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 import torch
 from lightning.pytorch.loggers import WandbLogger
@@ -23,7 +24,7 @@ def compute_mean_metrics(metrics: dict, prefix: str = "val") -> dict:
 
             if isinstance(value, torch.Tensor):
                 value = value.item()
-            elif isinstance(value, (int, float)):
+            elif isinstance(value, int | float):
                 value = float(value)
 
             mean_dict_list[f"{prefix}/mean/{metric_name}"].append(value)
@@ -31,13 +32,14 @@ def compute_mean_metrics(metrics: dict, prefix: str = "val") -> dict:
     return {k: stats.mean(v) for k, v in mean_dict_list.items()}
 
 
-def make_log_image_fn(trainer) -> Callable[[Any, Optional[str]], None]:
+def make_log_image_fn(trainer) -> Callable[[Any, str | None], None]:
     """Return a safe image logger function.
 
     - Logs only on global rank 0
     - If no WandbLogger is present, becomes a no-op
     """
     if not getattr(trainer, "is_global_zero", False):
+        # pyrefly: ignore [bad-return]
         return lambda img, title=None, title_prefix="": None
 
     wandb_logger = None
@@ -47,10 +49,12 @@ def make_log_image_fn(trainer) -> Callable[[Any, Optional[str]], None]:
             break
 
     if wandb_logger is None:
+        # pyrefly: ignore [bad-return]
         return lambda img, title=None, title_prefix="": None
 
-    def log_image(img, title: Optional[str] = None, title_prefix: str = ""):
+    def log_image(img, title: str | None = None, title_prefix: str = ""):
         full_title = f"{title_prefix}/{title}" if title_prefix and title else (title or title_prefix)
+        # pyrefly: ignore [missing-attribute]
         wandb_logger.log_image(full_title, [img])
 
     return log_image
@@ -77,6 +81,7 @@ def log_hyperparameters(object_dict: dict[str, Any], resolve: bool = True) -> No
         logger.warning("Logger not found! Skipping hyperparameter logging...")
         return
 
+    # pyrefly: ignore [bad-index, unsupported-operation]
     hparams["model"] = cfg["model"]
 
     # save number of model parameters
@@ -84,16 +89,25 @@ def log_hyperparameters(object_dict: dict[str, Any], resolve: bool = True) -> No
     hparams["model/params/trainable"] = sum(p.numel() for p in model.parameters() if p.requires_grad)
     hparams["model/params/non_trainable"] = sum(p.numel() for p in model.parameters() if not p.requires_grad)
 
+    # pyrefly: ignore [bad-index, unsupported-operation]
     hparams["data"] = cfg["data"]
+    # pyrefly: ignore [bad-index, unsupported-operation]
     hparams["trainer"] = cfg["trainer"]
 
+    # pyrefly: ignore [missing-attribute]
     hparams["callbacks"] = cfg.get("callbacks")
+    # pyrefly: ignore [missing-attribute]
     hparams["extras"] = cfg.get("extras")
 
+    # pyrefly: ignore [missing-attribute]
     hparams["task_name"] = cfg.get("task_name")
+    # pyrefly: ignore [missing-attribute]
     hparams["tags"] = cfg.get("tags")
+    # pyrefly: ignore [missing-attribute]
     hparams["ckpt_path"] = cfg.get("ckpt_path")
+    # pyrefly: ignore [missing-attribute]
     hparams["seed"] = cfg.get("seed")
+    # pyrefly: ignore [missing-attribute]
     hparams["paths"] = cfg.get("paths")
 
     # send hparams to all loggers

@@ -57,6 +57,7 @@ class GNN(nn.Module):
         # Edit Emiel: Remove velocity as input
         h = self.embedding(h)
         for i in range(0, self.n_layers):
+            # pyrefly: ignore [not-callable]
             h, _ = self._modules[f"gcl_{i}"](h, edges, edge_attr=edge_attr, node_mask=node_mask, edge_mask=edge_mask)
         h = self.embedding_out(h)
 

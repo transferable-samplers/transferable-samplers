@@ -1,13 +1,13 @@
 # ruff: noqa: E402, I001
 
-from typing import Any, Optional
+from typing import Any
 import logging
 
 
 import time
 import random
 import hydra
-import lightning as L
+import lightning
 import rootutils
 import torch
 from lightning import Callback, LightningDataModule, LightningModule, Trainer
@@ -66,7 +66,7 @@ def eval(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
     """
     # set seed for random number generators in pytorch, numpy and python.random
     if cfg.get("seed"):
-        L.seed_everything(cfg.seed, workers=True)
+        lightning.seed_everything(cfg.seed, workers=True)
 
     if cfg.get("torch_num_threads"):
         torch.set_num_threads(cfg.torch_num_threads)
@@ -131,7 +131,7 @@ def eval(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
 
 
 @hydra.main(version_base="1.3", config_path="../../configs", config_name="eval.yaml")
-def main(cfg: DictConfig) -> Optional[float]:
+def main(cfg: DictConfig) -> float | None:
     """Main entry point for training.
 
     :param cfg: DictConfig configuration composed by Hydra.
@@ -151,6 +151,7 @@ def main(cfg: DictConfig) -> Optional[float]:
         time.sleep(sleep_time)
 
     # train the model
+    # pyrefly: ignore [bad-argument-type]
     metric_dict, _ = eval(cfg)
 
     # safely retrieve metric value for hydra-based hyperparameter optimization

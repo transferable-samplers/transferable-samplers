@@ -18,6 +18,7 @@ class NormalDistribution(Prior):
         if self.mean_free:
             if mask is None:
                 mask = torch.ones((num_samples, num_atoms), device=device)
+            # pyrefly: ignore [no-matching-overload]
             com = (x * mask[..., None]).sum(dim=1, keepdims=True) / mask.sum(dim=1, keepdims=True)[..., None]
             x = x - com
             x *= mask[..., None]
@@ -30,6 +31,7 @@ class NormalDistribution(Prior):
         if mask is None:
             mask = torch.ones((num_samples, num_atoms), device=x.device)
         if self.mean_free:
+            # pyrefly: ignore [no-matching-overload]
             com = (x * mask[..., None]).sum(dim=1, keepdims=True) / mask.sum(dim=1, keepdims=True)[..., None]
             x = x - com
             x *= mask[..., None]

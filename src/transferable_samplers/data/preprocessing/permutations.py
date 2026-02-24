@@ -16,7 +16,7 @@ def load_yaml_as_dict(path: str | Path) -> dict:
 
 def standardize_atom_name(atom_name: str, aa_name: str) -> str:
     if atom_name[0] == "H" and atom_name[-1] in ("1", "2", "3"):
-        # For these AA the H-X-N atoms are not interchangable
+        # For these AA the H-X-N atoms are not interchangeable
         if aa_name in ("HIS", "HIE", "PHE", "TRP", "TYR") and atom_name[:2] in (
             "HE",
             "HD",
@@ -27,7 +27,7 @@ def standardize_atom_name(atom_name: str, aa_name: str) -> str:
         else:
             atom_name = atom_name[:-1]
 
-    # Standarize side-chain O atom encodings
+    # Standardize side-chain O atom encodings
     if atom_name[:2] == "OE" or atom_name[:2] == "OD":
         atom_name = atom_name[:-1]
 
@@ -65,7 +65,7 @@ def get_permutation(
 
     # Iterate through each residue to build permutations
     for i, residue in enumerate(residue_list):
-        # Get standarized residue name with terminal labels for cache
+        # Get standardized residue name with terminal labels for cache
         residue_name = residue.name if residue.name != "HIS" else "HIE"  # Timewarp data has HIE labelled as HIS
         assert residue_name in permutations_definition_dict["sidechain"], (
             f"Residue {residue_name} not found in sidechain definitions"

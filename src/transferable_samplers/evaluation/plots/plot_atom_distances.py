@@ -73,7 +73,7 @@ def plot_atom_distances(
         label="True data",
     )
 
-    for (name, dist), color in zip(named_dists.items(), COLORS):
+    for (name, dist), color in zip(named_dists.items(), COLORS, strict=False):
         ax.hist(
             dist,
             bins=bin_edges,

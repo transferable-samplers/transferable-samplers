@@ -1,6 +1,5 @@
 import copy
 from functools import partial
-from typing import Optional
 
 import torch
 from torchdyn.core import NeuralODE
@@ -20,6 +19,7 @@ class FlowMatchingModule(BaseLightningModule):
         self,
         net: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
+        # pyrefly: ignore [not-a-type]
         scheduler: torch.optim.lr_scheduler,
         prior,
         compile_net: bool = False,
@@ -54,6 +54,7 @@ class FlowMatchingModule(BaseLightningModule):
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         if self.train_from_buffer:
+            # pyrefly: ignore [missing-attribute]
             batch = self._buffer.sample(batch["x"].shape[0])
 
         assert len(batch["x"].shape) == 3, "molecules must be a pointcloud (batch_size, num_atoms, 3)"
@@ -90,12 +91,15 @@ class FlowMatchingModule(BaseLightningModule):
         return loss
 
     def generate_proposal(
-        self, net: torch.nn.Module, num_samples: int,
-        system_cond: Optional[SystemCond] = None,
+        self,
+        net: torch.nn.Module,
+        num_samples: int,
+        system_cond: SystemCond | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         encodings = system_cond.encodings if system_cond else None
 
         if encodings is None:
+            # pyrefly: ignore [missing-attribute]
             num_atoms = self.trainer.datamodule.num_atoms
         else:
             num_atoms = encodings["atom_type"].size(0)
@@ -113,7 +117,10 @@ class FlowMatchingModule(BaseLightningModule):
         return x_pred, -logq
 
     def proposal_energy(
-        self, net: torch.nn.Module, x: torch.Tensor, system_cond: Optional[SystemCond] = None,
+        self,
+        net: torch.nn.Module,
+        x: torch.Tensor,
+        system_cond: SystemCond | None = None,
     ) -> torch.Tensor:
         if torch.is_grad_enabled() and x.requires_grad:
             logger.warning(
@@ -126,10 +133,13 @@ class FlowMatchingModule(BaseLightningModule):
         logq = self.prior.logp(z_pred) - dlogp_rev
         return -logq  # energy is negative log probability
 
+    # pyrefly: ignore [bad-override]
     def forward(self, t: torch.Tensor, x: torch.Tensor, encodings, mask) -> torch.Tensor:
         return self.net(t, x, encodings=encodings, node_mask=mask)
 
-    def _integrate(self, net: torch.nn.Module, x: torch.Tensor, encodings=None, reverse=False, compute_dlogp=True) -> torch.Tensor:
+    def _integrate(
+        self, net: torch.nn.Module, x: torch.Tensor, encodings=None, reverse=False, compute_dlogp=True
+    ) -> torch.Tensor:
         batch_size = x.shape[0]
         num_atoms = x.shape[1]
 
@@ -167,6 +177,7 @@ class FlowMatchingModule(BaseLightningModule):
             dlogp_out = dlogp_init.squeeze(-1)
         x = x.reshape(batch_size, num_atoms, -1)
 
+        # pyrefly: ignore [bad-return]
         return x, dlogp_out.view(-1)
 
     def _get_xt(self, x0, x1, t, mask=None):
@@ -174,6 +185,7 @@ class FlowMatchingModule(BaseLightningModule):
 
         if not self.sigma == 0.0:
             num_samples = x1.shape[0]
+            # pyrefly: ignore [missing-attribute]
             num_tokens = x1.shape[1] // self.trainer.datamodule.num_dimensions
             noise = self.prior.sample(num_samples, num_tokens, mask=None, device=x1.device).flatten(start_dim=1)
             xt = mu_t + self.sigma * noise

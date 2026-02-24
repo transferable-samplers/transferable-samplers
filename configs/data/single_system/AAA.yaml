@@ -7,4 +7,4 @@ num_workers: 1
 persistent_workers: False
 pin_memory: False
 num_dimensions: 3
-num_atoms: 33       # Max number of particles + at least a single padding token
+num_atoms: 33 # Max number of particles + at least a single padding token

@@ -2,18 +2,15 @@ defaults:
   - default
   - net: egnn_dynamics_transferable_md
   - scheduler: cosine
-
 _target_: transferable_samplers.models.flow_matching_module.FlowMatchingModule
 mean_free_prior: True
 atol: 1e-4
 rtol: 1e-4
 dlogp_tol_scale: 1.0
-
 prior:
   _target_: transferable_samplers.models.priors.normal_distribution.NormalDistribution
   num_dimensions: ${data.num_dimensions}
   mean_free: true
-
 sigma: 0.0
 optimizer:
   _partial_: true

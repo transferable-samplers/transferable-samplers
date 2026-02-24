@@ -16,6 +16,7 @@ class PaddingTransform:
         assert all(len(v) == num_tokens for v in permutations.values()), "All permutations must have same length"
         true_mask = torch.ones(num_tokens, dtype=torch.bool)
         false_mask = torch.zeros(padded_seq_len - num_tokens, dtype=torch.bool)
+        # pyrefly: ignore [bad-return]
         return torch.cat([true_mask, false_mask])
 
     def pad_data(self, x: torch.Tensor) -> torch.Tensor:

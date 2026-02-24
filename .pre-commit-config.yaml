@@ -1,6 +1,5 @@
 default_language_version:
   python: python3
-
 repos:
   # --------------------------------------------
   # Python: Linting, formatting, import sorting,
@@ -12,7 +11,6 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
-
   # --------------------------------------------
   # Essential pre-commit housekeeping hooks
   # (not covered by Ruff)
@@ -28,7 +26,6 @@ repos:
       - id: check-case-conflict
       - id: check-added-large-files
       - id: check-executables-have-shebangs
-
   # --------------------------------------------
   # Secret scanning
   # --------------------------------------------
@@ -36,7 +33,6 @@ repos:
     rev: v8.18.4
     hooks:
       - id: gitleaks
-
   # --------------------------------------------
   # YAML formatting
   # --------------------------------------------
@@ -44,7 +40,6 @@ repos:
     rev: v0.21.0
     hooks:
       - id: yamlfmt
-
   # --------------------------------------------
   # Shell linting
   # --------------------------------------------
@@ -53,7 +48,6 @@ repos:
     hooks:
       - id: shellcheck
         args: ["-e", "SC2102"]
-
   # --------------------------------------------
   # Spelling checker
   # --------------------------------------------
@@ -63,7 +57,6 @@ repos:
       - id: codespell
         args:
           - --ignore-words-list=ot,nd,ser,manuel
-
   # --------------------------------------------
   # Type checking (manual stage — run explicitly
   # with: pre-commit run pyrefly --all-files)

@@ -48,7 +48,9 @@ def shard_tensor(x):
     """
     world_size = get_world_size()
     rank = get_rank()
-    assert len(x) % world_size == 0, f"Length of x ({len(x)}) must be divisible by world size ({world_size}) for sharding."
+    assert len(x) % world_size == 0, (
+        f"Length of x ({len(x)}) must be divisible by world size ({world_size}) for sharding."
+    )
     n = (len(x) // world_size) * world_size
     chunk_size = n // world_size
     return x[rank * chunk_size : (rank + 1) * chunk_size]

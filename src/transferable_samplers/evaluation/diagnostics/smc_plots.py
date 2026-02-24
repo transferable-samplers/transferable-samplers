@@ -1,6 +1,6 @@
 """SMC diagnostic plots from trajectory snapshots and per-step diagnostics."""
 
-from typing import Callable
+from collections.abc import Callable
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -156,10 +156,8 @@ def plot_smc_diagnostics(
 
     # Lineage survival from trajectory snapshots
     if trajectory:
-        survived_lineages = [
-            p.lineage.unique().numel() / len(p) for p in trajectory
-        ]
-        traj_t = [t_list[0]] + [t_list[min(i, len(t_list) - 1)] for i in range(len(trajectory))]
+        survived_lineages = [p.lineage.unique().numel() / len(p) for p in trajectory]
+        _traj_t = [t_list[0]] + [t_list[min(i, len(t_list) - 1)] for i in range(len(trajectory))]
         # Align: trajectory may have fewer points than diagnostics
         _plot_particle_survival(survived_lineages, log_image_fn)
 
@@ -174,9 +172,7 @@ def plot_smc_diagnostics(
         for i, p in enumerate(trajectory):
             # Approximate t from trajectory position
             t_approx = i / max(len(trajectory) - 1, 1)
-            interpolation_energy_list.append(
-                ((1 - t_approx) * p.E_source.cpu() + t_approx * p.E_target.cpu()).numpy()
-            )
+            interpolation_energy_list.append(((1 - t_approx) * p.E_source.cpu() + t_approx * p.E_target.cpu()).numpy())
         traj_t_list = [i / max(len(trajectory) - 1, 1) for i in range(len(trajectory))]
         _plot_stepwise_energy(target_energy_list, interpolation_energy_list, traj_t_list, log_image_fn)
         _plot_stepwise_energy_hist(target_energy_list, interpolation_energy_list, traj_t_list, log_image_fn)

@@ -1,26 +1,21 @@
 # @package _global_
-
 defaults:
   - override /model: normalizing_flow
   - override /model/net: prose
   - override /data: transferable/up_to_8aa
   - override /trainer: gpu
-
 hf_state_dict_path: transferable/prose_up_to_8aa.pth
-
 model:
   source_energy_config:
     _target_: transferable_samplers.utils.dataclasses.SourceEnergyConfig
     sample_batch_size: 2_500
     energy_batch_size: 2_500
     grad_batch_size: 2_500
-
 callbacks:
   sampling_evaluation:
     sampler:
       _target_: transferable_samplers.samplers.smc_sampler.SMCSampler
       num_samples: 10_000
-
       use_metropolis: true
       init_eps: 5e-4
       num_annealing_steps: 50
@@ -29,11 +24,9 @@ callbacks:
       resampling_method: systematic
       energy_cutoff_filter: 100
       log_traj_freq: 1
-
 data:
   batch_size: 128
   num_eval_samples: 10_000
-
 trainer:
   limit_test_batches: 1
   limit_val_batches: 1

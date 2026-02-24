@@ -1,11 +1,9 @@
 # @package _global_
-
 defaults:
   - override /model: normalizing_flow
   - override /model/net: tarflow_single_system
   - override /data: single_system/Ace-A-Nme
   - override /trainer: gpu
-
 model:
   source_energy_config:
     _target_: transferable_samplers.utils.dataclasses.SourceEnergyConfig
@@ -21,18 +19,15 @@ model:
   optimizer:
     lr: 1e-4
     weight_decay: 4e-4
-
 callbacks:
   sampling_evaluation:
     sampler:
       _target_: transferable_samplers.samplers.snis_sampler.SNISSampler
       num_samples: 10_000
-
 data:
   batch_size: 512
   com_augmentation: True
   num_eval_samples: 10_000
-
 trainer:
   check_val_every_n_epoch: 50
   max_epochs: 1000

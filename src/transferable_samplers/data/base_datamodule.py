@@ -1,6 +1,5 @@
-import logging
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any
 
 import webdataset as wds
 from lightning import LightningDataModule
@@ -63,7 +62,7 @@ class BaseDataModule(LightningDataModule, ABC):
         ...
 
     @abstractmethod
-    def setup(self, stage: Optional[str] = None) -> None:
+    def setup(self, stage: str | None = None) -> None:
         """Load data. Set variables: `self.data_train`, `self.data_val`, `self.data_test`.
 
         This method is called by Lightning before `trainer.fit()`, `trainer.validate()`, `trainer.test()`, and
@@ -90,11 +89,13 @@ class BaseDataModule(LightningDataModule, ABC):
 
     def _validate_and_set_batch_size(self) -> None:
         """Validate batch size is divisible by world size and set per-device batch size."""
+        # pyrefly: ignore [missing-attribute]
         if self.batch_size % self.trainer.world_size != 0:
             raise RuntimeError(
-                f"Batch size ({self.batch_size}) is not divisible by the number "
-                f"of devices ({self.trainer.world_size})."
+                # pyrefly: ignore [missing-attribute]
+                f"Batch size ({self.batch_size}) is not divisible by the number of devices ({self.trainer.world_size})."
             )
+        # pyrefly: ignore [missing-attribute]
         self.batch_size_per_device = self.batch_size // self.trainer.world_size
 
     def train_dataloader(self) -> DataLoader[Any]:
@@ -102,20 +103,26 @@ class BaseDataModule(LightningDataModule, ABC):
 
         :return: The train dataloader.
         """
+        # pyrefly: ignore [missing-attribute]
         is_iterable = isinstance(self.data_train, IterableDataset)
 
         if is_iterable:
             data_loader = wds.WebLoader(
-                self.data_train, batch_size=self.batch_size_per_device, num_workers=self.num_workers
+                # pyrefly: ignore [missing-attribute]
+                self.data_train,
+                batch_size=self.batch_size_per_device,
+                num_workers=self.num_workers,
             )
 
             # Define epoch length (can be overridden by Lightning's `limit_train_batches`)
             data_loader = data_loader.with_epoch(10_000)
 
+            # pyrefly: ignore [bad-return]
             return data_loader
 
         else:
             return DataLoader(
+                # pyrefly: ignore [missing-attribute]
                 dataset=self.data_train,
                 batch_size=self.batch_size_per_device,
                 num_workers=self.num_workers,
@@ -130,6 +137,7 @@ class BaseDataModule(LightningDataModule, ABC):
         NOTE: these only exist for Lightning compatibility. All evaluation is handled by custom callbacks.
         """
         world_size = self.trainer.world_size if self.trainer is not None else 1
+        # pyrefly: ignore [missing-attribute]
         return DataLoader(dataset=self.data_val, batch_size=world_size)
 
     def test_dataloader(self) -> DataLoader[Any]:
@@ -138,5 +146,5 @@ class BaseDataModule(LightningDataModule, ABC):
         NOTE: these only exist for Lightning compatibility. All evaluation is handled by custom callbacks.
         """
         world_size = self.trainer.world_size if self.trainer is not None else 1
+        # pyrefly: ignore [missing-attribute]
         return DataLoader(dataset=self.data_test, batch_size=world_size)
-

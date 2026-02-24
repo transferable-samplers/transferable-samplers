@@ -1,8 +1,7 @@
 import logging
-import os
 import tarfile
+from pathlib import Path
 
-import numpy as np
 from huggingface_hub import hf_hub_download, snapshot_download
 
 # TODO repos currently hardcoded - slightly hard to remove hardcode from data as assumes repo structure
@@ -144,16 +143,17 @@ def safe_extract_tar(tar_path, extraction_path):
         tar_path (str): Path to the tar archive.
         extraction_path (str): Directory to extract files into.
     """
-    abs_path = os.path.abspath(extraction_path)
+    abs_path = Path(extraction_path).resolve()
 
     with tarfile.open(tar_path) as tar:
         for member in tar.getmembers():
-            member_path = os.path.abspath(os.path.join(extraction_path, member.name))
-            if not member_path.startswith(abs_path + os.sep):
+            member_path = (abs_path / member.name).resolve()
+            if not str(member_path).startswith(str(abs_path) + "/"):
                 raise Exception(f"Blocked path traversal attempt: {member.name}")
         tar.extractall(extraction_path)  # noqa: S202 - safe, paths validated above
 
 
+# pyrefly: ignore [bad-return]
 def download_weights(destination_dir: str, hf_filepath: str) -> str:
     """
     Downloads the model weights from Hugging Face Hub.
@@ -166,7 +166,7 @@ def download_weights(destination_dir: str, hf_filepath: str) -> str:
     REPO_ID = "transferable-samplers/model-weights"
 
     try:
-        os.makedirs(destination_dir, exist_ok=True)
+        Path(destination_dir).mkdir(parents=True, exist_ok=True)
         local_path = hf_hub_download(repo_id=REPO_ID, filename=hf_filepath, local_dir=destination_dir)
         print(f"Model weights downloaded successfully to {destination_dir}")
         return local_path
@@ -181,7 +181,7 @@ def download_and_extract_pdb_tarfiles(data_dir: str):
     Args:
         data_dir (str): The top-level data dir in which to build the pdb file subdirectories
     """
-    if not os.path.exists(os.path.join(data_dir, "pdb_tarfiles")):
+    if not (Path(data_dir) / "pdb_tarfiles").exists():
         logging.info(f"Downloading PDB tarfiles to {data_dir}")
         # Snapshot download automatically avoids re-downloading if already present
         local_path = snapshot_download(
@@ -194,7 +194,7 @@ def download_and_extract_pdb_tarfiles(data_dir: str):
         logging.info(f"Extracting PDB tarfiles to {data_dir}")
         for subset in ["train", "val", "test"]:
             tar_filepath = local_path + f"/pdb_tarfiles/{subset}.tar"
-            safe_extract_tar(tar_filepath, os.path.join(data_dir, "pdbs"))
+            safe_extract_tar(tar_filepath, str(Path(data_dir) / "pdbs"))
     else:
         logging.info(f"PDB tarfiles already present in {data_dir}")
 
@@ -218,7 +218,7 @@ def download_evaluation_data(data_dir: str):
         "when it detects a change in the repo.\n"
         "We sincerely apologize for any inconvenience this may have caused."
     )
-    if not os.path.exists(os.path.join(data_dir, "trajectories_subsampled")):
+    if not (Path(data_dir) / "trajectories_subsampled").exists():
         logging.info(f"Downloading evaluation data to {data_dir}")
         # Snapshot download automatically avoids re-downloading if already present
         snapshot_download(

@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 import hydra
 import pytest
 import torch
@@ -5,20 +6,19 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-import logging
 
 from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
 from torch.utils.data import default_collate
 
-from transferable_samplers.models.priors.normal_distribution import NormalDistribution
 from transferable_samplers.data.transforms.padding import PaddingTransform
+from transferable_samplers.models.priors.normal_distribution import NormalDistribution
 
 # Didn't see any slowdown for TarFlow with BF16 enabled, once had issues with invertibility
 torch.set_float32_matmul_precision("highest")
 
 # Constant parameters for all tests
-NUM_SAMPLES = 32 # number of data samples to use per test
+NUM_SAMPLES = 32  # number of data samples to use per test
 TEST_SEQUENCES = [
     "AA",
 ]
@@ -44,7 +44,7 @@ def move_to_device(data, device):
         return data.to(device)
     elif isinstance(data, dict):
         return {key: move_to_device(value, device) for key, value in data.items()}
-    elif isinstance(data, (list, tuple)):
+    elif isinstance(data, list | tuple):
         return type(data)(move_to_device(item, device) for item in data)
     else:
         return data
@@ -215,7 +215,7 @@ def test_fwd_dlogp_no_pad(net, test_data):
             data_dim = x.shape[1] * x.shape[2]
 
             _, dlogp = net.forward(x, permutations=permutations, encodings=encodings)
-            fwd_func = lambda x: net.forward(x, permutations=permutations, encodings=encodings)[0]
+            fwd_func = lambda x, p=permutations, e=encodings: net.forward(x, permutations=p, encodings=e)[0]
             fwd_jac = torch.autograd.functional.jacobian(fwd_func, x, vectorize=True)
             dlogp_true = torch.logdet(fwd_jac.view(data_dim, data_dim))
             dlogp_diff = abs(dlogp - dlogp_true).item()
@@ -276,6 +276,4 @@ def test_fwd_vs_rev_dlogp_no_pad(net, test_data):
         _, rev_dlogp = net.reverse(z_pred, permutations=permutations, encodings=encodings)
 
         max_abs_error = torch.max(torch.abs(fwd_dlogp + rev_dlogp)).item()
-        assert max_abs_error < DLOGP_ATOL, (
-            f"fwd vs rev dlogp test (unpadded data) failed for sequence '{sequence}' "
-        )
+        assert max_abs_error < DLOGP_ATOL, f"fwd vs rev dlogp test (unpadded data) failed for sequence '{sequence}' "

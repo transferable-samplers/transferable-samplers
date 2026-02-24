@@ -1,5 +1,3 @@
-from typing import Optional
-
 import torch
 
 from transferable_samplers.samplers.base_sampler import BaseSampler
@@ -22,18 +20,18 @@ class SNISSampler(BaseSampler):
     def __init__(
         self,
         num_samples: int,
-        logw_quantile_filter: Optional[float] = None,
+        logw_quantile_filter: float | None = None,
     ):
         super().__init__(num_samples)
         self.logw_quantile_filter = logw_quantile_filter
 
     @torch.no_grad()  # sampling path, no training gradients needed
+    # pyrefly: ignore [bad-override]
     def sample(
         self,
         source_energy: SourceEnergy,
         target_energy: TargetEnergy,
     ) -> dict[str, SamplesData]:
-
         # Generate proposal
         world_size = get_world_size()
         loc_num_samples = self.num_samples // world_size
@@ -52,7 +50,9 @@ class SNISSampler(BaseSampler):
 
         # Clip by logit quantile (all ranks do same filtering to maintain same shape)
         if self.logw_quantile_filter is not None:
-            samples, E_source, E_target = filter_by_logw_quantile(samples, E_source, E_target, self.logw_quantile_filter)
+            samples, E_source, E_target = filter_by_logw_quantile(
+                samples, E_source, E_target, self.logw_quantile_filter
+            )
             logger.info("Clipped proposal logw for SMC initialisation")
 
         # Compute importance weights on all ranks
@@ -71,4 +71,5 @@ class SNISSampler(BaseSampler):
             logw=logw,
         )
 
+        # pyrefly: ignore [bad-return]
         return {"proposal": proposal_data, "resampled": resampled_data}, None

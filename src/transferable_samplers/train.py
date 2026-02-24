@@ -1,11 +1,11 @@
 # ruff: noqa: E402, I001, S311
 import random
 import time
-from typing import Any, Optional
+from typing import Any
 import logging
 
 import hydra
-import lightning as L
+import lightning
 import torch
 from lightning import Callback, LightningDataModule, LightningModule, Trainer
 from lightning.pytorch.loggers import Logger
@@ -66,7 +66,7 @@ def train(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
     """
     # set seed for random number generators in pytorch, numpy and python.random
     if cfg.get("seed"):
-        L.seed_everything(cfg.seed, workers=True)
+        lightning.seed_everything(cfg.seed, workers=True)
 
     if cfg.get("torch_num_threads"):
         torch.set_num_threads(cfg.torch_num_threads)
@@ -100,7 +100,8 @@ def train(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
         log_hyperparameters(object_dict)
 
     # This returns fit_ckpt_path if we are resuming from an existing checkpoint.
-    # Otherwise, it returns None and optionally an init_state_dict if we are initializing the model from a checkpoint (e.g. for fine-tuning).
+    # Otherwise, it returns None and optionally an init_state_dict if we are
+    # initializing the model from a checkpoint (e.g. for fine-tuning).
     fit_ckpt_path, init_state_dict = resolve_init_or_resume(
         resume_ckpt_path=cfg.get("resume_ckpt_path"),
         init_ckpt_path=cfg.get("init_ckpt_path"),
@@ -109,9 +110,7 @@ def train(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
     )
 
     if init_state_dict is not None:
-        assert fit_ckpt_path is None, (
-            "fit_ckpt_path must be None when init_state_dict is provided."
-        )
+        assert fit_ckpt_path is None, "fit_ckpt_path must be None when init_state_dict is provided."
         # If the model has a teacher (i.e. teacher regularization), we need to augment the state dict before loading.
         if hasattr(model, "teacher"):
             init_state_dict = augment_state_dict_for_teacher(init_state_dict)
@@ -127,7 +126,7 @@ def train(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
 
 
 @hydra.main(version_base="1.3", config_path="../../configs", config_name="train.yaml")
-def main(cfg: DictConfig) -> Optional[float]:
+def main(cfg: DictConfig) -> float | None:
     """Main entry point for training.
 
     :param cfg: DictConfig configuration composed by Hydra.

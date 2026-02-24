@@ -1,8 +1,7 @@
 """Utilities for resolving checkpoint / init-weight loading at training time."""
 
-import os
 from copy import deepcopy
-from typing import Optional
+from pathlib import Path
 
 import torch
 
@@ -24,7 +23,8 @@ def load_state_dict_from_ckpt(path: str) -> dict:
     Raises:
         KeyError: If the checkpoint does not contain a ``state_dict`` key.
 
-    NOTE: If the model was trained using EMAWeightAveraging, the EMA weights will be in the checkpoint's ``state_dict`` field.
+    NOTE: If the model was trained using EMAWeightAveraging, the EMA weights
+    will be in the checkpoint's ``state_dict`` field.
     """
     assert path.endswith(".ckpt"), f"Expected a .ckpt file, got: {path}"
     ckpt = torch.load(path, map_location="cpu")
@@ -56,7 +56,7 @@ def load_state_dict_from_hf(hf_filepath: str, scratch_dir: str) -> dict:
     Returns:
         The loaded state dict.
     """
-    dst_dir = os.path.join(scratch_dir, "model-weights")
+    dst_dir = str(Path(scratch_dir) / "model-weights")
     local_path = download_weights(hf_filepath=hf_filepath, destination_dir=dst_dir)
     return load_state_dict_from_file(local_path)
 
@@ -83,10 +83,10 @@ def augment_state_dict_for_teacher(sd: dict, student_prefix="net.", teacher_pref
 
 
 def resolve_init(
-    init_ckpt_path: Optional[str],
-    init_hf_state_dict_path: Optional[str],
+    init_ckpt_path: str | None,
+    init_hf_state_dict_path: str | None,
     scratch_dir: str,
-) -> Optional[dict]:
+) -> dict | None:
     """Resolve init weights from a checkpoint or HuggingFace state dict.
 
     Args:
@@ -113,7 +113,7 @@ def resolve_init(
         return state_dict
 
     if init_ckpt_path is not None:
-        if not os.path.exists(init_ckpt_path):
+        if not Path(init_ckpt_path).exists():
             raise FileNotFoundError(f"init_ckpt_path not found: {init_ckpt_path}")
         logger.info(f"Loading init weights from checkpoint: {init_ckpt_path}")
         state_dict = load_state_dict_from_ckpt(init_ckpt_path)
@@ -124,11 +124,11 @@ def resolve_init(
 
 
 def resolve_init_or_resume(
-    resume_ckpt_path: Optional[str],
-    init_ckpt_path: Optional[str],
-    init_hf_state_dict_path: Optional[str],
+    resume_ckpt_path: str | None,
+    init_ckpt_path: str | None,
+    init_hf_state_dict_path: str | None,
     scratch_dir: str,
-) -> tuple[Optional[str], Optional[dict]]:
+) -> tuple[str | None, dict | None]:
     """Determine whether to resume from a checkpoint or apply init weights.
 
     Implements preemptible semantics:
@@ -154,32 +154,23 @@ def resolve_init_or_resume(
         FileNotFoundError: If ``init_ckpt_path`` is set but the file does not exist.
     """
     # 1. Try to resume from an existing checkpoint
-    if resume_ckpt_path and os.path.exists(resume_ckpt_path):
+    if resume_ckpt_path and Path(resume_ckpt_path).exists():
         try:
             _ = torch.load(resume_ckpt_path, map_location="cpu")
-            logger.info(
-                f"Found resume checkpoint at {resume_ckpt_path}. "
-                "Resuming training; ignoring init_*."
-            )
+            logger.info(f"Found resume checkpoint at {resume_ckpt_path}. Resuming training; ignoring init_*.")
             return resume_ckpt_path, None
         except Exception:
             logger.exception(
-                f"Resume checkpoint exists but could not be loaded: {resume_ckpt_path}. "
-                "Falling back to init/scratch."
+                f"Resume checkpoint exists but could not be loaded: {resume_ckpt_path}. Falling back to init/scratch."
             )
 
     # 2. No valid resume checkpoint — resolve init weights or start from scratch
-    if resume_ckpt_path and not os.path.exists(resume_ckpt_path):
-        logger.warning(
-            f"resume_ckpt_path set but not found: {resume_ckpt_path}. "
-        )
+    if resume_ckpt_path and not Path(resume_ckpt_path).exists():
+        logger.warning(f"resume_ckpt_path set but not found: {resume_ckpt_path}. ")
 
     init_state_dict = resolve_init(init_ckpt_path, init_hf_state_dict_path, scratch_dir)
 
     if init_state_dict is None:
-        logger.info(
-            "No resume checkpoint found and no init weights provided; "
-            "training from random initialization."
-        )
+        logger.info("No resume checkpoint found and no init weights provided; training from random initialization.")
 
     return None, init_state_dict

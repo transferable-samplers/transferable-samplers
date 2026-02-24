@@ -64,7 +64,7 @@ class ConditionalEmbedder(nn.Module):
         residue_emb = self.residue_embed(aa_type)
         pos_embed = self.residue_pos_embed(aa_pos)
 
-        # t / seq_len is of shape [b, 1], once embeded it will be [b, 1, channels]
+        # t / seq_len is of shape [b, 1], once embedded it will be [b, 1, channels]
         # so we expand it to [b, n, channels] to be concatenated with the other embeddings
         num_tokens = atom_type.shape[1]
         if self.embed_time:
@@ -73,6 +73,7 @@ class ConditionalEmbedder(nn.Module):
 
         x = torch.concat([atom_emb, residue_emb, pos_embed, seq_len_embed], dim=-1)
         if self.embed_time:
+            # pyrefly: ignore [unbound-name]
             x = torch.concat([x, time_embed], dim=-1)
         return self.mlp(x) * mask[..., None]  # [b, n, channels]
 

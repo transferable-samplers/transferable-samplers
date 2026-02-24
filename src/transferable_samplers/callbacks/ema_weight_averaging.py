@@ -16,4 +16,4 @@ class EMAWeightAveraging(WeightAveraging):
         super().__init__(avg_fn=get_ema_avg_fn(decay=decay))
 
     def should_update(self, step_idx=None, epoch_idx=None):
-        return (step_idx is not None)
+        return step_idx is not None

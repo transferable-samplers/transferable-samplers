@@ -69,5 +69,6 @@ class TimestepEmbedder(nn.Module):
         half = dim // 2
         freqs = torch.exp(-math.log(max_period) * torch.arange(half, device=t.device) / half)
         args = t[:, None] * freqs[None]
+        # pyrefly: ignore [no-matching-overload]
         embedding = torch.cat([torch.cos(args), torch.sin(args)], axis=-1)
         return embedding

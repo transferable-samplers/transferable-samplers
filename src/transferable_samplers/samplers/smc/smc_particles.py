@@ -12,13 +12,14 @@ class SMCParticles:
     Bundles positions, log-weights, lineage tracking, and the source/target
     energies and gradients needed by the Langevin proposal and MH steps.
     """
-    x: torch.Tensor              # (batch, atoms, 3)
-    logw: torch.Tensor            # (batch,)
-    lineage: torch.Tensor         # (batch,) — index of the original proposal each particle descends from
-    E_source: torch.Tensor        # (batch,)
-    E_target: torch.Tensor        # (batch,)
-    E_source_grad: torch.Tensor   # (batch, atoms, 3)
-    E_target_grad: torch.Tensor   # (batch, atoms, 3)
+
+    x: torch.Tensor  # (batch, atoms, 3)
+    logw: torch.Tensor  # (batch,)
+    lineage: torch.Tensor  # (batch,) — index of the original proposal each particle descends from
+    E_source: torch.Tensor  # (batch,)
+    E_target: torch.Tensor  # (batch,)
+    E_source_grad: torch.Tensor  # (batch, atoms, 3)
+    E_target_grad: torch.Tensor  # (batch, atoms, 3)
 
     def __post_init__(self):
         batch = self.x.shape[0]
@@ -26,8 +27,12 @@ class SMCParticles:
         assert self.lineage.shape == (batch,), f"lineage shape {self.lineage.shape}, expected ({batch},)"
         assert self.E_source.shape == (batch,), f"E_source shape {self.E_source.shape}, expected ({batch},)"
         assert self.E_target.shape == (batch,), f"E_target shape {self.E_target.shape}, expected ({batch},)"
-        assert self.E_source_grad.shape == self.x.shape, f"E_source_grad shape {self.E_source_grad.shape}, expected {self.x.shape}"
-        assert self.E_target_grad.shape == self.x.shape, f"E_target_grad shape {self.E_target_grad.shape}, expected {self.x.shape}"
+        assert self.E_source_grad.shape == self.x.shape, (
+            f"E_source_grad shape {self.E_source_grad.shape}, expected {self.x.shape}"
+        )
+        assert self.E_target_grad.shape == self.x.shape, (
+            f"E_target_grad shape {self.E_target_grad.shape}, expected {self.x.shape}"
+        )
 
     def __len__(self):
         return len(self.x)
@@ -77,9 +82,13 @@ def merge_particles(mask: torch.Tensor, true_particles: SMCParticles, false_part
     E_target_grad[~mask] = false_particles.E_target_grad
 
     return SMCParticles(
-        x=x, logw=logw, lineage=lineage,
-        E_source=E_source, E_target=E_target,
-        E_source_grad=E_source_grad, E_target_grad=E_target_grad,
+        x=x,
+        logw=logw,
+        lineage=lineage,
+        E_source=E_source,
+        E_target=E_target,
+        E_source_grad=E_source_grad,
+        E_target_grad=E_target_grad,
     )
 
 

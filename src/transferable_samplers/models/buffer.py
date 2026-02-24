@@ -1,9 +1,7 @@
-from typing import Optional
-
 import torch
 
-from transferable_samplers.utils.standardization import destandardize_coords
 from transferable_samplers.utils.dataclasses import SystemCond
+from transferable_samplers.utils.standardization import destandardize_coords
 
 
 class Buffer:
@@ -20,7 +18,7 @@ class Buffer:
         self,
         samples: torch.Tensor,
         normalization_std: torch.Tensor,
-        system_cond: Optional[SystemCond],
+        system_cond: SystemCond | None,
         batch_transform=None,
     ):
         self.samples = samples
@@ -47,8 +45,10 @@ class Buffer:
         if self.system_cond is not None:
             batched_cond = self.system_cond.for_batch(batch_size)
             if batched_cond.encodings is not None:
+                # pyrefly: ignore [unsupported-operation]
                 batch["encodings"] = batched_cond.encodings
             if batched_cond.permutations is not None:
+                # pyrefly: ignore [unsupported-operation]
                 batch["permutations"] = batched_cond.permutations
 
         return batch

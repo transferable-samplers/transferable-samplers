@@ -21,11 +21,12 @@
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as F  # noqa: N812
 
 try:
     from transferable_samplers.nn.tarflow.attention import AttentionBlock
 except ImportError:
+    # pyrefly: ignore [missing-import]
     from attention import AttentionBlock
 
 
@@ -235,9 +236,9 @@ class AdaptiveAttnAndTransition(torch.nn.Module):
         residual_mha: Whether to use a residual connection in the mha layer.
         residual_transition: Whether to use a residual connection in the transition layer.
         parallel_mha_transition: Whether to run mha and transition in parallel or sequentially.
-        use_attn_pair_bias: Whether to use a pair represnetation to bias attention.
+        use_attn_pair_bias: Whether to use a pair representation to bias attention.
         use_qkln: Whether to use layer norm on keyus and queries for attention.
-        dropout: droput use in the self-attention layer.
+        dropout: dropout used in the self-attention layer.
     """
 
     def __init__(
@@ -323,9 +324,11 @@ if __name__ == "__main__":
     aa_pos = torch.randint(0, 2, (batch_size, num_atoms))
     mask = torch.ones((batch_size, num_atoms), dtype=torch.bool)
 
+    # pyrefly: ignore [missing-argument]
     embedder = ConditionalEmbedder(hidden_dim=channels)
     cond = embedder(atom_type, aa_type, aa_pos, mask)
 
+    # pyrefly: ignore [unexpected-keyword]
     adapt_layernorm = AdaptiveAttnAndTransition(in_channels=channels, head_channels=64)
     attn_mask = torch.tril(torch.ones((num_atoms, num_atoms), dtype=torch.bool))
     output = adapt_layernorm(x, cond, mask, attn_mask)

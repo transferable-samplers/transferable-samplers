@@ -47,6 +47,8 @@
 # Licensed under the MIT License (see LICENSE in the repository root).
 # -------------------------------------------------------------------------
 
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 
@@ -60,7 +62,7 @@ MAX_SEQ_LEN = 512
 def write_tensor_to_txt(tensor: torch.Tensor, filename: str, linesize: int = 3):
     """HELPFUL FOR DEBUGGING: write a tensor to a text file for easy diffs"""
     tensor = tensor.flatten()
-    with open("0DEBUG_" + filename, "w") as f:
+    with Path("0DEBUG_" + filename).open("w") as f:
         for j in range(0, tensor.size(0), linesize):
             triplet = tensor[j : j + linesize].tolist()
             line = " ".join(f"{x:.6f}" for x in triplet)
@@ -116,6 +118,7 @@ class MetaBlock(torch.nn.Module):
             if not lookahead_conditioning:
                 self.proj_cond = torch.nn.Linear(channels, channels)
             else:
+                # pyrefly: ignore [bad-assignment]
                 self.proj_cond = torch.nn.Sequential(
                     torch.nn.Linear(channels * 2, channels),
                     torch.nn.GELU(),
@@ -136,7 +139,9 @@ class MetaBlock(torch.nn.Module):
 
             # Scale the weights of the MLP layers - to slow down "switching on of learned mask"
             with torch.no_grad():
+                # pyrefly: ignore [not-callable]
                 self.pair_proj[0].weight.mul_(1e-3)
+                # pyrefly: ignore [not-callable]
                 self.pair_proj[-1].weight.mul_(1e-9)
 
         self.use_attn_pair_bias = use_attn_pair_bias
@@ -335,9 +340,12 @@ class MetaBlock(torch.nn.Module):
             tokenization_mask = self.permutation(tokenization_mask, permutations)
             tokenization_masks = [tokenization_mask[:, i] for i in range(tokenization_mask.size(1))]
         for i in range(x.size(1) - 1):
+            # pyrefly: ignore [bad-argument-type]
             za, zb = self.reverse_step(x, cond, pos_embed, i, which_cache="cond")
             if tokenization_map is not None:
+                # pyrefly: ignore [unbound-name]
                 zb = zb * tokenization_masks[i + 1]
+                # pyrefly: ignore [unbound-name]
                 za = za * tokenization_masks[i + 1]
             scale = za[:, 0].float().exp().type(za.dtype)  # get rid of the sequence dimension
             xs[i + 1] = xs[i + 1] * scale + zb[:, 0]
@@ -365,10 +373,7 @@ class TarFlow(torch.nn.Module):
         use_transition: bool = False,
         use_qkln: bool = False,
         dropout: float = 0.0,
-        permutation_keys: list[str] = [
-            "n2c_residue-by-residue_standard_group-by-group",
-            "n2c_residue-by-residue_standard_group-by-group_flip",
-        ],  # defaults to SBG
+        permutation_keys: list[str] | None = None,  # defaults to SBG
         cond_embed: nn.Module | None = None,  # TODO don't like name, could make a proper subclass
         pos_embed_type: str = "learned",  # learned, sinusoidal
         nvp: bool = True,
@@ -377,6 +382,11 @@ class TarFlow(torch.nn.Module):
     ):
         super().__init__()
         self.input_dimension = input_dimension
+        if permutation_keys is None:
+            permutation_keys = [
+                "n2c_residue-by-residue_standard_group-by-group",
+                "n2c_residue-by-residue_standard_group-by-group_flip",
+            ]
         permutation_keys = list(permutation_keys) * (
             num_blocks // len(permutation_keys) + 1
         )  # repeat to match num_blocks
@@ -414,6 +424,7 @@ class TarFlow(torch.nn.Module):
         x: torch.Tensor,
         permutations: dict[str, torch.Tensor],
         encodings: dict[str, torch.Tensor] | None = None,
+        # pyrefly: ignore [bad-function-definition]
         mask: torch.Tensor = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         if mask is not None:
@@ -428,6 +439,7 @@ class TarFlow(torch.nn.Module):
                     if not key == "seq_len":  # seq_len is not a tensor, so we don't check it
                         assert torch.all(encodings[key][mask == 0] == 0), f"{key} is not zero where mask is zero"
             # (batch_size, seq_len, channels)
+            # pyrefly: ignore [not-callable]
             cond = self.cond_embed(**encodings, mask=mask)
         else:
             cond = None
@@ -458,6 +470,7 @@ class TarFlow(torch.nn.Module):
                         assert not torch.any(encodings[key] == 0), (
                             f"{key} has padding zeros, padding not supported in reverse"
                         )
+            # pyrefly: ignore [not-callable]
             cond = self.cond_embed(**encodings)
         else:
             cond = None
@@ -465,6 +478,7 @@ class TarFlow(torch.nn.Module):
         logdets = torch.zeros(x.shape[0], device=x.device)
 
         for block in reversed(self.blocks):
+            # pyrefly: ignore [not-callable]
             x, logdet = block.reverse(x, permutations, cond=cond)
             logdets = logdets + logdet
 

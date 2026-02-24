@@ -8,8 +8,10 @@
 #SBATCH -c 8
 #SBATCH --get-user-env
 
+# shellcheck source=/dev/null
 source .env
-source ${UV_ENV_PATH}
+# shellcheck source=/dev/null
+source "${UV_ENV_PATH}"
 
 export PYTEST_REPORT_DIR="tests/reports"
 export PYTEST_TRAINER="ddp"

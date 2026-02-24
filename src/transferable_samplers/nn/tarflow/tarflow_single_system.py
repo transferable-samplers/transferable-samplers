@@ -204,6 +204,7 @@ class MetaBlock(torch.nn.Module):
         if num_classes:
             self.class_embed = torch.nn.Parameter(torch.randn(num_classes, 1, channels) * 1e-2)
         else:
+            # pyrefly: ignore [bad-assignment]
             self.class_embed = None
         self.attn_blocks = torch.nn.ModuleList(
             [AttentionBlock(channels, head_dim, expansion, dropout=dropout) for _ in range(num_layers)]
@@ -373,6 +374,7 @@ class TarFlow(torch.nn.Module):
             logdets = logdets + logdet
         if self.in_channels != original_channels:
             x = x.reshape(x.shape[0], -1, original_channels)
+        # pyrefly: ignore [bad-return]
         return x, logdets
 
     def reverse(
@@ -393,6 +395,7 @@ class TarFlow(torch.nn.Module):
             x = x.reshape(x.shape[0], -1, self.in_channels)
         logdets = torch.zeros(x.shape[0], device=x.device)
         for block in reversed(self.blocks):
+            # pyrefly: ignore [not-callable]
             x, logdet = block.reverse(x, y, guidance, guide_what, attn_temp, annealed_guidance)
             logdets = logdets + logdet
             seq.append(x.detach().clone())

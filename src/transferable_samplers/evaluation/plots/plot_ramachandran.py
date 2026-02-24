@@ -46,6 +46,7 @@ def plot_ramachandran(log_image_fn, samples, topology, prefix: str = ""):
         ax.yaxis.set_ticks([])
         cbar = fig.colorbar(im, ticks=ticks)
         # cbar.ax.set_yticklabels(np.abs(-np.log(ticks/h.max())), fontsize=25)
+        # pyrefly: ignore [bad-argument-type]
         cbar.ax.set_yticklabels([6.0, 4.0, 2.0, 0.0], fontsize=25)
 
         cbar.ax.invert_yaxis()

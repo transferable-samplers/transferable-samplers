@@ -28,6 +28,7 @@ def _wasserstein_distance(x0, x1, power: Literal[1, 2] = 2):
         M = M**2
     ret = pot.emd2(a, b, M.detach().cpu().numpy(), numItermax=1e7)
     if power == 2:
+        # pyrefly: ignore [bad-argument-type]
         ret = math.sqrt(ret)
     return ret
 
@@ -51,8 +52,10 @@ def _torus_wasserstein_distance(x0, x1, power: Literal[1, 2] = 2):
         dists = dists**2
     ret = pot.emd2(a, b, dists.sum(-1), numItermax=int(1e9))
     if power == 2:
+        # pyrefly: ignore [no-matching-overload]
         ret = np.sqrt(ret).item()
     else:
+        # pyrefly: ignore [bad-argument-type]
         ret = float(ret)
     return ret
 
@@ -71,6 +74,7 @@ def energy_wasserstein(pred_energy, true_energy, prefix=""):
     pred = pred_energy.cpu().numpy()
     true = true_energy.cpu().numpy()
     return {
+        # pyrefly: ignore [bad-argument-type]
         f"{prefix}/energy-w2": math.sqrt(pot.emd2_1d(true, pred)),
         f"{prefix}/energy-w1": pot.emd2_1d(true, pred, metric="euclidean"),
     }

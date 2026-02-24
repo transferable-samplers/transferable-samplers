@@ -1,6 +1,6 @@
 # Contributing Guide
 
-Thank you for your interest in contributing 🌟 
+Thank you for your interest in contributing 🌟
 
 We welcome bug reports, pull requests, and improvements of all kinds.
 

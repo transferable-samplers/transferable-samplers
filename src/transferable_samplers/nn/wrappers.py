@@ -36,4 +36,5 @@ class TorchDynWrapper(torch.nn.Module):
             return self.model(t, y).flatten()
 
         J = torch.func.jacrev(vecfield)
+        # pyrefly: ignore [bad-argument-type]
         return torch.trace(J(x))

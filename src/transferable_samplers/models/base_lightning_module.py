@@ -2,7 +2,7 @@ import inspect
 from abc import abstractmethod
 from copy import deepcopy
 from functools import partial
-from typing import Any, Optional
+from typing import Any
 
 import torch
 import torchmetrics
@@ -22,10 +22,11 @@ class BaseLightningModule(LightningModule):
         self,
         net: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
+        # pyrefly: ignore [not-a-type]
         scheduler: torch.optim.lr_scheduler,
         prior,
         compile_net: bool = False,
-        source_energy_config: Optional[SourceEnergyConfig] = None,
+        source_energy_config: SourceEnergyConfig | None = None,
         train_from_buffer: bool = False,
         mean_free_prior: bool = False,
     ) -> None:
@@ -46,12 +47,15 @@ class BaseLightningModule(LightningModule):
         self.train_metrics = torchmetrics.MetricCollection({"loss": MeanMetric()}, prefix="train/")
 
     @abstractmethod
-    def training_step(self, batch, batch_idx: int) -> torch.Tensor:
-        ...
+    # pyrefly: ignore [bad-override]
+    def training_step(self, batch, batch_idx: int) -> torch.Tensor: ...
 
     @abstractmethod
     def generate_proposal(
-        self, net: torch.nn.Module, num_samples: int, system_cond: Optional[SystemCond],
+        self,
+        net: torch.nn.Module,
+        num_samples: int,
+        system_cond: SystemCond | None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Generate a single batch of samples from the proposal distribution.
 
@@ -66,7 +70,7 @@ class BaseLightningModule(LightningModule):
         ...
 
     @abstractmethod
-    def proposal_energy(self, net: torch.nn.Module, x: torch.Tensor, system_cond: Optional[SystemCond]) -> torch.Tensor:
+    def proposal_energy(self, net: torch.nn.Module, x: torch.Tensor, system_cond: SystemCond | None) -> torch.Tensor:
         """Compute proposal energy (-log q) for a single batch.
 
         Args:
@@ -81,6 +85,7 @@ class BaseLightningModule(LightningModule):
 
     def setup(self, stage: str) -> None:
         if self.compile_net and stage == "fit":
+            # pyrefly: ignore [bad-assignment]
             self.net = torch.compile(self.net)
 
         if self.trainer is not None:
@@ -93,9 +98,11 @@ class BaseLightningModule(LightningModule):
                 "0 skips test phases, >1 wastes compute — real evaluation is in callbacks."
             )
 
+    # pyrefly: ignore [bad-override]
     def configure_optimizers(self) -> dict[str, Any]:
         # Only parameters with requires_grad=True are passed to optimizer
-        optimizer = self.optimizer_fn(params = [p for p in self.parameters() if p.requires_grad])
+        # pyrefly: ignore [not-callable]
+        optimizer = self.optimizer_fn(params=[p for p in self.parameters() if p.requires_grad])
         if self.scheduler_fn is not None:
             scheduler_fn = self.scheduler_fn
             scheduler_params = inspect.signature(scheduler_fn).parameters
@@ -116,11 +123,11 @@ class BaseLightningModule(LightningModule):
             }
         return {"optimizer": optimizer}
 
-
     def _has_ema_callback(self) -> bool:
         """Check if an EMAWeightAveraging callback is present in the trainer."""
         if self.trainer is None:
             return False
+        # pyrefly: ignore [missing-attribute]
         for cb in self.trainer.callbacks:
             if isinstance(cb, EMAWeightAveraging):
                 return True
@@ -129,14 +136,16 @@ class BaseLightningModule(LightningModule):
     def _build_net_copy(self, use_ema_if_available: bool = False) -> torch.nn.Module:
         """Return a detached copy of the EMA-averaged net (or plain net if no EMA callback)."""
         if use_ema_if_available:
+            # pyrefly: ignore [missing-attribute]
             for cb in self.trainer.callbacks:
                 if isinstance(cb, EMAWeightAveraging):
+                    # pyrefly: ignore [missing-attribute]
                     return deepcopy(cb._average_model.module.net)
         return deepcopy(self.net)
 
     def build_source_energy(
         self,
-        system_cond: Optional[SystemCond],
+        system_cond: SystemCond | None,
         use_ema_if_available: bool = False,
     ) -> SourceEnergy:
         """Build a SourceEnergy with batched sample and energy callables.
@@ -178,13 +187,13 @@ class BaseLightningModule(LightningModule):
         total_norm = total_norm ** (1.0 / 2)
         self.log_dict({"train/grad_norm": total_norm}, prog_bar=True)
 
-
     def on_validation_epoch_start(self) -> None:
         logger.info("Validation epoch start")
 
     def on_validation_epoch_end(self) -> None:
         logger.info("Validation epoch end")
 
+    # pyrefly: ignore [bad-override]
     def validation_step(self, batch, batch_idx):
         "NOTE: these only exist for Lightning compatibility. All evaluation is handled by custom callbacks."
         return None
@@ -195,6 +204,7 @@ class BaseLightningModule(LightningModule):
     def on_test_epoch_end(self) -> None:
         logger.info("Test epoch end")
 
+    # pyrefly: ignore [bad-override]
     def test_step(self, batch, batch_idx):
         "NOTE: these only exist for Lightning compatibility. All evaluation is handled by custom callbacks."
         return None

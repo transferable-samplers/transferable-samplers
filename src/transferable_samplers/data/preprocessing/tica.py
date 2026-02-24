@@ -16,7 +16,6 @@ import deeptime as dt
 import mdtraj as md
 import numpy as np
 
-
 SELECTION = "symbol == C or symbol == N or symbol == S"
 
 
@@ -44,10 +43,13 @@ def tica_features(trajectory, use_dihedrals=True, use_distances=True, selection=
     if use_distances:
         distances = _compute_distances(trajectory.xyz)
     if use_distances and use_dihedrals:
+        # pyrefly: ignore [unbound-name]
         return np.concatenate([distances, dihedrals], axis=-1)
     elif use_distances:
+        # pyrefly: ignore [unbound-name]
         return distances
     elif use_dihedrals:
+        # pyrefly: ignore [unbound-name]
         return dihedrals
     else:
         return []

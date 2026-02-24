@@ -17,5 +17,6 @@ class DummyDataset(torch.utils.data.Dataset):
     def __len__(self):
         return self.size
 
+    # pyrefly: ignore [bad-param-name-override]
     def __getitem__(self, idx):
         return {"x": torch.zeros(1)}

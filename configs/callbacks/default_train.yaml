@@ -7,6 +7,5 @@ defaults:
   - model_checkpoint_last
   - ema_weight_averaging
   - _self_
-
 model_summary:
   max_depth: 2

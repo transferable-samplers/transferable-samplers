@@ -29,7 +29,7 @@ def plot_com_norms(
     fig, ax = plt.subplots(figsize=(4, 3), dpi=300, constrained_layout=True)
     fig.patch.set_facecolor("white")
 
-    for (name, samples), color in zip(samples_dict.items(), COLORS):
+    for (name, samples), color in zip(samples_dict.items(), COLORS, strict=False):
         com_norm = samples.mean(dim=1).norm(dim=-1).cpu()
         ax.hist(
             com_norm,

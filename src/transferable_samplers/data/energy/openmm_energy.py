@@ -13,6 +13,7 @@ class _OpenMMEnergyGrad(torch.autograd.Function):
     """Custom autograd function that uses OpenMM forces as the backward gradient."""
 
     @staticmethod
+    # pyrefly: ignore [bad-override]
     def forward(ctx, positions, evaluator):
         energies, forces = evaluator._compute(positions)
         neg_forces = torch.tensor(-forces, device=positions.device, dtype=positions.dtype)
@@ -20,6 +21,7 @@ class _OpenMMEnergyGrad(torch.autograd.Function):
         return torch.tensor(energies, device=positions.device, dtype=positions.dtype).reshape(-1, 1)
 
     @staticmethod
+    # pyrefly: ignore [bad-override]
     def backward(ctx, grad_output):
         (neg_forces,) = ctx.saved_tensors
         # grad_output is (batch, 1); neg_forces may be (batch, n_atoms, 3)
@@ -48,18 +50,20 @@ class OpenMMEnergy:
     """
 
     def __init__(self, system, integrator, platform_name="CPU", device_index=None):
+        # pyrefly: ignore [missing-module-attribute]
         from openmm import Context, Platform, unit
 
         self._system = system
-        self._unit_reciprocal = 1.0 / (
-            integrator.getTemperature() * unit.MOLAR_GAS_CONSTANT_R
-        ).value_in_unit(unit.kilojoule_per_mole)
+        self._unit_reciprocal = 1.0 / (integrator.getTemperature() * unit.MOLAR_GAS_CONSTANT_R).value_in_unit(
+            unit.kilojoule_per_mole
+        )
 
         # Construct platform and context
         platform = Platform.getPlatformByName(platform_name)
         properties = {}
         if platform_name == "CPU":
             local_world_size = int(os.environ.get("LOCAL_WORLD_SIZE", 1))
+            # pyrefly: ignore [unsupported-operation]
             properties["Threads"] = str(os.cpu_count() // local_world_size)
         elif platform_name == "CUDA":
             if device_index is not None:
@@ -102,6 +106,7 @@ class OpenMMEnergy:
             self._context.setPositions(pos_np[i])
             state = self._context.getState(getEnergy=True, getForces=True)
             e = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+            # pyrefly: ignore [missing-attribute]
             f = state.getForces(asNumpy=True).value_in_unit(unit.kilojoule_per_mole / unit.nanometer)
 
             if not np.isfinite(e):

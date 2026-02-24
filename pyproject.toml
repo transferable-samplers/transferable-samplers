@@ -45,6 +45,7 @@ exclude = [
     "site-packages",
     "venv",
     "notebooks/",
+    "src/transferable_samplers/nn/egnn/",
 ]
 
 line-length = 120
@@ -69,7 +70,6 @@ select = [
     "UP",     # pyupgrade (modern Python syntax)
     "N",      # pep8-naming
     "S",      # bandit (security rules)
-    "D",      # pydocstyle (docstring linting)
 
     # Ruff-native rules
     "COM",    # flake8-commas
@@ -80,9 +80,11 @@ select = [
 ]
 
 ignore = [
-    "E203",  # whitespace before ':', black compatibility
-    "E731",  # assigning a lambda to a variable (stylistic preference)
-    "S101",  # use of assert (allowed in your code)
+    "E203",   # whitespace before ':', black compatibility
+    "E731",   # assigning a lambda to a variable (stylistic preference)
+    "S101",   # use of assert (allowed in your code)
+    "COM812", # trailing comma - conflicts with ruff formatter
+    "N817",   # CamelCase imported as acronym (e.g. Rotation as R)
 ]
 
 # Allow fix for all enabled rules (when `--fix` is passed).
@@ -92,12 +94,16 @@ unfixable = []
 # Allow unused variables if underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+))$"
 
-[tool.ruff.lint.pydocstyle]
-convention = "numpy"
-
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D"]
-"scripts/**" = ["D", "S"]
+"tests/**" = ["S"]
+"scripts/**" = ["S"]
+"src/transferable_samplers/nn/tarflow/**" = ["N806"]
+"src/transferable_samplers/samplers/**" = ["N803", "N806"]
+"src/transferable_samplers/evaluation/**" = ["N806"]
+"src/transferable_samplers/data/**" = ["N806"]
+"src/transferable_samplers/nn/wrappers.py" = ["N806"]
+"src/transferable_samplers/utils/dataclasses.py" = ["N806"]
+"src/transferable_samplers/utils/huggingface.py" = ["N806"]
 
 # ----------------------------------------
 # Formatting (Black-compatible)
@@ -107,3 +113,10 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
+
+# ----------------------------------------
+# Pyrefly configuration
+# ----------------------------------------
+[tool.pyrefly]
+search_path = ["src", "tests"]
+python_interpreter = ".venv/bin/python"

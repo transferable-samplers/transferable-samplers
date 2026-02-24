@@ -1,13 +1,12 @@
 import torch
 
-from transferable_samplers.utils.standardization import destandardize_coords
+from transferable_samplers.evaluation.metrics.ess import normalized_ess
+from transferable_samplers.evaluation.metrics.kmeans_jsd import tica_kmeans_jsd, torus_kmeans_jsd
 from transferable_samplers.evaluation.metrics.wasserstein_distances import (
     energy_wasserstein,
     tica_wasserstein,
     torus_wasserstein,
 )
-from transferable_samplers.evaluation.metrics.ess import normalized_ess
-from transferable_samplers.evaluation.metrics.kmeans_jsd import tica_kmeans_jsd, torus_kmeans_jsd
 from transferable_samplers.evaluation.plots.plot_atom_distances import plot_atom_distances
 from transferable_samplers.evaluation.plots.plot_com_norms import plot_com_norms
 from transferable_samplers.evaluation.plots.plot_energies import plot_energies
@@ -16,6 +15,7 @@ from transferable_samplers.evaluation.plots.plot_tica import plot_tica
 from transferable_samplers.utils.chirality import get_symmetry_change
 from transferable_samplers.utils.dataclasses import EvalContext, SamplesData
 from transferable_samplers.utils.pylogger import RankedLogger
+from transferable_samplers.utils.standardization import destandardize_coords
 
 logger = RankedLogger(__name__, rank_zero_only=False)
 
@@ -82,9 +82,7 @@ class PeptideEnsembleEvaluator:
         # Fix chirality on proposal samples if present
         proposal_data = samples_data_dict.get("proposal")
         if proposal_data is not None:
-            proposal_data, symmetry_metrics = self._fix_chirality(
-                proposal_data, true_data, topology, prefix
-            )
+            proposal_data, symmetry_metrics = self._fix_chirality(proposal_data, true_data, topology, prefix)
             metrics.update(symmetry_metrics)
             samples_data_dict = {**samples_data_dict, "proposal": proposal_data}
 
@@ -175,21 +173,29 @@ class PeptideEnsembleEvaluator:
         # Compute effective sample size
         if pred_data.logw is not None:
             ess = normalized_ess(pred_data.logw)
+            # pyrefly: ignore [unsupported-operation]
             metrics[f"{prefix}/effective_sample_size"] = ess
 
         metrics[f"{prefix}/mean_energy"] = pred_data.E_target.mean().cpu()
         metrics[f"{prefix}/median_energy"] = pred_data.E_target.median().cpu()
 
+        # pyrefly: ignore [no-matching-overload]
         metrics.update(energy_wasserstein(true_data.E_target, pred_data.E_target, prefix=prefix))
         logger.info("Energy wasserstein computed")
 
+        # pyrefly: ignore [no-matching-overload]
         metrics.update(torus_wasserstein(true_data.samples, pred_data.samples, topology, prefix=prefix))
         logger.info("Torus wasserstein computed")
 
+        # pyrefly: ignore [no-matching-overload]
         metrics.update(tica_wasserstein(true_data.samples, pred_data.samples, topology, tica_model, prefix=prefix))
         logger.info("TICA wasserstein computed")
 
-        metrics.update(tica_kmeans_jsd(true_data.samples, pred_data.samples, topology, tica_model=tica_model, prefix=prefix))
+        # pyrefly: ignore [no-matching-overload]
+        metrics.update(
+            tica_kmeans_jsd(true_data.samples, pred_data.samples, topology, tica_model=tica_model, prefix=prefix)
+        )
+        # pyrefly: ignore [no-matching-overload]
         metrics.update(torus_kmeans_jsd(true_data.samples, pred_data.samples, topology, prefix=prefix))
         logger.info("kMeans JSD computed")
 
@@ -255,6 +261,7 @@ class PeptideEnsembleEvaluator:
                 energy = energy[keep_mask]
                 logw = logw[keep_mask] if logw is not None else None
 
+            # pyrefly: ignore [bad-argument-type]
             pred_data = SamplesData(samples, energy, logw=logw)
 
         return pred_data, metrics

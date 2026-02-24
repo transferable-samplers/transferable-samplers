@@ -1,13 +1,10 @@
 # @package _global_
-
 defaults:
   - override /model: normalizing_flow
   - override /model/net: tarflow
   - override /data: transferable/up_to_8aa
   - override /trainer: gpu
-
 hf_state_dict_path: transferable/tarflow_up_to_8aa.pth
-
 model:
   source_energy_config:
     _target_: transferable_samplers.utils.dataclasses.SourceEnergyConfig
@@ -15,19 +12,15 @@ model:
     energy_batch_size: 5_000
     grad_batch_size: 5_000
     use_com_adjustment: true
-
 callbacks:
   sampling_evaluation:
     sampler:
       _target_: transferable_samplers.samplers.snis_sampler.SNISSampler
       num_samples: 1_000_000
-
       logw_quantile_filter: 0.002
-
 data:
   batch_size: 128
   num_eval_samples: 10_000
-
 trainer:
   limit_test_batches: 1
   limit_val_batches: 1

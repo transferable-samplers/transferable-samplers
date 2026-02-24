@@ -1,6 +1,5 @@
-import os
 from functools import partial
-from typing import Optional
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import torch
@@ -10,8 +9,8 @@ from lightning import Callback
 from transferable_samplers.evaluation.diagnostics.smc_plots import plot_smc_diagnostics
 from transferable_samplers.evaluation.evaluator import PeptideEnsembleEvaluator
 from transferable_samplers.samplers.base_sampler import BaseSampler
-from transferable_samplers.utils.wandb_utils import compute_mean_metrics, make_log_image_fn
 from transferable_samplers.utils.pylogger import RankedLogger
+from transferable_samplers.utils.wandb_utils import compute_mean_metrics, make_log_image_fn
 
 logger = RankedLogger(__name__, rank_zero_only=False)
 
@@ -31,8 +30,8 @@ class SamplingEvaluationCallback(Callback):
     def __init__(
         self,
         evaluator: PeptideEnsembleEvaluator,
-        sampler: Optional[BaseSampler] = None,
-        run_diagnostics_kwargs: Optional[dict] = None,
+        sampler: BaseSampler | None = None,
+        run_diagnostics_kwargs: dict | None = None,
         output_dir: str = "",
     ):
         super().__init__()
@@ -93,11 +92,13 @@ class SamplingEvaluationCallback(Callback):
                 )
 
                 if hasattr(pl_module, "run_model_diagnostics"):
-                    seq_metrics.update(pl_module.run_model_diagnostics(
-                        prefix=seq_prefix,
-                        system_cond=eval_ctx.system_cond,
-                        **self.run_diagnostics_kwargs,
-                    ))
+                    seq_metrics.update(
+                        pl_module.run_model_diagnostics(
+                            prefix=seq_prefix,
+                            system_cond=eval_ctx.system_cond,
+                            **self.run_diagnostics_kwargs,
+                        )
+                    )
 
                 pl_module.log_dict(seq_metrics)
                 all_metrics.update(seq_metrics)
@@ -112,12 +113,12 @@ class SamplingEvaluationCallback(Callback):
         if not self.output_dir:
             return
 
-        save_dir = os.path.join(self.output_dir, seq_prefix)
-        os.makedirs(save_dir, exist_ok=True)
+        save_dir = Path(self.output_dir) / seq_prefix
+        save_dir.mkdir(parents=True, exist_ok=True)
 
-        torch.save(samples_dict, os.path.join(save_dir, "samples_dict.pt"))
+        torch.save(samples_dict, str(save_dir / "samples_dict.pt"))
         logger.info(f"Saved samples_dict to {save_dir}/samples_dict.pt")
 
         if diagnostics is not None:
-            torch.save(diagnostics, os.path.join(save_dir, "diagnostics.pt"))
+            torch.save(diagnostics, str(save_dir / "diagnostics.pt"))
             logger.info(f"Saved diagnostics to {save_dir}/diagnostics.pt")

@@ -12,7 +12,7 @@ the annealing-time increment dt as follows:
     h = eps * dt,
 
 where dt is the annealing-time increment and eps controls the diffusion
-strength per unit annealing time; this ensures convergence to the underlying 
+strength per unit annealing time; this ensures convergence to the underlying
 SDE and preservation of intermediate marginals as dt → 0.
 
 In discrete-time MALA, the Metropolis–Hastings correction enforces
@@ -26,18 +26,22 @@ Proposition 1 of https://arxiv.org/pdf/2410.02711
 Appendix D.2 of https://arxiv.org/pdf/2508.18175
 """
 
-from typing import Optional
-
 import torch
 
+from transferable_samplers.evaluation.metrics.ess import normalized_ess
 from transferable_samplers.samplers.base_sampler import BaseSampler
 from transferable_samplers.samplers.filtering import filter_by_energy_cutoff, filter_by_logw_quantile
 from transferable_samplers.samplers.resampling import resampling_idx
 from transferable_samplers.samplers.smc.mcmc import mcmc_kernel
 from transferable_samplers.samplers.smc.smc_particles import SMCParticles, all_gather_particles
-from transferable_samplers.evaluation.metrics.ess import normalized_ess
 from transferable_samplers.utils.dataclasses import SamplesData, SourceEnergy, TargetEnergy
-from transferable_samplers.utils.dist_utils import all_gather_cat, broadcast_tensor, get_rank, get_world_size, shard_tensor
+from transferable_samplers.utils.dist_utils import (
+    all_gather_cat,
+    broadcast_tensor,
+    get_rank,
+    get_world_size,
+    shard_tensor,
+)
 from transferable_samplers.utils.pylogger import RankedLogger
 
 logger = RankedLogger(__name__, rank_zero_only=False)
@@ -60,12 +64,14 @@ class SMCSampler(BaseSampler):
         adaptive_step_size: bool = False,
         ess_threshold: float = -1.0,
         resampling_method: str = "multinomial",
-        energy_cutoff_filter: Optional[float] = None,
-        logw_quantile_filter: Optional[float] = None,
+        energy_cutoff_filter: float | None = None,
+        logw_quantile_filter: float | None = None,
         log_traj_freq: int = 10,
     ):
         super().__init__(num_samples)
-        logger.warning("init_eps has replaced langevin_eps, and has been reparameterized such that langevin_eps = init_eps * dt")
+        logger.warning(
+            "init_eps has replaced langevin_eps, and has been reparameterized such that langevin_eps = init_eps * dt"
+        )
 
         self.init_eps = init_eps
         self.use_metropolis = use_metropolis
@@ -78,12 +84,12 @@ class SMCSampler(BaseSampler):
         self.log_traj_freq = log_traj_freq
 
     @torch.no_grad()  # sampling path, no training gradients needed
+    # pyrefly: ignore [bad-override]
     def sample(
         self,
         source_energy: SourceEnergy,
         target_energy: TargetEnergy,
     ) -> dict[str, SamplesData]:
-
         # Generate proposal
         world_size = get_world_size()
         loc_num_samples = self.num_samples // world_size
@@ -102,17 +108,21 @@ class SMCSampler(BaseSampler):
 
         # Filter by energy cutoff (all ranks do same filtering to maintain same shape)
         if self.energy_cutoff_filter is not None:
-            samples, E_source, E_target = filter_by_energy_cutoff(samples, E_source, E_target, self.energy_cutoff_filter)
+            samples, E_source, E_target = filter_by_energy_cutoff(
+                samples, E_source, E_target, self.energy_cutoff_filter
+            )
             logger.info("Clipping energies")
 
         # Clip by logit quantile (all ranks do same filtering to maintain same shape)
         if self.logw_quantile_filter is not None:
-            samples, E_source, E_target = filter_by_logw_quantile(samples, E_source, E_target, self.logw_quantile_filter)
+            samples, E_source, E_target = filter_by_logw_quantile(
+                samples, E_source, E_target, self.logw_quantile_filter
+            )
             logger.info("Clipped proposal logw for SMC initialisation")
 
         # Shard across DDP ranks (no-op otherwise)
-        n_total = (len(samples) // world_size) * world_size # trim to be divisible
-        lineage = torch.arange(n_total, device=samples.device) # track original sample indices for diagnostics
+        n_total = (len(samples) // world_size) * world_size  # trim to be divisible
+        lineage = torch.arange(n_total, device=samples.device)  # track original sample indices for diagnostics
         X = shard_tensor(samples[:n_total])
         loc_lineage = shard_tensor(lineage)
 
@@ -123,26 +133,35 @@ class SMCSampler(BaseSampler):
             x=X,
             logw=torch.zeros(X.shape[0], device=X.device),
             lineage=loc_lineage,
-            E_source=loc_E_source, E_target=loc_E_target,
-            E_source_grad=loc_E_source_grad, E_target_grad=loc_E_target_grad,
+            E_source=loc_E_source,
+            E_target=loc_E_target,
+            E_source_grad=loc_E_source_grad,
+            E_target_grad=loc_E_target_grad,
         )
 
         eps = self.init_eps
         timesteps = torch.linspace(0, 1, self.num_annealing_steps + 1)
         trajectory: list[SMCParticles] = []
         diagnostics: dict[str, list] = {
-            "t": [], "ess": [], "eps": [], "acceptance_rate": [],
+            "t": [],
+            "ess": [],
+            "eps": [],
+            "acceptance_rate": [],
         }
 
         # Main loop
         t_previous = 0.0
         for j, t in enumerate(timesteps[:-1]):
-
-            logger.info(f"SMC step {j+1}/{self.num_annealing_steps}, t={t:.3f}, eps={eps:.2e}")
+            logger.info(f"SMC step {j + 1}/{self.num_annealing_steps}, t={t:.3f}, eps={eps:.2e}")
 
             dt = t - t_previous
             loc_particles, acceptance_rate = mcmc_kernel(
-                loc_particles, source_energy, target_energy, t, dt, eps,
+                loc_particles,
+                source_energy,
+                target_energy,
+                t,
+                dt,
+                eps,
                 use_metropolis=self.use_metropolis,
             )
 
@@ -190,6 +209,7 @@ class SMCSampler(BaseSampler):
         logger.info(f"Fraction of Original Samples: {unique_ratio:.2%}")
 
         smc_data = SamplesData(loc_particles.x, loc_particles.E_target, logw=loc_particles.logw)
+        # pyrefly: ignore [bad-return]
         return {"proposal": proposal_data, "smc": smc_data}, {"trajectory": trajectory, "diagnostics": diagnostics}
 
     @staticmethod
@@ -200,4 +220,3 @@ class SMCSampler(BaseSampler):
         elif acceptance_rate < 0.55:
             return eps / 1.1
         return eps
-

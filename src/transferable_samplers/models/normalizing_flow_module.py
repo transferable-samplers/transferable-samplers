@@ -15,6 +15,7 @@ class NormalizingFlowModule(BaseLightningModule):
         self,
         net: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
+        # pyrefly: ignore [not-a-type]
         scheduler: torch.optim.lr_scheduler,
         prior,
         compile_net: bool = False,
@@ -39,7 +40,7 @@ class NormalizingFlowModule(BaseLightningModule):
         self.teacher_regularize_weight = teacher_regularize_weight
 
         if self.teacher_regularize_weight > 0:
-            logger.info("Using teacher regularization with weight {:.3f}".format(self.teacher_regularize_weight))
+            logger.info(f"Using teacher regularization with weight {self.teacher_regularize_weight:.3f}")
             self.teacher = deepcopy(self.net)
             for param in self.teacher.parameters():
                 param.requires_grad_(False)
@@ -71,7 +72,9 @@ class NormalizingFlowModule(BaseLightningModule):
 
         if self.teacher_regularize_weight > 0:
             with torch.inference_mode():
-                z_pred_teacher, dlogp_teacher = self.teacher(x1, permutations=permutations, encodings=encodings, mask=mask)
+                z_pred_teacher, dlogp_teacher = self.teacher(
+                    x1, permutations=permutations, encodings=encodings, mask=mask
+                )
 
             logp_z_pred_teacher = self.prior.logp(z_pred_teacher, mask=mask)
             logq_teacher = logp_z_pred_teacher + dlogp_teacher
@@ -85,12 +88,15 @@ class NormalizingFlowModule(BaseLightningModule):
         return loss
 
     def generate_proposal(
-        self, net: torch.nn.Module, num_samples: int,
-        system_cond: Optional[SystemCond] = None,
+        self,
+        net: torch.nn.Module,
+        num_samples: int,
+        system_cond: SystemCond | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         encodings = system_cond.encodings if system_cond else None
 
         if encodings is None:
+            # pyrefly: ignore [missing-attribute]
             num_atoms = self.trainer.datamodule.num_atoms
         else:
             num_atoms = encodings["atom_type"].size(0)
@@ -102,6 +108,7 @@ class NormalizingFlowModule(BaseLightningModule):
         _encodings = batched_cond.encodings if batched_cond else None
         _permutations = batched_cond.permutations if batched_cond else None
 
+        # pyrefly: ignore [not-callable]
         x_pred, dlogp_rev = net.reverse(z, _permutations, encodings=_encodings)
 
         # dlogp_rev is log|det(dx/dz)| = -log|det(dz/dx)|, so logq = logp_z - dlogp_rev
@@ -110,7 +117,10 @@ class NormalizingFlowModule(BaseLightningModule):
         return x_pred, -logq
 
     def proposal_energy(
-        self, net: torch.nn.Module, x: torch.Tensor, system_cond: Optional[SystemCond] = None,
+        self,
+        net: torch.nn.Module,
+        x: torch.Tensor,
+        system_cond: SystemCond | None = None,
     ) -> torch.Tensor:
         batched_cond = system_cond.for_batch(x.shape[0], x.device) if system_cond else None
         _encodings = batched_cond.encodings if batched_cond else None
@@ -126,7 +136,9 @@ class NormalizingFlowModule(BaseLightningModule):
     def on_train_epoch_start(self) -> None:
         super().on_train_epoch_start()
         if self.teacher_regularize_weight > 0:
-            assert not self._has_ema_callback(), "EMAWeightAveraging callback should not be used with teacher regularization."
+            assert not self._has_ema_callback(), (
+                "EMAWeightAveraging callback should not be used with teacher regularization."
+            )
 
     # =====================================================================
     # Additional methods (not in base class)
@@ -153,10 +165,12 @@ class NormalizingFlowModule(BaseLightningModule):
         encodings = system_cond.encodings if system_cond else None
 
         if encodings is None:
+            # pyrefly: ignore [missing-attribute]
             num_atoms = self.trainer.datamodule.num_atoms
         else:
             num_atoms = encodings["atom_type"].size(0)
 
+        # pyrefly: ignore [missing-attribute]
         data_dim = num_atoms * self.trainer.datamodule.num_dimensions
         z = self.prior.sample(num_samples_invert, num_atoms, device=self.device)
 
@@ -165,6 +179,7 @@ class NormalizingFlowModule(BaseLightningModule):
         _permutations = batched_cond.permutations if batched_cond else None
 
         with torch.no_grad():  # diagnostics only, no gradient needed
+            # pyrefly: ignore [not-callable]
             x_pred, _ = self.net.reverse(z, _permutations, encodings=_encodings)
             z_recon, dlogp = self.net(x_pred, _permutations, encodings=_encodings)
 

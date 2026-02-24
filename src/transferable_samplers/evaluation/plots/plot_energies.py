@@ -57,7 +57,7 @@ def plot_energies(
         label="True data",
     )
 
-    for (name, energy), color in zip(samples_energy_dict.items(), COLORS):
+    for (name, energy), color in zip(samples_energy_dict.items(), COLORS, strict=False):
         ax.hist(
             energy_cropper(energy.cpu()),
             bins=bin_edges,
