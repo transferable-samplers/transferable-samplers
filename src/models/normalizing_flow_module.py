@@ -88,7 +88,6 @@ class NormalizingFlowModule(BaseLightningModule):
         self, net: torch.nn.Module, num_samples: int,
         system_cond: Optional[SystemCond] = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        permutations = system_cond.permutations if system_cond else None
         encodings = system_cond.encodings if system_cond else None
 
         if encodings is None:
@@ -99,19 +98,9 @@ class NormalizingFlowModule(BaseLightningModule):
         z = self.prior.sample(num_samples, num_atoms, device=self.device)
         logp_z = self.prior.logp(z)
 
-        _permutations = None
-        if permutations is not None:
-            _permutations = {
-                subkey: tensor.unsqueeze(0).repeat(num_samples, 1).to(self.device)
-                for subkey, tensor in permutations.items()
-            }
-
-        _encodings = None
-        if encodings is not None:
-            _encodings = {
-                key: tensor.unsqueeze(0).repeat(num_samples, 1).to(self.device)
-                for key, tensor in encodings.items()
-            }
+        batched_cond = system_cond.for_batch(num_samples, self.device) if system_cond else None
+        _encodings = batched_cond.encodings if batched_cond else None
+        _permutations = batched_cond.permutations if batched_cond else None
 
         x_pred, dlogp_rev = net.reverse(z, _permutations, encodings=_encodings)
 
@@ -123,28 +112,9 @@ class NormalizingFlowModule(BaseLightningModule):
     def proposal_energy(
         self, net: torch.nn.Module, x: torch.Tensor, system_cond: Optional[SystemCond] = None,
     ) -> torch.Tensor:
-        permutations = system_cond.permutations if system_cond else None
-        encodings = system_cond.encodings if system_cond else None
-
-        if encodings is not None:
-            _encodings = {}
-            for k, v in encodings.items():
-                # ensure encodings is broadcasted to batch if we pass
-                # in a single peptide
-                if v.ndim == 1 and x.ndim > 2:
-                    v = v[None, ...].repeat(x.shape[0], *([1] * v.ndim))
-
-                _encodings[k] = v.to(x.device)
-        else:
-            _encodings = None
-
-        if permutations is not None:
-            _permutations = {
-                subkey: tensor.unsqueeze(0).repeat(x.shape[0], 1).to(self.device)
-                for subkey, tensor in permutations.items()
-            }
-        else:
-            _permutations = None
+        batched_cond = system_cond.for_batch(x.shape[0], x.device) if system_cond else None
+        _encodings = batched_cond.encodings if batched_cond else None
+        _permutations = batched_cond.permutations if batched_cond else None
 
         z_pred, dlogp = net(x, _permutations, encodings=_encodings)
 
@@ -180,7 +150,6 @@ class NormalizingFlowModule(BaseLightningModule):
             num_samples_invert: Number of samples for invertibility check.
             num_samples_dlogp: Number of samples for dlogp check.
         """
-        permutations = system_cond.permutations if system_cond else None
         encodings = system_cond.encodings if system_cond else None
 
         if encodings is None:
@@ -191,19 +160,9 @@ class NormalizingFlowModule(BaseLightningModule):
         data_dim = num_atoms * self.trainer.datamodule.num_dimensions
         z = self.prior.sample(num_samples_invert, num_atoms, device=self.device)
 
-        _permutations = None
-        if permutations is not None:
-            _permutations = {
-                subkey: tensor.unsqueeze(0).repeat(num_samples_invert, 1).to(self.device)
-                for subkey, tensor in permutations.items()
-            }
-
-        _encodings = None
-        if encodings is not None:
-            _encodings = {
-                key: tensor.unsqueeze(0).repeat(num_samples_invert, 1).to(self.device)
-                for key, tensor in encodings.items()
-            }
+        batched_cond = system_cond.for_batch(num_samples_invert, self.device) if system_cond else None
+        _encodings = batched_cond.encodings if batched_cond else None
+        _permutations = batched_cond.permutations if batched_cond else None
 
         with torch.no_grad():  # diagnostics only, no gradient needed
             x_pred, _ = self.net.reverse(z, _permutations, encodings=_encodings)

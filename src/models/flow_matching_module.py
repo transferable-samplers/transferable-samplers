@@ -103,11 +103,8 @@ class FlowMatchingModule(BaseLightningModule):
         z = self.prior.sample(num_samples, num_atoms, device=self.device)
         logp_z = self.prior.logp(z)
 
-        if encodings is not None:
-            encodings = {
-                key: tensor.unsqueeze(0).repeat(num_samples, 1).to(self.device)
-                for key, tensor in encodings.items()
-            }
+        batched_cond = system_cond.for_batch(num_samples, self.device) if system_cond else None
+        encodings = batched_cond.encodings if batched_cond else None
 
         x_pred, dlogp = self._integrate(net, z, encodings=encodings, reverse=False)
 

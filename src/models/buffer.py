@@ -1,7 +1,6 @@
 from typing import Optional
 
 import torch
-import torch.utils._pytree as pytree
 
 from src.utils.standardization import destandardize_coords
 from src.utils.dataclasses import SystemCond
@@ -46,10 +45,10 @@ class Buffer:
             batch = self.batch_transform(batch)
 
         if self.system_cond is not None:
-            expand = lambda v: v.unsqueeze(0).expand(batch_size, *v.shape)
-            if self.system_cond.encodings is not None:
-                batch["encodings"] = pytree.tree_map(expand, self.system_cond.encodings)
-            if self.system_cond.permutations is not None:
-                batch["permutations"] = pytree.tree_map(expand, self.system_cond.permutations)
+            batched_cond = self.system_cond.for_batch(batch_size)
+            if batched_cond.encodings is not None:
+                batch["encodings"] = batched_cond.encodings
+            if batched_cond.permutations is not None:
+                batch["permutations"] = batched_cond.permutations
 
         return batch

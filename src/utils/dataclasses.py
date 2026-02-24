@@ -4,6 +4,7 @@ from typing import Callable, Optional, Tuple
 
 import scipy.special
 import torch
+import torch.utils._pytree as pytree
 
 from src.utils.standardization import destandardize_coords
 
@@ -149,8 +150,22 @@ class SourceEnergy:
 
 @dataclass
 class SystemCond:
+    """System conditioning (permutations, encodings) for transferable models.
+
+    Stores unbatched conditioning tensors. Use for_batch() to expand to batch size.
+    """
     permutations: Optional[dict] = None
     encodings: Optional[dict] = None
+
+    def for_batch(self, batch_size: int, device=None) -> "SystemCond":
+        """Expand unbatched conditioning tensors to batch_size and move to device."""
+        def expand(v):
+            v = v.unsqueeze(0).expand(batch_size, *v.shape)
+            return v.to(device) if device is not None else v
+        return SystemCond(
+            encodings=pytree.tree_map(expand, self.encodings) if self.encodings else None,
+            permutations=pytree.tree_map(expand, self.permutations) if self.permutations else None,
+        )
 
 
 @dataclass
