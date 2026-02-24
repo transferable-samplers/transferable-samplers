@@ -6,7 +6,7 @@ import torch
 from torchdyn.core import NeuralODE
 
 from src.models.base_lightning_module import BaseLightningModule
-from src.models.neural_networks.wrappers import TorchdynWrapper, torch_wrapper
+from src.models.neural_networks.wrappers import TorchDynWrapper
 from src.utils.dataclasses import SystemCond
 from src.utils.pylogger import RankedLogger
 
@@ -23,9 +23,7 @@ class FlowMatchingModule(BaseLightningModule):
         scheduler: torch.optim.lr_scheduler,
         prior,
         sigma: float = 0.0,
-        div_estimator: str = "hutch",
         logp_tol_scale: float = 1.0,
-        n_eps: int = 1,
         atol: float = 1e-5,
         rtol: float = 1e-5,
         mean_free_prior: bool = True,
@@ -49,14 +47,11 @@ class FlowMatchingModule(BaseLightningModule):
             train_from_buffer=train_from_buffer,
         )
         self.sigma = sigma
-        self.div_estimator = div_estimator
         self.logp_tol_scale = logp_tol_scale
-        self.n_eps = n_eps
         self.atol = atol
         self.rtol = rtol
         self.nfe = 0
         self.num_integrations = 0
-        self.eps = 1e-1
 
     def forward(self, t: torch.Tensor, x: torch.Tensor, encodings, mask) -> torch.Tensor:
         return self.net(t, x, encodings=encodings, node_mask=mask)
@@ -119,32 +114,22 @@ class FlowMatchingModule(BaseLightningModule):
         return loss
 
     @torch.no_grad()
-    def _integrate(self, net: torch.nn.Module, x: torch.Tensor, encodings=None, reverse=False, dummy_ll=False) -> torch.Tensor:
+    def _integrate(self, net: torch.nn.Module, x: torch.Tensor, encodings=None, reverse=False, compute_dlogp=True) -> torch.Tensor:
         batch_size = x.shape[0]
         num_atoms = x.shape[1]
 
         x = x.reshape(batch_size, -1)  # Ensure x is 2D
 
-        dlogp = torch.zeros((x.shape[0], 1), device=x.device)
+        dlogp_init = torch.zeros((x.shape[0], 1), device=x.device)
         t_span = torch.linspace(1, 0, 2) if reverse else torch.linspace(0, 1, 2)
 
         eval_fn = partial(copy.deepcopy(net), encodings=encodings)
 
-        if self.div_estimator == "ito":
-            x_ito, dlogp_ito = self.sde_integrate(x, reverse=reverse)
-            return x_ito, dlogp_ito
-
-        if dummy_ll:
-            wrapped_net = torch_wrapper(eval_fn)
-            logger.info("Using dummy ll")
-        else:
-            wrapped_net = TorchdynWrapper(
-                eval_fn,
-                div_estimator=self.div_estimator,
-                logp_tol_scale=self.logp_tol_scale,
-                n_eps=self.n_eps,
-            )
-            logger.info(f"Using {self.div_estimator} with n_eps {self.n_eps}")
+        wrapped_net = TorchDynWrapper(
+            eval_fn,
+            compute_dlogp=compute_dlogp,
+            logp_tol_scale=self.logp_tol_scale,
+        )
 
         node = NeuralODE(
             wrapped_net,
@@ -153,73 +138,21 @@ class FlowMatchingModule(BaseLightningModule):
             solver="dopri5",
             sensitivity="adjoint",
         )
-        if not dummy_ll:
-            x = torch.cat([x, dlogp], dim=-1)
+        if compute_dlogp:
+            x = torch.cat([x, dlogp_init], dim=-1)
         x = node.trajectory(x, t_span=t_span)[-1]
         logger.info(f"nfe: {wrapped_net.nfe}")
         self.nfe += wrapped_net.nfe
         self.num_integrations += 1
         wrapped_net.nfe = 0
-        if not dummy_ll:
-            dlogp = x[..., -1] * self.logp_tol_scale
+        if compute_dlogp:
+            dlogp_out = x[..., -1] * self.logp_tol_scale
             x = x[..., :-1]
+        else:
+            dlogp_out = dlogp_init.squeeze(-1)
         x = x.reshape(batch_size, num_atoms, -1)
 
-        return x, dlogp.view(-1)
-
-    def euler_maruyama_step(
-        self,
-        t: torch.Tensor,
-        x: torch.Tensor,
-        dt: float,
-        step: int,
-        batch_size: int,
-    ):
-        vt = self.net(t, x, d_base=None)
-
-        sigma_t_squared = 2 * (1 - t) / torch.clip(t, min=self.eps)
-        sigma_t_squared = 2 * (1 - t) / torch.clip(t, min=0.1)
-        sigma_t = sigma_t_squared**0.5
-
-        # st is correct we checked
-        st = vt + sigma_t_squared * (t * vt - x) / torch.clip(1 - t, min=self.eps) / 2
-        eps_t = torch.randn_like(x)
-        noise_t = sigma_t * eps_t * (dt**0.5)
-        dxt = st * dt + noise_t
-
-        score_t = (t * vt - x) / torch.clip(1 - t, min=self.eps)
-        a = -x.shape[-1] / torch.clip(t, min=self.eps) * dt
-        b = (sigma_t_squared / 2 * score_t * score_t).sum(-1) * dt
-        c = (score_t * noise_t).sum(-1)
-
-        dlogp = a + b + c
-        # Update the state
-        x_next = x + dxt
-        return x_next, dlogp
-
-    def sde_integrate(self, x0: torch.Tensor, reverse=False) -> torch.Tensor:
-        batch_size = x0.shape[0]
-        time_range = 1.0
-        start_time = 1.0 if reverse else 0.0
-        end_time = 1.0 - start_time
-        if self.num_integrations == 0:
-            num_integration_steps = 1000
-        else:
-            num_integration_steps = self.num_integrations
-        times = torch.linspace(start_time, end_time, num_integration_steps + 1, device=x0.device)[:-1]
-        x = x0
-
-        x0.requires_grad = True
-        samples = []
-        dlogp_sum = 0
-
-        for step, t in enumerate(times):
-            x, dlogp = self.euler_maruyama_step(t, x, time_range / num_integration_steps, step, batch_size)
-            dlogp_sum += dlogp
-            samples.append(x)
-
-        samples = torch.stack(samples)
-        return x, dlogp_sum
+        return x, dlogp_out.view(-1)
 
     def proposal_energy(
         self, net: torch.nn.Module, x: torch.Tensor, system_cond: Optional[SystemCond] = None,

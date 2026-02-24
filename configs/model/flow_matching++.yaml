@@ -7,9 +7,7 @@ _target_: src.models.flow_matching_module.FlowMatchingModule
 mean_free_prior: True
 atol: 1e-4
 rtol: 1e-4
-div_estimator: "exact"
 logp_tol_scale: 1.0
-n_eps: 1
 
 prior:
   _target_: src.models.priors.normal_distribution.NormalDistribution

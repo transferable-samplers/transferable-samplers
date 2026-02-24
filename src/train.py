@@ -112,7 +112,7 @@ def train(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
         assert fit_ckpt_path is None, (
             "fit_ckpt_path must be None when init_state_dict is provided."
         )
-        # If the model has a teacher (i.e. if we're using distillation loss), we need to augment the state dict before loading.
+        # If the model has a teacher (i.e. teacher regularization), we need to augment the state dict before loading.
         if hasattr(model, "teacher"):
             init_state_dict = augment_state_dict_for_teacher(init_state_dict)
         logger.info("Loading model state dict from init_state_dict")
