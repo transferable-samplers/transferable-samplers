@@ -9,5 +9,5 @@ class Prior(ABC):
         ...
 
     @abstractmethod
-    def energy(self, x: torch.Tensor, mask: torch.Tensor | None = None) -> torch.Tensor:
+    def logp(self, x: torch.Tensor, mask: torch.Tensor | None = None) -> torch.Tensor:
         ...

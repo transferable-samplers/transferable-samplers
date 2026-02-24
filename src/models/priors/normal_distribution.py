@@ -22,7 +22,7 @@ class NormalDistribution(Prior):
             x *= mask[..., None]
         return x.reshape(num_samples, num_atoms, self.num_dimensions)
 
-    def energy(self, x: torch.Tensor, mask: torch.Tensor | None = None) -> torch.Tensor:
+    def logp(self, x: torch.Tensor, mask: torch.Tensor | None = None) -> torch.Tensor:
         assert x.dim() == 3
         num_samples = x.shape[0]
         num_atoms = x.shape[1]
@@ -33,12 +33,10 @@ class NormalDistribution(Prior):
             x = x - com
             x *= mask[..., None]
 
-        pointwise_energy = -self.distribution.log_prob(x)
+        pointwise_logp = self.distribution.log_prob(x)
 
-        pointwise_energy = pointwise_energy * mask.unsqueeze(-1)
-        pointwise_energy = pointwise_energy.reshape(num_samples, -1)
-        num_atoms = mask.sum(dim=-1, keepdim=True)
-        # account for the pad tokens when taking the mean
-        energy = pointwise_energy.sum(dim=-1, keepdims=True) / (num_atoms * self.num_dimensions)
+        pointwise_logp = pointwise_logp * mask.unsqueeze(-1)
+        pointwise_logp = pointwise_logp.reshape(num_samples, -1)
+        logp = pointwise_logp.sum(dim=-1)
 
-        return energy
+        return logp

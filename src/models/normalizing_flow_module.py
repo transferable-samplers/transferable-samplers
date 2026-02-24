@@ -29,8 +29,15 @@ class NormalizingFlowLitModule(BaseLightningModule):
         permutations = batch.get("permutations")
         mask = batch.get("mask")
 
+        if mask is not None:
+            data_dim = mask.sum(dim=-1) * x1.shape[-1]
+        else:
+            data_dim = x1.shape[-2] * x1.shape[-1]
+
         z_pred, dlogp = self.net(x1, permutations=permutations, encodings=encodings, mask=mask)
-        loss = self.prior.energy(z_pred, mask=mask).mean() - dlogp.mean()
+        logp_pred_z = self.prior.logp(z_pred, mask=mask)
+        logq = logp_pred_z + dlogp
+        loss = -(logq / data_dim).mean()
 
         self.log("train/mle_loss", loss.item(), prog_bar=True, sync_dist=True)
 
@@ -38,10 +45,9 @@ class NormalizingFlowLitModule(BaseLightningModule):
             with torch.inference_mode():
                 z_pred_teacher, dlogp_teacher = self.teacher(x1, permutations=permutations, encodings=encodings, mask=mask)
 
-            logp_z_pred_teacher = -self.prior.energy(z_pred_teacher, mask=mask)
+            logp_z_pred_teacher = self.prior.logp(z_pred_teacher, mask=mask)
             logq_teacher = logp_z_pred_teacher + dlogp_teacher
 
-            logq = -self.prior.energy(z_pred, mask=mask) + dlogp
             distill_loss = (logq - logq_teacher).pow(2).mean()
             loss = loss + self.hparams.distill_weight * distill_loss
             self.log("finetune/distill_loss", distill_loss.item(), prog_bar=True, sync_dist=True)
@@ -55,8 +61,6 @@ class NormalizingFlowLitModule(BaseLightningModule):
     ) -> torch.Tensor:
         permutations = system_cond.permutations if system_cond else None
         encodings = system_cond.encodings if system_cond else None
-
-        data_dim = x.shape[1] * self.trainer.datamodule.hparams.num_dimensions
 
         if encodings is not None:
             _encodings = {}
@@ -80,8 +84,8 @@ class NormalizingFlowLitModule(BaseLightningModule):
 
         z_pred, dlogp = net(x, _permutations, encodings=_encodings)
 
-        dlogp = dlogp.view(-1) * data_dim  # rescale from mean to sum
-        logp_z_pred = - self.prior.energy(z_pred).view(-1) * data_dim  # rescale from mean to sum
+        dlogp = dlogp
+        logp_z_pred = self.prior.logp(z_pred)
 
         logq = logp_z_pred + dlogp
         return -logq  # energy is negative log probability
@@ -98,12 +102,8 @@ class NormalizingFlowLitModule(BaseLightningModule):
         else:
             num_atoms = encodings["atom_type"].size(0)
 
-        data_dim = num_atoms * self.trainer.datamodule.hparams.num_dimensions
-
         z = self.prior.sample(num_samples, num_atoms, device=self.device)
-
-        # need to rescale to the "sum" of the log p (the prior returns the position-wise mean)
-        logp_z = -self.prior.energy(z) * data_dim
+        logp_z = self.prior.logp(z)
 
         _permutations = None
         if permutations is not None:
@@ -120,11 +120,10 @@ class NormalizingFlowLitModule(BaseLightningModule):
             }
 
         with torch.no_grad():
-            x_pred = net.reverse(z, _permutations, encodings=_encodings)
-            _, dlogp = net(x_pred, _permutations, encodings=_encodings)
-            dlogp = dlogp * data_dim  # rescale from mean to sum
+            x_pred, dlogp_rev = net.reverse(z, _permutations, encodings=_encodings)
 
-        logq = logp_z.flatten() + dlogp.flatten()
+        # dlogp_rev is log|det(dx/dz)| = -log|det(dz/dx)|, so logq = logp_z - dlogp_rev
+        logq = logp_z - dlogp_rev
 
         return x_pred, -logq
 
@@ -172,9 +171,8 @@ class NormalizingFlowLitModule(BaseLightningModule):
             }
 
         with torch.no_grad():
-            x_pred = self.net.reverse(z, _permutations, encodings=_encodings)
+            x_pred, _ = self.net.reverse(z, _permutations, encodings=_encodings)
             z_recon, dlogp = self.net(x_pred, _permutations, encodings=_encodings)
-            dlogp = dlogp * data_dim  # rescale from mean to sum
 
         # ── Invertibility metrics ─────────────────────────────────────────
         diff = (z - z_recon).abs()

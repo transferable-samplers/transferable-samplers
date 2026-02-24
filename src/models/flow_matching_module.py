@@ -101,8 +101,6 @@ class FlowMatchLitModule(BaseLightningModule):
 
         if self.hparams.div_estimator == "ito":
             x_ito, dlogp_ito = self.sde_integrate(x, reverse=reverse)
-            if reverse:
-                dlogp_ito = -dlogp_ito
             return x_ito, dlogp_ito
 
         if dummy_ll:
@@ -133,12 +131,10 @@ class FlowMatchLitModule(BaseLightningModule):
         wrapped_net.nfe = 0
         if not dummy_ll:
             dlogp = x[..., -1] * self.hparams.logp_tol_scale
-            if reverse:
-                dlogp = -dlogp  # negate so dlogp always has forward-direction sign
             x = x[..., :-1]
         x = x.reshape(batch_size, num_atoms, -1)
 
-        return x, dlogp
+        return x, dlogp.view(-1)
 
     def euler_maruyama_step(
         self,
@@ -198,8 +194,9 @@ class FlowMatchLitModule(BaseLightningModule):
         self, net: torch.nn.Module, x: torch.Tensor, system_cond: Optional[SystemCond] = None,
     ) -> torch.Tensor:
         encodings = system_cond.encodings if system_cond else None
-        z_pred, dlogp = self.flow(net, x, encodings=encodings, reverse=True)
-        logq = -self.prior.energy(z_pred).view(-1) + dlogp.view(-1)  # logp_z + dlogp
+        z_pred, dlogp_rev = self.flow(net, x, encodings=encodings, reverse=True)
+        # dlogp_rev is log|det(dx/dz)| = -log|det(dz/dx)|, so logq = logp_z - dlogp_rev
+        logq = self.prior.logp(z_pred) - dlogp_rev
         return -logq  # energy is negative log probability
 
     def sample_proposal(
@@ -213,10 +210,8 @@ class FlowMatchLitModule(BaseLightningModule):
         else:
             num_atoms = encodings["atom_type"].size(0)
 
-        data_dim = num_atoms * self.trainer.datamodule.hparams.num_atoms
-
         z = self.prior.sample(num_samples, num_atoms, device=self.device)
-        logp_z = -self.prior.energy(z) * data_dim
+        logp_z = self.prior.logp(z)
 
         if encodings is not None:
             encodings = {
@@ -227,6 +222,6 @@ class FlowMatchLitModule(BaseLightningModule):
         with torch.no_grad():
             x_pred, dlogp = self.flow(net, z, encodings=encodings, reverse=False)
 
-        logq = logp_z.flatten() + dlogp.flatten()
+        logq = logp_z + dlogp
 
         return x_pred, -logq

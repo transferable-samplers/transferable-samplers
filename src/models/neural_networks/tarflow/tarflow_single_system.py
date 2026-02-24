@@ -243,7 +243,7 @@ class MetaBlock(torch.nn.Module):
             xa = torch.zeros_like(x)
 
         scale = (-xa.float()).exp().type(xa.dtype)
-        return self.permutation((x_in - xb) * scale, inverse=True), -xa.mean(dim=[1, 2])
+        return self.permutation((x_in - xb) * scale, inverse=True), -xa.sum(dim=[1, 2])
 
     def reverse_step(
         self,
@@ -288,13 +288,14 @@ class MetaBlock(torch.nn.Module):
         guide_what: str = "ab",
         attn_temp: float = 1.0,
         annealed_guidance: bool = False,
-    ) -> torch.Tensor:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         x = self.permutation(x)
         pos_embed = self.permutation(self.pos_embed, dim=0)
         self.set_sample_mode(True)
         T = x.size(1)
         # 512 x 8 x 1
         xs = [x[:, i] for i in range(x.size(1))]
+        logdets = torch.zeros(x.shape[0], device=x.device)
         for i in range(x.size(1) - 1):
             za, zb = self.reverse_step(x, pos_embed, i, y, which_cache="cond")
             if guidance > 0 and guide_what:
@@ -309,14 +310,11 @@ class MetaBlock(torch.nn.Module):
                     zb = zb + g * (zb - zb_u)
 
             scale = za[:, 0].float().exp().type(za.dtype)  # get rid of the sequence dimension
-            # x_copy = x.clone()
-            # x_copy[:, i + 1] = x[:, i + 1] * scale + zb[:, 0]
-            # x = x_copy
-            # x[:, i + 1] = x[:, i + 1] * scale + zb[:, 0]
             xs[i + 1] = xs[i + 1] * scale + zb[:, 0]
+            logdets = logdets + za[:, 0].sum(dim=-1)
             x = torch.stack(xs, dim=1)
         self.set_sample_mode(False)
-        return self.permutation(x, inverse=True)
+        return self.permutation(x, inverse=True), logdets
 
 
 class TarFlow(torch.nn.Module):
@@ -388,17 +386,19 @@ class TarFlow(torch.nn.Module):
         return_sequence: bool = False,
         *args,
         **kwargs,
-    ) -> torch.Tensor | list[torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor] | list[torch.Tensor]:
         seq = [x.detach().clone()]
         original_channels = x.shape[-1]
         if self.in_channels != original_channels:
             x = x.reshape(x.shape[0], -1, self.in_channels)
+        logdets = torch.zeros(x.shape[0], device=x.device)
         for block in reversed(self.blocks):
-            x = block.reverse(x, y, guidance, guide_what, attn_temp, annealed_guidance)
+            x, logdet = block.reverse(x, y, guidance, guide_what, attn_temp, annealed_guidance)
+            logdets = logdets + logdet
             seq.append(x.detach().clone())
         if self.in_channels != original_channels:
             x = x.reshape(x.shape[0], -1, original_channels)
         if not return_sequence:
-            return x
+            return x, logdets
         else:
             return seq

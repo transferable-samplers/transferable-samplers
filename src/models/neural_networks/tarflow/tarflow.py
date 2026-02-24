@@ -253,16 +253,7 @@ class MetaBlock(torch.nn.Module):
         scale = (-xa.float()).exp().type(xa.dtype)
         x_out = self.permutation((x_in - xb) * scale, permutations, inverse=True)
 
-        if tokenization_map is not None:
-            data_dim = (tokenization_map != -1).int().sum(
-                dim=[1, 2]
-            ) * 3  # this will inherently account for full padded residue tokens # TODO could be better
-        elif mask is not None:
-            data_dim = mask.sum(dim=-1) * 3  # TODO ugly and makes assumptions
-        else:
-            data_dim = x.shape[1] * 3  # assume all tokens are valid
-
-        logdet = -xa.sum(dim=[1, 2]) / data_dim
+        logdet = -xa.sum(dim=[1, 2])
 
         return x_out, logdet
 
@@ -324,7 +315,7 @@ class MetaBlock(torch.nn.Module):
         x: torch.Tensor,
         permutations: dict[str, torch.Tensor],
         cond: torch.Tensor | None = None,
-    ) -> torch.Tensor:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         x = self.permutation(x, permutations)
 
         # no permutation on pos_embed - it encodes sequence position AFTER permutation
@@ -337,6 +328,7 @@ class MetaBlock(torch.nn.Module):
 
         self.set_sample_mode(True)
         xs = [x[:, i] for i in range(x.size(1))]
+        logdets = torch.zeros(x.shape[0], device=x.device)
         tokenization_map = permutations.get("tokenization_map", None)
         if tokenization_map is not None:
             tokenization_mask = (tokenization_map != -1).float().repeat_interleave(3, dim=-1)  # TODO hardcode
@@ -349,12 +341,13 @@ class MetaBlock(torch.nn.Module):
                 za = za * tokenization_masks[i + 1]
             scale = za[:, 0].float().exp().type(za.dtype)  # get rid of the sequence dimension
             xs[i + 1] = xs[i + 1] * scale + zb[:, 0]
+            logdets = logdets + za[:, 0].sum(dim=-1)
             x = torch.stack(xs, dim=1)
 
         self.set_sample_mode(False)
         x = self.permutation(x, permutations, inverse=True)
 
-        return x
+        return x, logdets
 
 
 class TarFlow(torch.nn.Module):
@@ -452,7 +445,7 @@ class TarFlow(torch.nn.Module):
         x: torch.Tensor,
         permutations: dict[str, torch.Tensor],
         encodings: dict[str, torch.Tensor] | None = None,
-    ) -> torch.Tensor:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """No masking in reverse since we assume the model generates a single peptide system as a time."""
 
         if self.conditional:
@@ -469,7 +462,10 @@ class TarFlow(torch.nn.Module):
         else:
             cond = None
 
-        for block in reversed(self.blocks):
-            x = block.reverse(x, permutations, cond=cond)
+        logdets = torch.zeros(x.shape[0], device=x.device)
 
-        return x
+        for block in reversed(self.blocks):
+            x, logdet = block.reverse(x, permutations, cond=cond)
+            logdets = logdets + logdet
+
+        return x, logdets
