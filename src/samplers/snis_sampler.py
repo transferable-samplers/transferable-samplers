@@ -2,9 +2,9 @@ from typing import Optional
 
 import torch
 
-from src.sampling.base_sampler import BaseSampler
-from src.sampling.filtering import filter_by_logw_quantile
-from src.sampling.resampling import resampling_idx
+from src.samplers.base_sampler import BaseSampler
+from src.samplers.filtering import filter_by_logw_quantile
+from src.samplers.resampling import resampling_idx
 from src.utils.dataclasses import SamplesData, SourceEnergy, TargetEnergy
 from src.utils.dist_utils import all_gather_cat, broadcast_tensor, get_rank, get_world_size
 from src.utils.pylogger import RankedLogger
