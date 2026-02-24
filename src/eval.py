@@ -39,7 +39,7 @@ from src.utils.init_resume_utils import resolve_init
 from src.utils.instantiators import instantiate_callbacks, instantiate_loggers
 from src.utils.logging_utils import log_hyperparameters
 from src.utils.pylogger import RankedLogger
-from src.utils.utils import extras, get_metric_value, task_wrapper
+from src.utils.hydra_utils import extras, get_metric_value, task_wrapper
 
 # We had issues with invertbility of TarFlow without the following settings.
 # Didn't notice any walltime difference for TarFlow or ECNF, but is worth

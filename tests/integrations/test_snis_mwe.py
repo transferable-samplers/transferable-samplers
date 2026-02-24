@@ -82,7 +82,7 @@ def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, t
             # Replace SMC sampler with SNIS for this test — we only test weight loading here.
             # TODO probably indicative that the tests should be refactored.
             cfg.callbacks.sampling_evaluation.sampler = OmegaConf.create({
-                "_target_": "src.models.samplers.snis_sampler.SNISSampler",
+                "_target_": "src.samplers.snis_sampler.SNISSampler",
                 "num_samples": 25,
             })
         if "transferable" in experiment_name:

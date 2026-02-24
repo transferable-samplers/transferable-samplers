@@ -13,7 +13,7 @@
 import torch
 import torch.nn as nn
 
-from src.models.neural_networks.egnn.egnn import EGNN
+from src.nn.egnn.egnn import EGNN
 
 # TODO remove hardcode
 NUM_ATOM_TYPE = 54

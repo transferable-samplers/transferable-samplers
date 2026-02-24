@@ -1,7 +1,7 @@
 
 import torch
 
-from src.models.samplers.smc_utils import SMCParticles, merge_particles
+from src.sampling.smc import SMCParticles, merge_particles
 from src.utils.dataclasses import SourceEnergy, TargetEnergy
 
 

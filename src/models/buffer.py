@@ -3,7 +3,7 @@ from typing import Optional
 import torch
 import torch.utils._pytree as pytree
 
-from src.data.normalization import unnormalize
+from src.utils.standardization import destandardize_coords
 from src.utils.dataclasses import SystemCond
 
 
@@ -40,7 +40,7 @@ class Buffer:
         3. Adds system_cond fields (expanded to batch_size).
         """
         indices = torch.randint(0, len(self.samples), (batch_size,))
-        batch = {"x": unnormalize(self.samples[indices], self.normalization_std)}
+        batch = {"x": destandardize_coords(self.samples[indices], self.normalization_std)}
 
         if self.batch_transform is not None:
             batch = self.batch_transform(batch)

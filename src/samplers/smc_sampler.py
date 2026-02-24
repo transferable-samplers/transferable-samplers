@@ -31,10 +31,11 @@ from typing import Optional
 import torch
 
 from src.evaluation.metrics.ess import normalized_ess
-from src.models.samplers.base_sampler import BaseSampler
-from src.models.samplers.smc_utils.mcmc import mcmc_kernel
-from src.models.samplers.smc_utils.smc_particles import SMCParticles, all_gather_particles
-from src.models.samplers.utils import filter_by_energy_cutoff, filter_by_logw_quantile, resampling_idx
+from src.sampling.base_sampler import BaseSampler
+from src.sampling.smc.mcmc import mcmc_kernel
+from src.sampling.smc.smc_particles import SMCParticles, all_gather_particles
+from src.sampling.filtering import filter_by_energy_cutoff, filter_by_logw_quantile
+from src.sampling.resampling import resampling_idx
 from src.utils.dist_utils import all_gather_cat, broadcast_tensor, get_rank, get_world_size, shard_tensor
 from src.utils.dataclasses import SamplesData, SourceEnergy, TargetEnergy
 from src.utils.pylogger import RankedLogger

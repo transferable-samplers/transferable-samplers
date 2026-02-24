@@ -1,6 +1,6 @@
 import torch
 
-from src.data.normalization import unnormalize
+from src.utils.standardization import destandardize_coords
 from src.evaluation.metrics.wasserstein_distances import (
     energy_wasserstein,
     tica_wasserstein,
@@ -71,7 +71,7 @@ class PeptideEnsembleEvaluator:
         # Unnormalize generated sample sets for metrics/plots
         samples_data_dict = {
             name: SamplesData(
-                unnormalize(data.samples, normalization_std),
+                destandardize_coords(data.samples, normalization_std),
                 data.energy,
                 logw=data.logw,
             )

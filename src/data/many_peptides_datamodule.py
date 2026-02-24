@@ -18,7 +18,7 @@ from src.data.datasets.webdataset import build_webdataset
 from src.data.energy.openmm_energy import OpenMMEnergy
 from src.data.preprocessing.encodings import get_encodings
 from src.data.preprocessing.permutations import get_permutations_dict
-from src.data.preprocessing.preprocessing import (
+from src.data.preprocessing.cache import (
     prepare_and_cache_encodings_dict,
     prepare_and_cache_pdb_dict,
     prepare_and_cache_permutations_dict,

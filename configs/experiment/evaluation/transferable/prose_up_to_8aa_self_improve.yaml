@@ -26,12 +26,12 @@ callbacks:
   populate_buffer:
     _target_: src.callbacks.populate_buffer_callback.PopulateBufferCallback
     sampler:
-      _target_: src.models.samplers.snis_sampler.SNISSampler
+      _target_: src.samplers.snis_sampler.SNISSampler
       num_samples: 200_000
       logw_quantile_filter: 0.002
   sampling_evaluation:
     sampler:
-      _target_: src.models.samplers.snis_sampler.SNISSampler
+      _target_: src.samplers.snis_sampler.SNISSampler
       num_samples: 10_000
 
       logw_quantile_filter: 0.002

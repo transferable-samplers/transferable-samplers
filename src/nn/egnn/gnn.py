@@ -12,7 +12,7 @@
 
 import torch.nn as nn
 
-from src.models.neural_networks.egnn.gcl import GCL
+from src.nn.egnn.gcl import GCL
 
 
 class GNN(nn.Module):

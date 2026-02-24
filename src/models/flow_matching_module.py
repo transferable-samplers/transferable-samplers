@@ -6,7 +6,7 @@ import torch
 from torchdyn.core import NeuralODE
 
 from src.models.base_lightning_module import BaseLightningModule
-from src.models.neural_networks.wrappers import TorchDynWrapper
+from src.nn.wrappers import TorchDynWrapper
 from src.utils.dataclasses import SystemCond
 from src.utils.pylogger import RankedLogger
 

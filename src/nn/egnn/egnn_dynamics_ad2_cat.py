@@ -14,7 +14,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from src.models.neural_networks.egnn.egnn import EGNN
+from src.nn.egnn.egnn import EGNN
 def remove_mean(x):
     mean = torch.mean(x, dim=1, keepdim=True)
     x = x - mean

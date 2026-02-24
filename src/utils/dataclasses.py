@@ -5,7 +5,7 @@ from typing import Callable, Optional, Tuple
 import scipy.special
 import torch
 
-from src.data.normalization import unnormalize
+from src.utils.standardization import destandardize_coords
 
 
 @dataclass(frozen=True)
@@ -28,7 +28,7 @@ class TargetEnergy:
     normalization_std: torch.Tensor
 
     def energy(self, x: torch.Tensor) -> torch.Tensor:
-        return self.energy_fn(unnormalize(x, self.normalization_std))
+        return self.energy_fn(destandardize_coords(x, self.normalization_std))
 
     def energy_and_grad(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         if torch.is_grad_enabled():
@@ -39,7 +39,7 @@ class TargetEnergy:
             )
         x = x.detach().requires_grad_(True)
         with torch.enable_grad():
-            e = self.energy_fn(unnormalize(x, self.normalization_std))
+            e = self.energy_fn(destandardize_coords(x, self.normalization_std))
             g = torch.autograd.grad(e.sum(), x)[0]
         return e.detach(), g.detach()
 

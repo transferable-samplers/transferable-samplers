@@ -9,7 +9,7 @@ from lightning import Callback
 from src.callbacks.ema_weight_averaging import EMAWeightAveraging
 from src.evaluation.evaluator import PeptideEnsembleEvaluator
 from src.models.buffer import Buffer
-from src.models.samplers.base_sampler import BaseSampler
+from src.sampling.base_sampler import BaseSampler
 from src.utils.logging_utils import make_log_image_fn
 from src.utils.pylogger import RankedLogger
 

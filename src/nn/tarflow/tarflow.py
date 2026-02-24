@@ -50,9 +50,9 @@
 import torch
 import torch.nn as nn
 
-from src.models.neural_networks.embedder import SinusoidalEmbedding
-from src.models.neural_networks.tarflow.adaptive_blocks import AdaptiveAttnAndTransition
-from src.models.neural_networks.tarflow.attention import Attention, AttentionBlock
+from src.nn.embedder import SinusoidalEmbedding
+from src.nn.tarflow.adaptive_blocks import AdaptiveAttnAndTransition
+from src.nn.tarflow.attention import Attention, AttentionBlock
 
 MAX_SEQ_LEN = 512
 
