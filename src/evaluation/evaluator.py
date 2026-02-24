@@ -22,7 +22,7 @@ from src.utils.dataclasses import EvalContext, SamplesData
 logger = pylogger.RankedLogger(__name__, rank_zero_only=False)
 
 
-class Evaluator:
+class PeptideEnsembleEvaluator:
     """Evaluates generated samples against reference data.
 
     Handles chirality fixing, metric computation, and plot generation.

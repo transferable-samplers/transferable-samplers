@@ -48,7 +48,7 @@ class FlowMatchLitModule(BaseLightningModule):
         return vt_flow
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
-        if self._buffer is not None:
+        if self.train_from_buffer:
             batch = self._buffer.sample(batch["x"].shape[0])
 
         if self.hparams.use_distill_loss:

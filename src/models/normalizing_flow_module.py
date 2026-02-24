@@ -18,7 +18,8 @@ class NormalizingFlowLitModule(BaseLightningModule):
         self.eval_ctx = None
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
-        if self._buffer is not None:
+        if self.train_from_buffer:
+            assert self._buffer is not None, "Buffer must be set for training from buffer"
             batch = self._buffer.sample(batch["x"].shape[0])
 
         assert len(batch["x"].shape) == 3, "molecules must be a pointcloud (batch_size, num_atoms, 3)"

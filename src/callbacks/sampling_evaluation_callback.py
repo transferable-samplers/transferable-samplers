@@ -7,7 +7,7 @@ import torch.utils._pytree as pytree
 from lightning import Callback
 
 from src.evaluation.diagnostics.smc_plots import plot_smc_diagnostics
-from src.evaluation.evaluator import Evaluator
+from src.evaluation.evaluator import PeptideEnsembleEvaluator
 from src.models.samplers.base_sampler import BaseSampler
 from src.utils import pylogger
 from src.utils.logging_utils import compute_mean_metrics, make_log_image_fn
@@ -28,7 +28,7 @@ class SamplingEvaluationCallback(Callback):
 
     def __init__(
         self,
-        evaluator: Evaluator,
+        evaluator: PeptideEnsembleEvaluator,
         sampler: Optional[BaseSampler] = None,
         run_diagnostics_kwargs: Optional[dict] = None,
     ):

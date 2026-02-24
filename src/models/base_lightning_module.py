@@ -11,9 +11,8 @@ from torchmetrics import MeanMetric
 
 from src.callbacks.ema_weight_averaging import EMAWeightAveraging
 from src.models.buffer import Buffer
-from src.models.samplers.base_sampler import BaseSampler
 from src.utils import pylogger
-from src.utils.dataclasses import SourceEnergy, SourceEnergyConfig, SystemCond, TargetEnergy
+from src.utils.dataclasses import SourceEnergy, SourceEnergyConfig, SystemCond
 
 logger = pylogger.RankedLogger(__name__, rank_zero_only=False)
 
@@ -31,14 +30,13 @@ class BaseLightningModule(LightningModule):
         use_distill_loss: bool = False,
         distill_weight: float = 0.5,
         output_dir: str = "",
-        sampler: Optional[BaseSampler] = None,
         source_energy_config: Optional[SourceEnergyConfig] = None,
         train_from_buffer: bool = False,
         *args,
         **kwargs,
     ) -> None:
         super().__init__()
-        self.save_hyperparameters(logger=False, ignore=["sampler", "source_energy_config"])
+        self.save_hyperparameters(logger=False, ignore=["source_energy_config"])
         if args or kwargs:
             logger.warning(f"Unexpected arguments: {args}, {kwargs}")
 
@@ -46,10 +44,9 @@ class BaseLightningModule(LightningModule):
 
         self.prior = prior
 
-        self.sampler = sampler
         self.source_energy_config = source_energy_config
         self.train_from_buffer = train_from_buffer
-        self._buffer: Optional[Buffer] = None
+        self._buffer = None # buffer can be set by set_buffer() (from callback)
 
         self.train_metrics = torchmetrics.MetricCollection({"loss": MeanMetric()}, prefix="train/")
 
@@ -120,11 +117,9 @@ class BaseLightningModule(LightningModule):
             use_com_adjustment=self.source_energy_config.use_com_adjustment,
         )
 
-    def sample(self, system_cond, target_energy: TargetEnergy):
-        """Run the sampler. Delegates to self.sampler.sample()."""
-        assert self.sampler is not None, "No sampler configured on this model."
-        source_energy = self.build_source_energy(system_cond)
-        return self.sampler.sample(source_energy, target_energy)
+    def set_buffer(self, buffer: Buffer) -> None:
+        """Set the sample buffer for self-improvement training."""
+        self._buffer = buffer
 
     def setup(self, stage: str) -> None:
         if self.hparams.compile and stage == "fit":
@@ -195,11 +190,6 @@ class BaseLightningModule(LightningModule):
         if self.hparams.use_distill_loss:
             assert not self._has_ema_callback(), "EMAWeightAveraging callback should not be used with distillation loss."
 
-        if self.train_from_buffer:
-            assert not self._has_ema_callback(), "EMAWeightAveraging callback should not be used with train_from_buffer."
-            assert self.sampler is not None, "train_from_buffer requires a sampler on the model."
-            self._populate_buffer()
-
     def on_train_epoch_end(self) -> None:
         self.train_metrics.reset()
         logger.info("Train epoch end")
@@ -242,31 +232,3 @@ class BaseLightningModule(LightningModule):
         total_norm = total_norm ** (1.0 / 2)
         self.log_dict({"train/grad_norm": total_norm}, prog_bar=True)
 
-    def _populate_buffer(self):
-        """Generate new samples and store in the buffer for self-improvement training."""
-        datamodule = self.trainer.datamodule
-        assert datamodule.test_sequences is not None, "Eval sequence name should be set"
-        assert len(datamodule.test_sequences) == 1, "Can only self-refine on 1 test sequence at a time."
-
-        sequence = datamodule.test_sequences[0]
-        logger.info(f"Generating {self.sampler.num_samples} samples for self-consumption")
-
-        eval_ctx = datamodule.prepare_eval(sequence, stage="test")
-        source_energy = self.build_source_energy(eval_ctx.system_cond, use_ema_if_available=True)
-
-        with torch.no_grad():
-            samples_dict, _ = self.sampler.sample(
-                source_energy, eval_ctx.target_energy
-            )
-
-        batch_transform = getattr(datamodule, "buffer_transforms", None)
-
-        # SMC is much more costly, just assume we want to use it if present.
-        key = "smc" if "smc" in samples_dict else "resampled"
-        self._buffer = Buffer(
-            samples=samples_dict[key].samples,
-            normalization_std=datamodule.std,
-            system_cond=eval_ctx.system_cond,
-            batch_transform=batch_transform,
-        )
-        logger.info(f"Buffer populated with {len(self._buffer)} resampled samples for sequence '{sequence}'")

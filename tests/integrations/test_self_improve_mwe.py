@@ -47,7 +47,7 @@ def cfg_test_self_improve_mwe(request: pytest.FixtureRequest, trainer_name_param
         cfg.trainer.num_sanity_val_steps = 0  # disable val sanity checks
         cfg.trainer.max_epochs = 1
         cfg.trainer.limit_train_batches = 1
-        cfg.model.sampler.num_samples = 16
+        cfg.callbacks.populate_buffer.sampler.num_samples = 16
         if trainer_name_param == "cpu":
             cfg.callbacks.sampling_evaluation.run_diagnostics_kwargs = {
                 "num_samples_invert": 8, "num_samples_logdet": 2,
