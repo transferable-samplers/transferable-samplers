@@ -11,10 +11,9 @@ import torchvision
 from huggingface_hub import snapshot_download
 
 from src.data.base_datamodule import BaseDataModule
-from src.data.normalization import normalize, unnormalize
 from src.data.datasets.dummy_dataset import DummyDataset
 from src.data.datasets.tensor_dataset import TensorDataset
-from src.data.energy.openmm import OpenMMBridge, OpenMMEnergy
+from src.data.energy.openmm_energy import OpenMMEnergy
 from src.data.preprocessing.tica import get_tica_model
 from src.data.transforms.center_of_mass import CenterOfMassTransform
 from src.data.transforms.rotation import Random3DRotationTransform
@@ -171,7 +170,8 @@ class SinglePeptideDataModule(BaseDataModule):
                 1.0 * openmm.unit.femtosecond,
             )
             platform_name = "CUDA" if torch.cuda.is_available() else "CPU"
-            potential = OpenMMEnergy(bridge=OpenMMBridge(system, integrator, platform_name=platform_name))
+            device_index = torch.cuda.current_device() if torch.cuda.is_available() else None
+            potential = OpenMMEnergy(system, integrator, platform_name=platform_name, device_index=device_index)
         else:
             forcefield = openmm.app.ForceField("amber14-all.xml", "implicit/obc1.xml")
             temperature = 310
@@ -190,7 +190,8 @@ class SinglePeptideDataModule(BaseDataModule):
 
             # Initialize potential
             platform_name = "CUDA" if torch.cuda.is_available() else "CPU"
-            potential = OpenMMEnergy(bridge=OpenMMBridge(system, integrator, platform_name=platform_name))
+            device_index = torch.cuda.current_device() if torch.cuda.is_available() else None
+            potential = OpenMMEnergy(system, integrator, platform_name=platform_name, device_index=device_index)
 
         return potential
 
@@ -221,17 +222,16 @@ class SinglePeptideDataModule(BaseDataModule):
         true_samples = true_samples[:: len(true_samples) // self.hparams.num_eval_samples]
 
         potential = self._setup_potential()
-        # energy_fn takes normalized samples — unnormalizes internally
-        energy_fn = lambda x: potential.energy(unnormalize(x, self.std)).flatten()
+        energy_fn = lambda x: potential(x)
 
         true_data = SamplesData(
             samples=true_samples,
-            energy=potential.energy(true_samples).flatten(),
+            energy=potential(true_samples),
         )
 
         return EvalContext(
             true_data=true_data,
-            target_energy=TargetEnergy(energy_fn=energy_fn),
+            target_energy=TargetEnergy(energy_fn=energy_fn, normalization_std=self.std),
             normalization_std=self.std,
             system_cond=None,
             tica_model=tica_model,

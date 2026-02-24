@@ -13,10 +13,9 @@ import torchvision
 from omegaconf import ListConfig, OmegaConf
 
 from src.data.base_datamodule import BaseDataModule
-from src.data.normalization import normalize, unnormalize
 from src.data.datasets.dummy_dataset import DummyDataset
 from src.data.datasets.webdataset import build_webdataset
-from src.data.energy.openmm import OpenMMBridge, OpenMMEnergy
+from src.data.energy.openmm_energy import OpenMMEnergy
 from src.data.preprocessing.encodings import get_encodings
 from src.data.preprocessing.permutations import get_permutations_dict
 from src.data.preprocessing.preprocessing import (
@@ -263,7 +262,8 @@ class ManyPeptidesDataModule(BaseDataModule):
             1.0 * openmm.unit.femtosecond,
         )
         platform_name = "CUDA" if torch.cuda.is_available() else "CPU"
-        return OpenMMEnergy(bridge=OpenMMBridge(system, integrator, platform_name=platform_name))
+        device_index = torch.cuda.current_device() if torch.cuda.is_available() else None
+        return OpenMMEnergy(system, integrator, platform_name=platform_name, device_index=device_index)
 
 
     def prepare_eval(self, sequence: str, stage: str = None) -> EvalContext:
@@ -300,8 +300,7 @@ class ManyPeptidesDataModule(BaseDataModule):
         topology = md.Topology.from_openmm(pdb.topology)
 
         potential = self._setup_potential(pdb)
-        # energy_fn takes normalized samples — unnormalizes internally
-        energy_fn = lambda x: potential.energy(unnormalize(x, self.std)).flatten()
+        energy_fn = lambda x: potential(x)
 
         system_cond = None
         if "encodings" in self.system_cond_ids or "permutations" in self.system_cond_ids:
@@ -314,12 +313,12 @@ class ManyPeptidesDataModule(BaseDataModule):
 
         true_data = SamplesData(
             samples=true_samples,
-            energy=potential.energy(true_samples).flatten(),
+            energy=potential(true_samples),
         )
 
         return EvalContext(
             true_data=true_data,
-            target_energy=TargetEnergy(energy_fn=energy_fn),
+            target_energy=TargetEnergy(energy_fn=energy_fn, normalization_std=self.std),
             normalization_std=self.std,
             system_cond=system_cond,
             tica_model=tica_model,

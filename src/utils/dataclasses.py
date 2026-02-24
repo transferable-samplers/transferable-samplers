@@ -5,6 +5,8 @@ from typing import Callable, Optional, Tuple
 import scipy.special
 import torch
 
+from src.data.normalization import unnormalize
+
 
 @dataclass(frozen=True)
 class SourceEnergyConfig:
@@ -17,16 +19,27 @@ class SourceEnergyConfig:
 
 @dataclass
 class TargetEnergy:
-    """Target energy function, provided by the datamodule."""
-    energy_fn: Callable  # (x) -> energy (batch,)
+    """Target energy function, provided by the datamodule.
+
+    Handles unnormalization internally: callers pass normalized samples,
+    and the energy function receives unnormalized positions.
+    """
+    energy_fn: Callable  # (x_unnormalized) -> energy (batch,)
+    normalization_std: torch.Tensor
 
     def energy(self, x: torch.Tensor) -> torch.Tensor:
-        return self.energy_fn(x)
+        return self.energy_fn(unnormalize(x, self.normalization_std))
 
     def energy_and_grad(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        if torch.is_grad_enabled():
+            raise RuntimeError(
+                "TargetEnergy.energy_and_grad() is non-differentiable by design."
+                "It is not implemented to get higher-order terms from OpenMM."
+                "Use TargetEnergy.energy() for differentiable energy evaluations."
+            )
         x = x.detach().requires_grad_(True)
         with torch.enable_grad():
-            e = self.energy_fn(x)
+            e = self.energy_fn(unnormalize(x, self.normalization_std))
             g = torch.autograd.grad(e.sum(), x)[0]
         return e.detach(), g.detach()
 
@@ -59,14 +72,12 @@ class SourceEnergy:
         # This is the same as used in the data augmentation.
         com_std_analytic = 1.0 / math.sqrt(x.shape[1])
 
-        # Convert to the equivalent std of the norm of a 3D Gaussian.
-        com_norm_std_analytic = com_std_analytic * math.sqrt(3 - 8/math.pi)
-
         # Compute the Norms of the CoM for each sample in the batch.
         com_norms = x.mean(dim=1).norm(dim=-1)
+
         return (
-            com_norms ** 2 / (2 * com_norm_std_analytic ** 2)
-            - torch.log(com_norms**2 / (math.sqrt(2) * com_norm_std_analytic**3 * scipy.special.gamma(1.5)))
+            com_norms ** 2 / (2 * com_std_analytic ** 2)
+            - torch.log(com_norms**2 / (math.sqrt(2) * com_std_analytic**3 * scipy.special.gamma(1.5)))
         )
 
     def sample(self, num_samples: int, **kwargs) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -93,7 +104,10 @@ class SourceEnergy:
 
     @torch.no_grad()
     def energy(self, x: torch.Tensor, batch_size: Optional[int] = None) -> torch.Tensor:
-        """Compute energy in batches."""
+        """Compute energy in batches.
+                If use_com_adjustment is True, applies a CoM energy adjustment to log_q
+        using std = 1/sqrt(num_atoms), as per Prop. 1 of https://arxiv.org/pdf/2502.18462.
+        """
         bs = batch_size or self.energy_batch_size
         out = torch.empty(x.shape[0], device=x.device, dtype=torch.float32)
         for i in range(0, x.shape[0], bs):
@@ -107,7 +121,17 @@ class SourceEnergy:
     def energy_and_grad(
         self, x: torch.Tensor, batch_size: Optional[int] = None
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Compute energy and gradient in batches."""
+        """
+        Compute energy and gradient in batches.
+        If use_com_adjustment is True, applies a CoM energy adjustment to log_q
+        using std = 1/sqrt(num_atoms), as per Prop. 1 of https://arxiv.org/pdf/2502.18462.
+        """
+        if torch.is_grad_enabled():
+            raise RuntimeError(
+                "SourceEnergy.energy_and_grad() is non-differentiable by convention with TargetEnergy.energy_and_grad()."
+                "Use SourceEnergy.energy() for differentiable energy evaluations."
+                "Take care to test well if removing this!"
+            )
         bs = batch_size or self.grad_batch_size
         e_out = torch.empty(x.shape[0], device=x.device, dtype=torch.float32)
         g_out = torch.empty_like(x)
