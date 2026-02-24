@@ -31,6 +31,11 @@ class BaseDataModule(LightningDataModule, ABC):
         # also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=False)
 
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.persistent_workers = persistent_workers
+        self.pin_memory = pin_memory
+
     @abstractmethod
     def prepare_data(self) -> None:
         """Download data if needed. Lightning ensures that `self.prepare_data()` is called only
@@ -70,12 +75,12 @@ class BaseDataModule(LightningDataModule, ABC):
 
     def _validate_and_set_batch_size(self) -> None:
         """Validate batch size is divisible by world size and set per-device batch size."""
-        if self.hparams.batch_size % self.trainer.world_size != 0:
+        if self.batch_size % self.trainer.world_size != 0:
             raise RuntimeError(
-                f"Batch size ({self.hparams.batch_size}) is not divisible by the number "
+                f"Batch size ({self.batch_size}) is not divisible by the number "
                 f"of devices ({self.trainer.world_size})."
             )
-        self.batch_size_per_device = self.hparams.batch_size // self.trainer.world_size
+        self.batch_size_per_device = self.batch_size // self.trainer.world_size
 
     def train_dataloader(self) -> DataLoader[Any]:
         """Create and return the train dataloader.
@@ -86,7 +91,7 @@ class BaseDataModule(LightningDataModule, ABC):
 
         if is_iterable:
             data_loader = wds.WebLoader(
-                self.data_train, batch_size=self.batch_size_per_device, num_workers=self.hparams.num_workers
+                self.data_train, batch_size=self.batch_size_per_device, num_workers=self.num_workers
             )
 
             # Define epoch length (can be overridden by Lightning's `limit_train_batches`)
@@ -98,10 +103,10 @@ class BaseDataModule(LightningDataModule, ABC):
             return DataLoader(
                 dataset=self.data_train,
                 batch_size=self.batch_size_per_device,
-                num_workers=self.hparams.num_workers,
-                pin_memory=self.hparams.pin_memory,
+                num_workers=self.num_workers,
+                pin_memory=self.pin_memory,
                 shuffle=True,
-                persistent_workers=self.hparams.persistent_workers,
+                persistent_workers=self.persistent_workers,
             )
 
     def val_dataloader(self) -> DataLoader[Any]:

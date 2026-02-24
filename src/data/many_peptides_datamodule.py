@@ -61,6 +61,15 @@ class ManyPeptidesDataModule(BaseDataModule):
     ):
         super().__init__(batch_size=batch_size, num_workers=num_workers, persistent_workers=persistent_workers,  pin_memory=pin_memory)
 
+        self.data_dir = data_dir
+        self.num_aa_min = num_aa_min
+        self.num_aa_max = num_aa_max
+        self.num_dimensions = num_dimensions
+        self.num_atoms = num_atoms
+        self.precomputed_std = precomputed_std
+        self.com_augmentation = com_augmentation
+        self.num_eval_samples = num_eval_samples
+
         self.pdb_dir = os.path.join(data_dir, "pdbs")
 
         self.wds_cache_dir = os.path.join(data_dir, self.WDS_REPO_PATH)
@@ -80,21 +89,21 @@ class ManyPeptidesDataModule(BaseDataModule):
         self.train_from_buffer = train_from_buffer
 
         # Parse evaluation sequence hparam (which sequences to use for val / testing)
-        if isinstance(self.hparams.val_sequences, str):
-            self.val_sequences = [self.hparams.val_sequences]
-        elif isinstance(self.hparams.val_sequences, ListConfig):
-            self.val_sequences = OmegaConf.to_container(self.hparams.val_sequences)
+        if isinstance(val_sequences, str):
+            self.val_sequences = [val_sequences]
+        elif isinstance(val_sequences, ListConfig):
+            self.val_sequences = OmegaConf.to_container(val_sequences)
         else:
             raise TypeError("Unrecognized type for val_sequences")
-        if isinstance(self.hparams.test_sequences, str):
-            self.test_sequences = [self.hparams.test_sequences]
-        elif isinstance(self.hparams.test_sequences, ListConfig):
-            self.test_sequences = OmegaConf.to_container(self.hparams.test_sequences)
+        if isinstance(test_sequences, str):
+            self.test_sequences = [test_sequences]
+        elif isinstance(test_sequences, ListConfig):
+            self.test_sequences = OmegaConf.to_container(test_sequences)
         else:
             raise TypeError("Unrecognized type for test_sequences")
 
         # Precomputed std for standardization
-        self.std = torch.tensor(self.hparams.precomputed_std)
+        self.std = torch.tensor(self.precomputed_std)
 
     def prepare_data(self) -> None:
         """Download + preprocessing data. Lightning ensures that `self.prepare_data()` is called only
@@ -108,8 +117,8 @@ class ManyPeptidesDataModule(BaseDataModule):
         os.makedirs(self.wds_cache_dir, exist_ok=True)
         os.makedirs(self.preproc_cache_dir, exist_ok=True)
 
-        download_and_extract_pdb_tarfiles(self.hparams.data_dir)
-        download_evaluation_data(self.hparams.data_dir)
+        download_and_extract_pdb_tarfiles(self.data_dir)
+        download_evaluation_data(self.data_dir)
 
         # Build or load cached preprocessing dicts (each function handles caching internally)
         pdb_paths = glob.glob(os.path.join(self.pdb_dir, "*", "*.pdb"))
@@ -203,7 +212,7 @@ class ManyPeptidesDataModule(BaseDataModule):
             StandardizeTransform(self.std),
             Random3DRotationTransform(),
         ]
-        if self.hparams.com_augmentation:
+        if self.com_augmentation:
             base_transform_list.append(CenterOfMassTransform())
 
         if self.train_from_buffer:
@@ -223,15 +232,15 @@ class ManyPeptidesDataModule(BaseDataModule):
                 train_transform_list.append(AddEncodingsTransform(self.encodings_dict))
             if self.permutations_dict is not None:
                 train_transform_list.append(AddPermutationsTransform(self.permutations_dict))
-            train_transform_list.append(PaddingTransform(self.hparams.num_atoms))
+            train_transform_list.append(PaddingTransform(self.num_atoms))
             train_transforms = torchvision.transforms.Compose(train_transform_list)
 
             tar_urls = self._resolve_tar_urls()
             self.data_train = build_webdataset(
                 tar_urls=tar_urls,
                 cache_dir=self.wds_cache_dir,
-                num_aa_min=self.hparams.num_aa_min,
-                num_aa_max=self.hparams.num_aa_max,
+                num_aa_min=self.num_aa_min,
+                num_aa_max=self.num_aa_max,
                 transform=train_transforms,
             )
 

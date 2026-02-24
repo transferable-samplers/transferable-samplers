@@ -24,25 +24,23 @@ class BaseLightningModule(LightningModule):
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
         prior,
-        compile: bool = False,
+        compile_net: bool = False,
         fix_symmetry: bool = True,
         drop_unfixable_symmetry: bool = False,
-        use_distill_loss: bool = False,
-        distill_weight: float = 0.5,
         output_dir: str = "",
         source_energy_config: Optional[SourceEnergyConfig] = None,
         train_from_buffer: bool = False,
-        *args,
-        **kwargs,
     ) -> None:
         super().__init__()
         self.save_hyperparameters(logger=False, ignore=["source_energy_config"])
-        if args or kwargs:
-            logger.warning(f"Unexpected arguments: {args}, {kwargs}")
 
         self.net = net
 
         self.prior = prior
+
+        self.compile_net = compile_net
+        self.optimizer_fn = optimizer
+        self.scheduler_fn = scheduler
 
         self.source_energy_config = source_energy_config
         self.train_from_buffer = train_from_buffer
@@ -51,14 +49,6 @@ class BaseLightningModule(LightningModule):
         self.train_metrics = torchmetrics.MetricCollection({"loss": MeanMetric()}, prefix="train/")
 
         self.output_dir = output_dir
-
-        if self.hparams.use_distill_loss:
-            logger.info("Using distillation loss with weight {:.3f}".format(self.hparams.distill_weight))
-            logger.info("Copying net to teacher for distillation loss")
-            self.teacher = deepcopy(self.net)
-            for param in self.teacher.parameters():
-                param.requires_grad_(False)
-            self.teacher.eval()
 
     @abstractmethod
     def generate_proposal(
@@ -122,7 +112,7 @@ class BaseLightningModule(LightningModule):
         self._buffer = buffer
 
     def setup(self, stage: str) -> None:
-        if self.hparams.compile and stage == "fit":
+        if self.compile_net and stage == "fit":
             self.net = torch.compile(self.net)
 
         if self.trainer is not None:
@@ -136,10 +126,10 @@ class BaseLightningModule(LightningModule):
             )
 
     def configure_optimizers(self) -> dict[str, Any]:
-        # Only parameters with requires_grad=True are passed to optimizer (e.g not self.teacher)
-        optimizer = self.hparams.optimizer(params = [p for p in self.parameters() if p.requires_grad])
-        if self.hparams.scheduler is not None:
-            scheduler_fn = self.hparams.scheduler
+        # Only parameters with requires_grad=True are passed to optimizer
+        optimizer = self.optimizer_fn(params = [p for p in self.parameters() if p.requires_grad])
+        if self.scheduler_fn is not None:
+            scheduler_fn = self.scheduler_fn
             scheduler_params = inspect.signature(scheduler_fn).parameters
 
             if "total_steps" in scheduler_params:
@@ -186,9 +176,6 @@ class BaseLightningModule(LightningModule):
     def on_train_epoch_start(self) -> None:
         logger.info("Train epoch start")
         self.train_metrics.reset()
-
-        if self.hparams.use_distill_loss:
-            assert not self._has_ema_callback(), "EMAWeightAveraging callback should not be used with distillation loss."
 
     def on_train_epoch_end(self) -> None:
         self.train_metrics.reset()

@@ -40,8 +40,16 @@ class SinglePeptideDataModule(BaseDataModule):
     ):
         super().__init__(batch_size=batch_size, num_workers=num_workers, persistent_workers=persistent_workers,  pin_memory=pin_memory)
 
+        self.sequence = sequence
+        self.temperature = temperature
+        self.data_dir = data_dir
+        self.num_dimensions = num_dimensions
+        self.num_atoms = num_atoms
+        self.com_augmentation = com_augmentation
+        self.num_eval_samples = num_eval_samples
+
         self.repo_name = self.HF_REPO_ID.split("/")[-1]
-        self.trajectory_name = f"{self.hparams.sequence}_{self.hparams.temperature}K"
+        self.trajectory_name = f"{self.sequence}_{self.temperature}K"
 
         self.train_from_buffer = train_from_buffer
 
@@ -53,8 +61,8 @@ class SinglePeptideDataModule(BaseDataModule):
         self.pdb_path = f"{self.trajectory_data_dir}/{self.trajectory_name}.pdb"
 
         # For compatibility with transferable case
-        self.val_sequences = [self.hparams.sequence]
-        self.test_sequences = [self.hparams.sequence]
+        self.val_sequences = [self.sequence]
+        self.test_sequences = [self.sequence]
 
     def prepare_data(self):
         """Download + preprocessing data. Lightning ensures that `self.prepare_data()` is called only
@@ -69,12 +77,12 @@ class SinglePeptideDataModule(BaseDataModule):
             logging.info(f"All required files already exist for {self.trajectory_name}, skipping download.")
             return
 
-        os.makedirs(f"{self.hparams.data_dir}/{self.repo_name}", exist_ok=True)
+        os.makedirs(f"{self.data_dir}/{self.repo_name}", exist_ok=True)
 
         local_dir = snapshot_download(
             repo_id=self.HF_REPO_ID,
             repo_type="dataset",
-            local_dir=f"{self.hparams.data_dir}/{self.repo_name}",
+            local_dir=f"{self.data_dir}/{self.repo_name}",
             allow_patterns=[f"{self.trajectory_name}/*"],
             token=True,
         )
@@ -113,13 +121,13 @@ class SinglePeptideDataModule(BaseDataModule):
         self.topology = md.load_topology(self.pdb_path)
 
         # For compatibility with transferable BG
-        self.topology_dict = {self.hparams.sequence: self.topology}
+        self.topology_dict = {self.sequence: self.topology}
 
         transform_list = [
             StandardizeTransform(self.std),
             Random3DRotationTransform(),
         ]
-        if self.hparams.com_augmentation:
+        if self.com_augmentation:
             transform_list.append(CenterOfMassTransform())
         train_transforms = torchvision.transforms.Compose(transform_list)
 
@@ -152,7 +160,7 @@ class SinglePeptideDataModule(BaseDataModule):
         Returns:
             OpenMMEnergy: An energy function wrapper around the OpenMM system and integrator.
         """
-        if self.hparams.sequence in ["Ace-A-Nme", "Ace-AAA-Nme"]:
+        if self.sequence in ["Ace-A-Nme", "Ace-AAA-Nme"]:
             forcefield = openmm.app.ForceField("amber99sbildn.xml", "tip3p.xml", "amber99_obc.xml")
 
             system = forcefield.createSystem(
@@ -165,7 +173,7 @@ class SinglePeptideDataModule(BaseDataModule):
             integrator = openmm.LangevinMiddleIntegrator(
                 temperature * openmm.unit.kelvin,
                 0.3 / openmm.unit.picosecond
-                if self.hparams.sequence == "Ace-AAA-Nme"
+                if self.sequence == "Ace-AAA-Nme"
                 else 1.0 / openmm.unit.picosecond,
                 1.0 * openmm.unit.femtosecond,
             )
@@ -199,7 +207,7 @@ class SinglePeptideDataModule(BaseDataModule):
         """
         Prepare evaluation data and energy function for validation or test trajectories.
         """
-        assert sequence == self.hparams.sequence, f"Requested eval sequence '{sequence}' does not match datamodule sequence '{self.hparams.sequence}'"
+        assert sequence == self.sequence, f"Requested eval sequence '{sequence}' does not match datamodule sequence '{self.sequence}'"
         if stage == "test":
             true_samples = torch.from_numpy(np.load(self.test_data_path))
         elif stage == "val":
@@ -219,7 +227,7 @@ class SinglePeptideDataModule(BaseDataModule):
         tica_model = get_tica_model(true_samples, self.topology)
 
         # Subsample the true trajectory
-        true_samples = true_samples[:: len(true_samples) // self.hparams.num_eval_samples]
+        true_samples = true_samples[:: len(true_samples) // self.num_eval_samples]
 
         potential = self._setup_potential()
         energy_fn = lambda x: potential(x)

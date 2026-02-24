@@ -68,7 +68,7 @@ def get_test_data(datamodule, sequence: str):
         unpadded_data.append(sample)
 
     # Build padded versions
-    padding_transform = PaddingTransform(datamodule.hparams.num_atoms)
+    padding_transform = PaddingTransform(datamodule.num_atoms)
     padded_data = []
     for sample in unpadded_data:
         padded_data.append(padding_transform(sample.copy()))

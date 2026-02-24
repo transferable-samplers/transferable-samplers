@@ -16,13 +16,47 @@ logger = RankedLogger(__name__, rank_zero_only=False)
 class FlowMatchingModule(BaseLightningModule):
     """Flow matching model."""
 
-    def __init__(self, sigma=0.0, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        net: torch.nn.Module,
+        optimizer: torch.optim.Optimizer,
+        scheduler: torch.optim.lr_scheduler,
+        prior,
+        sigma: float = 0.0,
+        div_estimator: str = "hutch",
+        logp_tol_scale: float = 1.0,
+        n_eps: int = 1,
+        atol: float = 1e-5,
+        rtol: float = 1e-5,
+        mean_free_prior: bool = True,
+        compile_net: bool = False,
+        fix_symmetry: bool = True,
+        drop_unfixable_symmetry: bool = False,
+        output_dir: str = "",
+        source_energy_config=None,
+        train_from_buffer: bool = False,
+    ) -> None:
+        super().__init__(
+            net=net,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            prior=prior,
+            compile_net=compile_net,
+            fix_symmetry=fix_symmetry,
+            drop_unfixable_symmetry=drop_unfixable_symmetry,
+            output_dir=output_dir,
+            source_energy_config=source_energy_config,
+            train_from_buffer=train_from_buffer,
+        )
+        self.sigma = sigma
+        self.div_estimator = div_estimator
+        self.logp_tol_scale = logp_tol_scale
+        self.n_eps = n_eps
+        self.atol = atol
+        self.rtol = rtol
         self.nfe = 0
         self.num_integrations = 0
         self.eps = 1e-1
-        if "strict_loading" in kwargs:
-            self.strict_loading = kwargs["strict_loading"]
 
     def forward(self, t: torch.Tensor, x: torch.Tensor, encodings, mask) -> torch.Tensor:
         return self.net(t, x, encodings=encodings, node_mask=mask)
@@ -30,11 +64,11 @@ class FlowMatchingModule(BaseLightningModule):
     def _get_xt(self, x0, x1, t, mask=None):
         mu_t = (1.0 - t) * x0 + t * x1
 
-        if not self.hparams.sigma == 0.0:
+        if not self.sigma == 0.0:
             num_samples = x1.shape[0]
-            num_tokens = x1.shape[1] // self.trainer.datamodule.hparams.num_dimensions
+            num_tokens = x1.shape[1] // self.trainer.datamodule.num_dimensions
             noise = self.prior.sample(num_samples, num_tokens, mask=None, device=x1.device).flatten(start_dim=1)
-            xt = mu_t + self.hparams.sigma * noise
+            xt = mu_t + self.sigma * noise
             if mask is not None:
                 xt = xt.view(num_samples, num_tokens, -1) * mask[..., None]
                 xt = xt.view(num_samples, -1)
@@ -50,9 +84,6 @@ class FlowMatchingModule(BaseLightningModule):
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         if self.train_from_buffer:
             batch = self._buffer.sample(batch["x"].shape[0])
-
-        if self.hparams.use_distill_loss:
-            raise NotImplementedError("Distillation loss not implemented for flow matching.")
 
         assert len(batch["x"].shape) == 3, "molecules must be a pointcloud (batch_size, num_atoms, 3)"
 
@@ -99,7 +130,7 @@ class FlowMatchingModule(BaseLightningModule):
 
         eval_fn = partial(copy.deepcopy(net), encodings=encodings)
 
-        if self.hparams.div_estimator == "ito":
+        if self.div_estimator == "ito":
             x_ito, dlogp_ito = self.sde_integrate(x, reverse=reverse)
             return x_ito, dlogp_ito
 
@@ -109,16 +140,16 @@ class FlowMatchingModule(BaseLightningModule):
         else:
             wrapped_net = TorchdynWrapper(
                 eval_fn,
-                div_estimator=self.hparams.div_estimator,
-                logp_tol_scale=self.hparams.logp_tol_scale,
-                n_eps=self.hparams.n_eps,
+                div_estimator=self.div_estimator,
+                logp_tol_scale=self.logp_tol_scale,
+                n_eps=self.n_eps,
             )
-            logger.info(f"Using {self.hparams.div_estimator} with n_eps {self.hparams.n_eps}")
+            logger.info(f"Using {self.div_estimator} with n_eps {self.n_eps}")
 
         node = NeuralODE(
             wrapped_net,
-            atol=self.hparams.atol,
-            rtol=self.hparams.rtol,
+            atol=self.atol,
+            rtol=self.rtol,
             solver="dopri5",
             sensitivity="adjoint",
         )
@@ -130,7 +161,7 @@ class FlowMatchingModule(BaseLightningModule):
         self.num_integrations += 1
         wrapped_net.nfe = 0
         if not dummy_ll:
-            dlogp = x[..., -1] * self.hparams.logp_tol_scale
+            dlogp = x[..., -1] * self.logp_tol_scale
             x = x[..., :-1]
         x = x.reshape(batch_size, num_atoms, -1)
 
@@ -206,7 +237,7 @@ class FlowMatchingModule(BaseLightningModule):
         encodings = system_cond.encodings if system_cond else None
 
         if encodings is None:
-            num_atoms = self.trainer.datamodule.hparams.num_atoms
+            num_atoms = self.trainer.datamodule.num_atoms
         else:
             num_atoms = encodings["atom_type"].size(0)
 

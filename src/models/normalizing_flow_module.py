@@ -1,21 +1,61 @@
+from copy import deepcopy
 from typing import Optional
 
 import torch
 
 from src.models.base_lightning_module import BaseLightningModule
 from src.utils.dataclasses import SystemCond
+from src.utils.pylogger import RankedLogger
+
+logger = RankedLogger(__name__, rank_zero_only=False)
 
 
 class NormalizingFlowModule(BaseLightningModule):
     def __init__(
         self,
-        *args,
-        **kwargs,
+        net: torch.nn.Module,
+        optimizer: torch.optim.Optimizer,
+        scheduler: torch.optim.lr_scheduler,
+        prior,
+        mean_free_prior: bool = False,
+        teacher_regularize_weight: float = 0.0,
+        compile_net: bool = False,
+        fix_symmetry: bool = True,
+        drop_unfixable_symmetry: bool = False,
+        output_dir: str = "",
+        source_energy_config=None,
+        train_from_buffer: bool = False,
     ) -> None:
-        super().__init__(*args, **kwargs)
-        assert not self.hparams.mean_free_prior, "Mean free prior is not supported for normalizing flows"
+        super().__init__(
+            net=net,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            prior=prior,
+            compile_net=compile_net,
+            fix_symmetry=fix_symmetry,
+            drop_unfixable_symmetry=drop_unfixable_symmetry,
+            output_dir=output_dir,
+            source_energy_config=source_energy_config,
+            train_from_buffer=train_from_buffer,
+        )
+        self.mean_free_prior = mean_free_prior
+        assert not self.mean_free_prior, "Mean free prior is not supported for normalizing flows"
+
+        self.teacher_regularize_weight = teacher_regularize_weight
+
+        if self.teacher_regularize_weight > 0:
+            logger.info("Using teacher regularization with weight {:.3f}".format(self.teacher_regularize_weight))
+            self.teacher = deepcopy(self.net)
+            for param in self.teacher.parameters():
+                param.requires_grad_(False)
+            self.teacher.eval()
 
         self.eval_ctx = None
+
+    def on_train_epoch_start(self) -> None:
+        super().on_train_epoch_start()
+        if self.teacher_regularize_weight > 0:
+            assert not self._has_ema_callback(), "EMAWeightAveraging callback should not be used with teacher regularization."
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         if self.train_from_buffer:
@@ -41,16 +81,16 @@ class NormalizingFlowModule(BaseLightningModule):
 
         self.log("train/mle_loss", loss.item(), prog_bar=True, sync_dist=True)
 
-        if self.hparams.use_distill_loss:
+        if self.teacher_regularize_weight > 0:
             with torch.inference_mode():
                 z_pred_teacher, dlogp_teacher = self.teacher(x1, permutations=permutations, encodings=encodings, mask=mask)
 
             logp_z_pred_teacher = self.prior.logp(z_pred_teacher, mask=mask)
             logq_teacher = logp_z_pred_teacher + dlogp_teacher
 
-            distill_loss = (logq - logq_teacher).pow(2).mean()
-            loss = loss + self.hparams.distill_weight * distill_loss
-            self.log("finetune/distill_loss", distill_loss.item(), prog_bar=True, sync_dist=True)
+            teacher_reg = (logq - logq_teacher).pow(2).mean()
+            loss = loss + self.teacher_regularize_weight * teacher_reg
+            self.log("finetune/teacher_regularization", teacher_reg.item(), prog_bar=True, sync_dist=True)
 
         batch_value = self.train_metrics(loss)
         self.log_dict(batch_value, prog_bar=True)
@@ -97,7 +137,7 @@ class NormalizingFlowModule(BaseLightningModule):
         encodings = system_cond.encodings if system_cond else None
 
         if encodings is None:
-            num_atoms = self.trainer.datamodule.hparams.num_atoms
+            num_atoms = self.trainer.datamodule.num_atoms
         else:
             num_atoms = encodings["atom_type"].size(0)
 
@@ -148,11 +188,11 @@ class NormalizingFlowModule(BaseLightningModule):
         encodings = system_cond.encodings if system_cond else None
 
         if encodings is None:
-            num_atoms = self.trainer.datamodule.hparams.num_atoms
+            num_atoms = self.trainer.datamodule.num_atoms
         else:
             num_atoms = encodings["atom_type"].size(0)
 
-        data_dim = num_atoms * self.trainer.datamodule.hparams.num_dimensions
+        data_dim = num_atoms * self.trainer.datamodule.num_dimensions
         z = self.prior.sample(num_samples_invert, num_atoms, device=self.device)
 
         _permutations = None

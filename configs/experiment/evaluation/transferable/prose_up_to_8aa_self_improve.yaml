@@ -15,8 +15,7 @@ model:
     energy_batch_size: 2_500
     grad_batch_size: 2_500
     use_com_adjustment: true
-  use_distill_loss: True
-  distill_weight: 0.5
+  teacher_regularize_weight: 0.5
   train_from_buffer: true
 
   optimizer:

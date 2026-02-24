@@ -2,7 +2,7 @@ defaults:
   - optimizer: adam_w
 
 # compile model for faster training with pytorch 2.0
-compile: false
+compile_net: false
 
 output_dir: ${paths.output_dir}
 
