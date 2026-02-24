@@ -10,7 +10,7 @@ hf_state_dict_path: single_system/ecnf++_Ace-AAA-Nme_0.pth
 
 model:
   source_energy_config:
-    _target_: src.utils.dataclasses.SourceEnergyConfig
+    _target_: transferable_samplers.utils.dataclasses.SourceEnergyConfig
     sample_batch_size: 8
     energy_batch_size: 8
     grad_batch_size: 8
@@ -21,7 +21,7 @@ model:
 callbacks:
   sampling_evaluation:
     sampler:
-      _target_: src.samplers.snis_sampler.SNISSampler
+      _target_: transferable_samplers.samplers.snis_sampler.SNISSampler
       num_samples: 10_000
 
 

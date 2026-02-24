@@ -11,7 +11,7 @@ import pytest
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, open_dict
 
-from src.train import train
+from transferable_samplers.train import train
 from tests.helpers.utils import compose_config, get_config_stem
 
 EXPERIMENT_NAMES = [

@@ -1,0 +1,185 @@
+"""Utilities for resolving checkpoint / init-weight loading at training time."""
+
+import os
+from copy import deepcopy
+from typing import Optional
+
+import torch
+
+from transferable_samplers.utils.huggingface import download_weights
+from transferable_samplers.utils.pylogger import RankedLogger
+
+logger = RankedLogger(__name__, rank_zero_only=False)
+
+
+def load_state_dict_from_ckpt(path: str) -> dict:
+    """Extract a state dict from a Lightning checkpoint file (``state_dict`` key).
+
+    Args:
+        path: Path to the Lightning checkpoint file.
+
+    Returns:
+        The state dict extracted from the checkpoint.
+
+    Raises:
+        KeyError: If the checkpoint does not contain a ``state_dict`` key.
+
+    NOTE: If the model was trained using EMAWeightAveraging, the EMA weights will be in the checkpoint's ``state_dict`` field.
+    """
+    assert path.endswith(".ckpt"), f"Expected a .ckpt file, got: {path}"
+    ckpt = torch.load(path, map_location="cpu")
+    if "state_dict" not in ckpt:
+        raise KeyError(f"Checkpoint at {path} missing 'state_dict' key.")
+    return ckpt["state_dict"]
+
+
+def load_state_dict_from_file(path: str) -> dict:
+    """Load a raw state dict from a ``.pth`` file.
+
+    Args:
+        path: Path to the state-dict file.
+
+    Returns:
+        The loaded state dict.
+    """
+    assert path.endswith(".pth"), f"Expected a .pth file, got: {path}"
+    return torch.load(path, map_location="cpu")
+
+
+def load_state_dict_from_hf(hf_filepath: str, scratch_dir: str) -> dict:
+    """Download a state dict from HuggingFace Hub and return it.
+
+    Args:
+        hf_filepath: The filepath within the HuggingFace repo.
+        scratch_dir: Local scratch directory used to cache downloaded weights.
+
+    Returns:
+        The loaded state dict.
+    """
+    dst_dir = os.path.join(scratch_dir, "model-weights")
+    local_path = download_weights(hf_filepath=hf_filepath, destination_dir=dst_dir)
+    return load_state_dict_from_file(local_path)
+
+
+def augment_state_dict_for_teacher(sd: dict, student_prefix="net.", teacher_prefix="teacher."):
+    """
+    If teacher keys are missing but student keys exist, synthesize teacher keys
+    by copying tensors from the student keys. Returns a NEW dict.
+    """
+    has_student = any(k.startswith(student_prefix) for k in sd.keys())
+    assert has_student, "Expected student keys in state dict when calling augment_state_dict_for_teacher."
+
+    has_teacher = any(k.startswith(teacher_prefix) for k in sd.keys())
+    assert not has_teacher, "Expected no teacher keys in state dict when calling augment_state_dict_for_teacher."
+
+    logger.info("Augmenting state dict for teacher by copying student parameters.")
+
+    new_sd = deepcopy(sd)
+    for k, v in sd.items():
+        if k.startswith(student_prefix):
+            teacher_k = k.replace(student_prefix, teacher_prefix, 1)
+            new_sd[teacher_k] = v
+    return new_sd
+
+
+def resolve_init(
+    init_ckpt_path: Optional[str],
+    init_hf_state_dict_path: Optional[str],
+    scratch_dir: str,
+) -> Optional[dict]:
+    """Resolve init weights from a checkpoint or HuggingFace state dict.
+
+    Args:
+        init_ckpt_path: Path to a Lightning checkpoint for weights-only init.
+        init_hf_state_dict_path: HuggingFace filepath for weights-only init.
+        scratch_dir: Local scratch directory for caching HF downloads.
+
+    Returns:
+        The init state dict, or ``None`` if no init source was provided.
+
+    Raises:
+        AssertionError: If both ``init_ckpt_path`` and ``init_hf_state_dict_path``
+            are set (they are mutually exclusive).
+        FileNotFoundError: If ``init_ckpt_path`` is set but the file does not exist.
+    """
+    assert not (init_ckpt_path and init_hf_state_dict_path), (
+        "At most one of init_ckpt_path / init_hf_state_dict_path may be set."
+    )
+
+    if init_hf_state_dict_path is not None:
+        logger.info("Downloading init weights from HuggingFace...")
+        state_dict = load_state_dict_from_hf(init_hf_state_dict_path, scratch_dir)
+        logger.info("Loaded init weights from HuggingFace state_dict.")
+        return state_dict
+
+    if init_ckpt_path is not None:
+        if not os.path.exists(init_ckpt_path):
+            raise FileNotFoundError(f"init_ckpt_path not found: {init_ckpt_path}")
+        logger.info(f"Loading init weights from checkpoint: {init_ckpt_path}")
+        state_dict = load_state_dict_from_ckpt(init_ckpt_path)
+        logger.info("Loaded init weights from init checkpoint.")
+        return state_dict
+
+    return None
+
+
+def resolve_init_or_resume(
+    resume_ckpt_path: Optional[str],
+    init_ckpt_path: Optional[str],
+    init_hf_state_dict_path: Optional[str],
+    scratch_dir: str,
+) -> tuple[Optional[str], Optional[dict]]:
+    """Determine whether to resume from a checkpoint or apply init weights.
+
+    Implements preemptible semantics:
+    - If ``resume_ckpt_path`` exists on disk and is loadable, resume from it
+      (ignoring any init weights).
+    - Otherwise, resolve init weights if provided, or start from scratch.
+
+    Args:
+        resume_ckpt_path: Path for full Lightning resume. May not exist yet.
+        init_ckpt_path: Path to a Lightning checkpoint for weights-only init.
+        init_hf_state_dict_path: HuggingFace filepath for weights-only init.
+        scratch_dir: Local scratch directory for caching HF downloads.
+
+    Returns:
+        A tuple of ``(fit_ckpt_path, init_state_dict)`` where exactly one (or
+        neither) is non-None:
+        - ``fit_ckpt_path``: checkpoint path to pass to ``trainer.fit(ckpt_path=...)``.
+        - ``init_state_dict``: state dict to load into the model before training.
+
+    Raises:
+        AssertionError: If both ``init_ckpt_path`` and ``init_hf_state_dict_path``
+            are set (they are mutually exclusive).
+        FileNotFoundError: If ``init_ckpt_path`` is set but the file does not exist.
+    """
+    # 1. Try to resume from an existing checkpoint
+    if resume_ckpt_path and os.path.exists(resume_ckpt_path):
+        try:
+            _ = torch.load(resume_ckpt_path, map_location="cpu")
+            logger.info(
+                f"Found resume checkpoint at {resume_ckpt_path}. "
+                "Resuming training; ignoring init_*."
+            )
+            return resume_ckpt_path, None
+        except Exception:
+            logger.exception(
+                f"Resume checkpoint exists but could not be loaded: {resume_ckpt_path}. "
+                "Falling back to init/scratch."
+            )
+
+    # 2. No valid resume checkpoint — resolve init weights or start from scratch
+    if resume_ckpt_path and not os.path.exists(resume_ckpt_path):
+        logger.warning(
+            f"resume_ckpt_path set but not found: {resume_ckpt_path}. "
+        )
+
+    init_state_dict = resolve_init(init_ckpt_path, init_hf_state_dict_path, scratch_dir)
+
+    if init_state_dict is None:
+        logger.info(
+            "No resume checkpoint found and no init weights provided; "
+            "training from random initialization."
+        )
+
+    return None, init_state_dict

@@ -1,4 +1,4 @@
-_target_: src.data.single_peptide_datamodule.SinglePeptideDataModule
+_target_: transferable_samplers.data.single_peptide_datamodule.SinglePeptideDataModule
 data_dir: ${paths.scratch_dir}/sequential-boltzmann-generators-data
 sequence: GYDPETGTWG
 temperature: 310

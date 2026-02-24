@@ -9,7 +9,7 @@ hf_state_dict_path: transferable/ecnf++_up_to_4aa.pth
 
 model:
   source_energy_config:
-    _target_: src.utils.dataclasses.SourceEnergyConfig
+    _target_: transferable_samplers.utils.dataclasses.SourceEnergyConfig
     sample_batch_size: 4
     energy_batch_size: 4
     grad_batch_size: 4
@@ -22,7 +22,7 @@ model:
 callbacks:
   sampling_evaluation:
     sampler:
-      _target_: src.samplers.snis_sampler.SNISSampler
+      _target_: transferable_samplers.samplers.snis_sampler.SNISSampler
       num_samples: 10_000
 
       logw_quantile_filter: 0.002

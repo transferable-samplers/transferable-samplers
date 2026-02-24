@@ -10,7 +10,7 @@ hf_state_dict_path: transferable/prose_up_to_8aa.pth
 
 model:
   source_energy_config:
-    _target_: src.utils.dataclasses.SourceEnergyConfig
+    _target_: transferable_samplers.utils.dataclasses.SourceEnergyConfig
     sample_batch_size: 2_500
     energy_batch_size: 2_500
     grad_batch_size: 2_500
@@ -18,7 +18,7 @@ model:
 callbacks:
   sampling_evaluation:
     sampler:
-      _target_: src.samplers.smc_sampler.SMCSampler
+      _target_: transferable_samplers.samplers.smc_sampler.SMCSampler
       num_samples: 10_000
 
       use_metropolis: true

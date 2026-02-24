@@ -10,7 +10,7 @@ init_hf_state_dict_path: transferable/prose_up_to_8aa.pth
 
 model:
   source_energy_config:
-    _target_: src.utils.dataclasses.SourceEnergyConfig
+    _target_: transferable_samplers.utils.dataclasses.SourceEnergyConfig
     sample_batch_size: 2_500
     energy_batch_size: 2_500
     grad_batch_size: 2_500
@@ -24,14 +24,14 @@ model:
 callbacks:
   ema: null
   populate_buffer:
-    _target_: src.callbacks.populate_buffer_callback.PopulateBufferCallback
+    _target_: transferable_samplers.callbacks.populate_buffer_callback.PopulateBufferCallback
     sampler:
-      _target_: src.samplers.snis_sampler.SNISSampler
+      _target_: transferable_samplers.samplers.snis_sampler.SNISSampler
       num_samples: 200_000
       logw_quantile_filter: 0.002
   sampling_evaluation:
     sampler:
-      _target_: src.samplers.snis_sampler.SNISSampler
+      _target_: transferable_samplers.samplers.snis_sampler.SNISSampler
       num_samples: 10_000
 
       logw_quantile_filter: 0.002

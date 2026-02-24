@@ -15,7 +15,7 @@ import pytest
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, OmegaConf, open_dict
 
-from src.eval import eval
+from transferable_samplers.eval import eval
 from tests.helpers.utils import compose_config, extract_test_sequence, get_config_stem
 
 MEDIAN_PROPOSAL_ENERGY_THRESHOLDS = {  # these are intentionally loose, just to catch major issues
@@ -82,7 +82,7 @@ def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, t
             # Replace SMC sampler with SNIS for this test — we only test weight loading here.
             # TODO probably indicative that the tests should be refactored.
             cfg.callbacks.sampling_evaluation.sampler = OmegaConf.create({
-                "_target_": "src.samplers.snis_sampler.SNISSampler",
+                "_target_": "transferable_samplers.samplers.snis_sampler.SNISSampler",
                 "num_samples": 25,
             })
         if "transferable" in experiment_name:

@@ -11,8 +11,8 @@ from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
 from torch.utils.data import default_collate
 
-from src.models.priors.normal_distribution import NormalDistribution
-from src.data.transforms.padding import PaddingTransform
+from transferable_samplers.models.priors.normal_distribution import NormalDistribution
+from transferable_samplers.data.transforms.padding import PaddingTransform
 
 # Didn't see any slowdown for TarFlow with BF16 enabled, once had issues with invertibility
 torch.set_float32_matmul_precision("highest")

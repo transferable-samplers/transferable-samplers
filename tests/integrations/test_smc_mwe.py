@@ -12,7 +12,7 @@ import torch
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, open_dict
 
-from src.eval import eval
+from transferable_samplers.eval import eval
 from tests.helpers.utils import compose_config, extract_test_sequence, get_config_stem
 
 MEDIAN_SMC_ENERGY_THRESHOLDS = {  # these are intentionally loose, just to catch major issues

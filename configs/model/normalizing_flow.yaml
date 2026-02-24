@@ -3,11 +3,11 @@ defaults:
   - net: tarflow
   - scheduler: cosine
 
-_target_: src.models.normalizing_flow_module.NormalizingFlowModule
+_target_: transferable_samplers.models.normalizing_flow_module.NormalizingFlowModule
 mean_free_prior: False
 
 prior:
-  _target_: src.models.priors.normal_distribution.NormalDistribution
+  _target_: transferable_samplers.models.priors.normal_distribution.NormalDistribution
   num_dimensions: ${data.num_dimensions}
   mean_free: false
 

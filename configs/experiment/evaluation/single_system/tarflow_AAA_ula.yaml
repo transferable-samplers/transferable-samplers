@@ -8,7 +8,7 @@ defaults:
 
 model:
   source_energy_config:
-    _target_: src.utils.dataclasses.SourceEnergyConfig
+    _target_: transferable_samplers.utils.dataclasses.SourceEnergyConfig
     sample_batch_size: 10_000
     energy_batch_size: 10_000
     grad_batch_size: 10_000
@@ -20,7 +20,7 @@ model:
 callbacks:
   sampling_evaluation:
     sampler:
-      _target_: src.samplers.smc_sampler.SMCSampler
+      _target_: transferable_samplers.samplers.smc_sampler.SMCSampler
       num_samples: 10_000
 
       init_eps: 1e-5
