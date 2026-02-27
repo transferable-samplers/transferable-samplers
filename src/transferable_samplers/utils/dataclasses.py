@@ -74,7 +74,6 @@ class SourceEnergy:
 
         NOTE: need to benchmark / implement the fixed version from https://arxiv.org/pdf/2602.03729
         """
-
         # The mean of N i.i.d. standard Gaussian samples has std = 1/sqrt(N)
         # This is the same as used in the data augmentation.
         com_std_analytic = 1.0 / math.sqrt(x.shape[1])
@@ -110,7 +109,8 @@ class SourceEnergy:
 
     def energy(self, x: torch.Tensor, batch_size: int | None = None) -> torch.Tensor:
         """Compute energy in batches.
-                If use_com_adjustment is True, applies a CoM energy adjustment
+
+        If use_com_adjustment is True, applies a CoM energy adjustment
         using std = 1/sqrt(num_atoms), as per Prop. 1 of https://arxiv.org/pdf/2502.18462.
         """
         bs = batch_size or self.energy_batch_size
@@ -124,8 +124,8 @@ class SourceEnergy:
         return out
 
     def energy_and_grad(self, x: torch.Tensor, batch_size: int | None = None) -> tuple[torch.Tensor, torch.Tensor]:
-        """
-        Compute energy and gradient in batches.
+        """Compute energy and gradient in batches.
+
         If use_com_adjustment is True, applies a CoM energy adjustment
         using std = 1/sqrt(num_atoms), as per Prop. 1 of https://arxiv.org/pdf/2502.18462.
         """

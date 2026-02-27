@@ -57,12 +57,12 @@ from torch import einsum
 
 
 def exists(val: Any) -> bool:
-    """returns whether val is not none"""
+    """Returns whether val is not none."""
     return val is not None
 
 
 def default(x: Any, y: Any) -> Any:
-    """returns x if it exists, otherwise y"""
+    """Returns x if it exists, otherwise y."""
     return x if exists(x) else y
 
 
@@ -199,7 +199,7 @@ class Attention(torch.nn.Module):
         mask: torch.Tensor | None = None,
         temp: float = 1.0,
     ) -> torch.Tensor:
-        """Perform attention update"""
+        """Perform attention update."""
         scale = self.sqrt_scale**2 / temp
         sim = einsum("b h i d, b h j d -> b h i j", q, k) * scale
         sim += bias

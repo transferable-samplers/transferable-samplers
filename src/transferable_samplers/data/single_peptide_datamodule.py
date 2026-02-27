@@ -70,7 +70,9 @@ class SinglePeptideDataModule(BaseDataModule):
         self.test_sequences = [self.sequence]
 
     def prepare_data(self) -> None:
-        """Download + preprocessing data. Lightning ensures that `self.prepare_data()` is called only
+        """Download + preprocessing data.
+
+        Lightning ensures that `self.prepare_data()` is called only
         within a single process on CPU, so you can safely add your downloading logic within. In
         case of multi-node training, the execution of this hook depends upon
         `self.prepare_data_per_node()`.
@@ -164,9 +166,7 @@ class SinglePeptideDataModule(BaseDataModule):
         logging.info(f"Train dataset size: {len(self.data_train)}")
 
     def prepare_eval(self, sequence: str, stage: str) -> EvalContext:
-        """
-        Prepare evaluation data and energy function for validation or test trajectories.
-        """
+        """Prepare evaluation data and energy function for validation or test trajectories."""
         assert sequence == self.sequence, (
             f"Requested eval sequence '{sequence}' does not match datamodule sequence '{self.sequence}'"
         )
@@ -209,8 +209,7 @@ class SinglePeptideDataModule(BaseDataModule):
         )
 
     def _setup_potential(self) -> OpenMMEnergy:
-        """
-        Set up the OpenMM potential energy function.
+        """Set up the OpenMM potential energy function.
 
         Returns:
             OpenMMEnergy: An energy function wrapper around the OpenMM system and integrator.

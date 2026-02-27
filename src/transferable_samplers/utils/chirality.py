@@ -27,8 +27,7 @@ def _get_adj_list(topology: Any) -> torch.Tensor:
 
 
 def _find_chirality_centers(adj_list: torch.Tensor, atom_types: torch.Tensor, num_h_atoms: int = 2) -> torch.Tensor:
-    """
-    Return the chirality centers for a peptide, e.g. carbon alpha atoms and their bonds.
+    """Return the chirality centers for a peptide, e.g. carbon alpha atoms and their bonds.
 
     Args:
         adj_list: List of bonds
@@ -51,8 +50,8 @@ def _find_chirality_centers(adj_list: torch.Tensor, atom_types: torch.Tensor, nu
 
 
 def _compute_chirality_sign(coords: torch.Tensor, chirality_centers: torch.Tensor) -> torch.Tensor:
-    """
-    Compute indicator signs for a given configuration.
+    """Compute indicator signs for a given configuration.
+
     If the signs for two configurations are different for the same center, the chirality changed.
 
     Args:
@@ -78,8 +77,8 @@ def _check_symmetry_change(
     adj_list: torch.Tensor,
     atom_types: torch.Tensor,
 ) -> torch.Tensor:
-    """
-    Check for a batch if the chirality changed wrt to some reference reference_signs.
+    """Check for a batch if the chirality changed wrt to some reference reference_signs.
+
     If the signs for two configurations are different for the same center, the chirality changed.
 
     Args:

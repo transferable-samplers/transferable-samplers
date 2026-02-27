@@ -38,10 +38,7 @@ class ConditionalEmbedder(nn.Module):
         sinusoid_div_value: float = 0.0,
         embed_time: bool = False,
     ) -> None:
-        """
-        Input the value of the atom type, residue type, and residue position WITHOUT counting the padding token
-        """
-
+        """Input the value of the atom type, residue type, and residue position WITHOUT counting the padding token."""
         super().__init__()
 
         self.atom_embed = nn.Embedding(num_embeddings=num_atom_emb, embedding_dim=hidden_dim)

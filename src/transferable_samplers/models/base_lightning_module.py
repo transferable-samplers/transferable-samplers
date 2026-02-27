@@ -198,7 +198,7 @@ class BaseLightningModule(LightningModule):
 
     # pyrefly: ignore [bad-override]
     def validation_step(self, batch: dict[str, Any], batch_idx: int) -> None:
-        "NOTE: these only exist for Lightning compatibility. All evaluation is handled by custom callbacks."
+        """NOTE: these only exist for Lightning compatibility. All evaluation is handled by custom callbacks."""
         return None
 
     def on_test_epoch_start(self) -> None:
@@ -209,5 +209,5 @@ class BaseLightningModule(LightningModule):
 
     # pyrefly: ignore [bad-override]
     def test_step(self, batch: dict[str, Any], batch_idx: int) -> None:
-        "NOTE: these only exist for Lightning compatibility. All evaluation is handled by custom callbacks."
+        """NOTE: these only exist for Lightning compatibility. All evaluation is handled by custom callbacks."""
         return None

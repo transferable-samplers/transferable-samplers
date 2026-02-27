@@ -62,7 +62,7 @@ MAX_SEQ_LEN = 512
 
 
 def write_tensor_to_txt(tensor: torch.Tensor, filename: str, linesize: int = 3) -> None:
-    """HELPFUL FOR DEBUGGING: write a tensor to a text file for easy diffs"""
+    """HELPFUL FOR DEBUGGING: write a tensor to a text file for easy diffs."""
     tensor = tensor.flatten()
     with Path("0DEBUG_" + filename).open("w") as f:
         for j in range(0, tensor.size(0), linesize):
@@ -463,7 +463,6 @@ class TarFlow(torch.nn.Module):
         encodings: dict[str, torch.Tensor] | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """No masking in reverse since we assume the model generates a single peptide system as a time."""
-
         if self.conditional:
             assert encodings is not None, "encodings must be provided for conditional model."
             assert x.shape[1] == encodings["aa_type"].shape[1], "x and encodings do not match"

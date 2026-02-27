@@ -1,5 +1,4 @@
-"""
-Consider the Euler–Maruyama discretization of the overdamped Langevin SDE:
+"""Consider the Euler-Maruyama discretization of the overdamped Langevin SDE.
 
     X_{k+1} = X_k - h grad_E_t(X_k) + sqrt(2h) ξ,
     ξ ~ N(0, I),

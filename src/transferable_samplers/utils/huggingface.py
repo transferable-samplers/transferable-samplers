@@ -139,8 +139,7 @@ TICA_MEAN_SHAPES = {
 
 
 def safe_extract_tar(tar_path: str, extraction_path: str) -> None:
-    """
-    Safely extracts a tar archive to the given path.
+    """Safely extracts a tar archive to the given path.
 
     Args:
         tar_path (str): Path to the tar archive.
@@ -158,14 +157,12 @@ def safe_extract_tar(tar_path: str, extraction_path: str) -> None:
 
 # pyrefly: ignore [bad-return]
 def download_weights(destination_dir: str, hf_filepath: str) -> str:
-    """
-    Downloads the model weights from Hugging Face Hub.
+    """Downloads the model weights from Hugging Face Hub.
 
     Args:
         destination_dir (str): The destination dir where the model weights will be saved.
         hf_filepath (str): The filepath in the Hugging Face repo
     """
-
     try:
         Path(destination_dir).mkdir(parents=True, exist_ok=True)
         local_path = hf_hub_download(repo_id=MODEL_WEIGHTS_REPO_ID, filename=hf_filepath, local_dir=destination_dir)
@@ -176,8 +173,7 @@ def download_weights(destination_dir: str, hf_filepath: str) -> str:
 
 
 def download_and_extract_pdb_tarfiles(data_dir: str) -> None:
-    """
-    Downloads and extracts the PDB tarfiles from Hugging Face Hub.
+    """Downloads and extracts the PDB tarfiles from Hugging Face Hub.
 
     Args:
         data_dir (str): The top-level data dir in which to build the pdb file subdirectories
@@ -201,8 +197,7 @@ def download_and_extract_pdb_tarfiles(data_dir: str) -> None:
 
 
 def download_evaluation_data(data_dir: str) -> None:
-    """
-    Downloads and extracts the evaluation trajectories_subsampled from Hugging Face Hub.
+    """Downloads and extracts the evaluation trajectories_subsampled from Hugging Face Hub.
 
     Args:
         data_dir (str): The top-level data dir in which to build the evaluation data subdirectories

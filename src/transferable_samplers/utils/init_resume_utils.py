@@ -68,9 +68,9 @@ def augment_state_dict_for_teacher(
     student_prefix: str = "net.",
     teacher_prefix: str = "teacher.",
 ) -> dict[str, torch.Tensor]:
-    """
-    If teacher keys are missing but student keys exist, synthesize teacher keys
-    by copying tensors from the student keys. Returns a NEW dict.
+    """Synthesize teacher keys by copying from student keys if missing.
+
+    Returns a NEW dict.
     """
     has_student = any(k.startswith(student_prefix) for k in sd.keys())
     assert has_student, "Expected student keys in state dict when calling augment_state_dict_for_teacher."

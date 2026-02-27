@@ -88,7 +88,7 @@ class OpenMMEnergy:
         positions : torch.Tensor
             Positions with shape (batch, n_atoms * 3) or (batch, n_atoms, 3).
 
-        Returns
+        Returns:
         -------
         energies : np.ndarray
             Energies in kT units, shape (batch,).
@@ -137,7 +137,7 @@ class OpenMMEnergy:
         positions : torch.Tensor
             Positions with shape (..., n_atoms, 3) or (..., n_atoms * 3).
 
-        Returns
+        Returns:
         -------
         energies : torch.Tensor
             Energies in kT units, shape (batch,).

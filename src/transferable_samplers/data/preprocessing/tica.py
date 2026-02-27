@@ -76,7 +76,7 @@ class TicaModel:
         return x_centered @ self.projection[:, : self.dim]
 
     def transform(self, x: np.ndarray) -> np.ndarray:
-        """Compatibility with original tica code from deeptime"""
+        """Compatibility with original tica code from deeptime."""
         return self.forward(x)
 
 

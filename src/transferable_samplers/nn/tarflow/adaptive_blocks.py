@@ -35,8 +35,7 @@ except ImportError:
 # Code adapted from Lucidrain's implementation of AF3
 # https://github.com/lucidrains/alphafold3-pytorch
 class AdaptiveLayerNorm(torch.nn.Module):
-    """Adaptive layer norm layer, where scales and biases are learned from some
-    conditioning variables."""
+    """Adaptive layer norm layer, where scales and biases are learned from some conditioning variables."""
 
     def __init__(self, *, channels: int, channels_cond: int) -> None:
         super().__init__()
@@ -47,7 +46,8 @@ class AdaptiveLayerNorm(torch.nn.Module):
         self.to_beta = torch.nn.Linear(channels_cond, channels, bias=False)
 
     def forward(self, x: torch.Tensor, cond: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-        """
+        """Forward pass.
+
         Args:
             x: input representation, shape [*, dim]
             cond: conditioning variables, shape [*, dim_cond]
@@ -80,7 +80,8 @@ class AdaptiveLayerNormOutputScale(torch.nn.Module):
         self.to_adaln_zero_gamma = torch.nn.Sequential(adaln_zero_gamma_linear, torch.nn.Sigmoid())
 
     def forward(self, x: torch.Tensor, cond: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-        """
+        """Forward pass.
+
         Args:
             x: input sequence, shape [*, dim]
             cond: conditioning variables, shape [*, dim_cond]
@@ -99,7 +100,8 @@ class SwiGLU(torch.nn.Module):
     """SwiGLU layer."""
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
+        """Forward pass.
+
         Args:
             x: input tensor, shape [..., d]
 
@@ -131,7 +133,8 @@ class Transition(torch.nn.Module):
         self.linear_out = torch.nn.Linear(channels_inner, channels, bias=False)
 
     def forward(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-        """
+        """Forward pass.
+
         Args:
             x: Input sequence representation, shape [b, n, dim]
             mask: binary, shape [b, n]
@@ -146,12 +149,12 @@ class Transition(torch.nn.Module):
 
 
 class MultiHeadAttentionADALN(nn.Module):
-    """
+    """Pair biased multi-head self-attention with adaptive layer norm.
+
+    Applies adaptive layer norm to input and adaptive scaling to output.
+
     Adapted from Proteina:
         https://github.com/NVIDIA-Digital-Bio/proteina/blob/main/proteinfoundation/nn/protein_transformer.py
-
-    Pair biased multi-head self-attention with adaptive layer norm applied to input
-    and adaptive scaling applied to output.
     """
 
     def __init__(
@@ -187,7 +190,8 @@ class MultiHeadAttentionADALN(nn.Module):
         attn_temp: float = 1.0,
         which_cache: str = "cond",
     ) -> torch.Tensor:
-        """
+        """Forward pass.
+
         Args:
             x: Input sequence representation, shape [b, n, channels]
             cond: Conditioning variables, shape [b, n, channels]
@@ -210,8 +214,7 @@ class MultiHeadAttentionADALN(nn.Module):
 
 
 class TransitionADALN(torch.nn.Module):
-    """Transition layer with adaptive layer norm applied to input and adaptive
-    scaling applied to output."""
+    """Transition layer with adaptive layer norm applied to input and adaptive scaling applied to output."""
 
     def __init__(self, channels: int, channels_cond: int, expansion_factor: int = 4) -> None:
         super().__init__()
@@ -220,7 +223,8 @@ class TransitionADALN(torch.nn.Module):
         self.scale_output = AdaptiveLayerNormOutputScale(channels=channels, channels_cond=channels_cond)
 
     def forward(self, x: torch.Tensor, cond: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-        """
+        """Forward pass.
+
         Args:
             x: Input sequence representation, shape [b, n, dim]
             cond: conditioning variables, shape [b, n, dim_cond]
@@ -236,7 +240,9 @@ class TransitionADALN(torch.nn.Module):
 
 
 class AdaptiveAttnAndTransition(torch.nn.Module):
-    """Layer that applies mha and transition to a sequence representation. Both layers are their adaptive versions
+    """Layer that applies mha and transition to a sequence representation.
+
+    Both layers are their adaptive versions
     which rely on conditining variables (see above).
 
     Args:
@@ -316,7 +322,8 @@ class AdaptiveAttnAndTransition(torch.nn.Module):
         attn_temp: float = 1.0,
         which_cache: str = "cond",
     ) -> torch.Tensor:
-        """
+        """Forward pass.
+
         Args:
             x: Input sequence representation, shape [b, n, dim_token]
             cond: conditioning variables, shape [b, n, dim_cond]
