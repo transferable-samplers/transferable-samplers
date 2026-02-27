@@ -39,6 +39,6 @@ class TorchDynWrapper(torch.nn.Module):
             y = y.view(1, -1)  # batch dims required by EGNN architecture
             return self.model(t, y).flatten()
 
-        J = torch.func.jacrev(vecfield)
+        jac = torch.func.jacrev(vecfield)
         # pyrefly: ignore [bad-argument-type]
-        return torch.trace(J(x))
+        return torch.trace(jac(x))

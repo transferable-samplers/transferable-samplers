@@ -1,7 +1,7 @@
 from typing import Any
 
 import torch
-from scipy.spatial.transform import Rotation as R
+from scipy.spatial.transform import Rotation
 
 
 class Random3DRotationTransform:
@@ -22,7 +22,7 @@ class Random3DRotationTransform:
             x = x.unsqueeze(0)
 
         batch_size = x.shape[0]
-        rot = torch.tensor(R.random(batch_size).as_matrix()).to(x)
+        rot = torch.tensor(Rotation.random(batch_size).as_matrix()).to(x)
         x = torch.einsum("bij,bki->bkj", rot, x)
 
         if unbatched:

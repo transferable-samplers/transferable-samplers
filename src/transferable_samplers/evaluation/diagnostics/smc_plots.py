@@ -29,10 +29,10 @@ def _plot_weights_and_ess(
     # Plot logw trajectories from snapshots if available
     if trajectory:
         logw_list = [p.logw for p in trajectory]
-        A_np = torch.stack(logw_list).cpu().numpy()
+        logw_np = torch.stack(logw_list).cpu().numpy()
         traj_t = np.linspace(0, 1, len(trajectory))
-        for k in range(A_np.shape[1]):
-            axs[0].plot(traj_t, A_np[:, k], linewidth=1, alpha=0.5)
+        for k in range(logw_np.shape[1]):
+            axs[0].plot(traj_t, logw_np[:, k], linewidth=1, alpha=0.5)
     axs[0].set_xlabel("Time", fontsize=12)
     axs[0].set_ylabel("log w", fontsize=12)
 

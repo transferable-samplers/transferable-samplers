@@ -98,9 +98,10 @@ class Attention(torch.nn.Module):
         temp: float = 1.0,
         which_cache: str = "cond",
     ) -> torch.Tensor:
-        B, T, C = x.size()
+        batch, seq, chan = x.size()
         x = self.norm(x.float()).type(x.dtype)
-        q, k, v = self.qkv(x).reshape(B, T, 3 * self.num_heads, -1).transpose(1, 2).chunk(3, dim=1)  # (b, h, t, d)
+        # (b, h, t, d)
+        q, k, v = self.qkv(x).reshape(batch, seq, 3 * self.num_heads, -1).transpose(1, 2).chunk(3, dim=1)
 
         if self.sample:
             self.k_cache[which_cache].append(k)
@@ -112,7 +113,7 @@ class Attention(torch.nn.Module):
         if mask is not None:
             mask = mask.bool()
         x = torch.nn.functional.scaled_dot_product_attention(q, k, v, attn_mask=mask, scale=scale)
-        x = x.transpose(1, 2).reshape(B, T, C)
+        x = x.transpose(1, 2).reshape(batch, seq, chan)
         x = self.dropout(self.proj(x))
         return x
 
@@ -123,9 +124,9 @@ class Attention(torch.nn.Module):
         temp: float = 1.0,
         which_cache: str = "cond",
     ) -> torch.Tensor:
-        B, T, C = x.size()
+        batch, seq, chan = x.size()
         x = self.norm(x.float()).type(x.dtype)
-        q, k, v = self.qkv(x).reshape(B, T, 3 * self.num_heads, -1).chunk(3, dim=2)
+        q, k, v = self.qkv(x).reshape(batch, seq, 3 * self.num_heads, -1).chunk(3, dim=2)
         if self.sample:
             self.k_cache[which_cache].append(k)
             self.v_cache[which_cache].append(v)
@@ -137,7 +138,7 @@ class Attention(torch.nn.Module):
             attn = attn.masked_fill(mask.unsqueeze(-1) == 0, float("-inf"))
         attn = attn.float().softmax(dim=-2).type(attn.dtype)
         x = torch.einsum("bmnh,bnhd->bmhd", attn, v)
-        x = x.reshape(B, T, C)
+        x = x.reshape(batch, seq, chan)
         x = self.dropout(self.proj(x))
         return x
 
@@ -297,7 +298,7 @@ class MetaBlock(torch.nn.Module):
         x = self.permutation(x)
         pos_embed = self.permutation(self.pos_embed, dim=0)
         self.set_sample_mode(True)
-        T = x.size(1)
+        seq_len = x.size(1)
         # 512 x 8 x 1
         xs = [x[:, i] for i in range(x.size(1))]
         logdets = torch.zeros(x.shape[0], device=x.device)
@@ -306,7 +307,7 @@ class MetaBlock(torch.nn.Module):
             if guidance > 0 and guide_what:
                 za_u, zb_u = self.reverse_step(x, pos_embed, i, None, attn_temp=attn_temp, which_cache="uncond")
                 if annealed_guidance:
-                    g = (i + 1) / (T - 1) * guidance
+                    g = (i + 1) / (seq_len - 1) * guidance
                 else:
                     g = guidance
                 if "a" in guide_what:

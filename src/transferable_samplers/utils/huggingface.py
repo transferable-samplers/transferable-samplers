@@ -8,6 +8,7 @@ from huggingface_hub import hf_hub_download, snapshot_download
 
 # TODO repos currently hardcoded - slightly hard to remove hardcode from data as assumes repo structure
 REPO_ID = "transferable-samplers/many-peptides-md"
+MODEL_WEIGHTS_REPO_ID = "transferable-samplers/model-weights"
 
 TICA_MEAN_SHAPES = {
     "test": {
@@ -165,11 +166,9 @@ def download_weights(destination_dir: str, hf_filepath: str) -> str:
         hf_filepath (str): The filepath in the Hugging Face repo
     """
 
-    REPO_ID = "transferable-samplers/model-weights"
-
     try:
         Path(destination_dir).mkdir(parents=True, exist_ok=True)
-        local_path = hf_hub_download(repo_id=REPO_ID, filename=hf_filepath, local_dir=destination_dir)
+        local_path = hf_hub_download(repo_id=MODEL_WEIGHTS_REPO_ID, filename=hf_filepath, local_dir=destination_dir)
         print(f"Model weights downloaded successfully to {destination_dir}")
         return local_path
     except Exception as e:

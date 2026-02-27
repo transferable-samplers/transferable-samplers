@@ -72,8 +72,8 @@ class TicaModel:
         self.dim = dim
 
     def forward(self, x: np.ndarray) -> np.ndarray:
-        X_centered = x - self.mean
-        return X_centered @ self.projection[:, : self.dim]
+        x_centered = x - self.mean
+        return x_centered @ self.projection[:, : self.dim]
 
     def transform(self, x: np.ndarray) -> np.ndarray:
         """Compatibility with original tica code from deeptime"""

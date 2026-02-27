@@ -110,7 +110,7 @@ class Attention(torch.nn.Module):
         if (self.use_attn_pair_bias and not exists(pair)) or (not self.use_attn_pair_bias and exists(pair)):
             raise ValueError("pair must be provided if use_attn_pair_bias is True")
 
-        B, T, C = x.size()
+        batch, seq_len, channels = x.size()
         x = self.norm(x.float()).type(x.dtype)
         q, k, v = self.qkv(x).chunk(3, dim=-1)
         q = self.q_layer_norm(q)
@@ -148,7 +148,7 @@ class Attention(torch.nn.Module):
         x = torch.nn.functional.scaled_dot_product_attention(
             q, k, v, attn_mask=mask, scale=scale, dropout_p=self.dropout if self.training else 0.0
         )
-        x = x.transpose(1, 2).reshape(B, T, C)
+        x = x.transpose(1, 2).reshape(batch, seq_len, channels)
         x = self.proj(x)
         return x
 

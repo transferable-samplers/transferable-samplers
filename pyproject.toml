@@ -85,7 +85,6 @@ ignore = [
     "E731",   # assigning a lambda to a variable (stylistic preference)
     "S101",   # use of assert (allowed in your code)
     "COM812", # trailing comma - conflicts with ruff formatter
-    "N817",   # CamelCase imported as acronym (e.g. Rotation as R)
     "ANN401", # dynamically typed expressions (Any) are disallowed - too strict for this codebase
 ]
 
@@ -99,13 +98,8 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+))$"
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S", "ANN"]
 "scripts/**" = ["S", "ANN"]
-"src/transferable_samplers/nn/tarflow/**" = ["N806"]
 "src/transferable_samplers/samplers/**" = ["N803", "N806"]
-"src/transferable_samplers/evaluation/**" = ["N806"]
-"src/transferable_samplers/data/**" = ["N806"]
-"src/transferable_samplers/nn/wrappers.py" = ["N806"]
 "src/transferable_samplers/utils/dataclasses.py" = ["N806"]
-"src/transferable_samplers/utils/huggingface.py" = ["N806"]
 
 [tool.ruff.lint.flake8-annotations]
 allow-star-arg-any = true
