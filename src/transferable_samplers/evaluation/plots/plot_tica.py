@@ -1,9 +1,15 @@
+from __future__ import annotations
+
 import logging
+from collections.abc import Callable
+from typing import Any
 
 import matplotlib
 import matplotlib.pyplot as plt
 import mdtraj as md
+import numpy as np
 import torch
+from matplotlib.axes import Axes
 from matplotlib.colors import LogNorm
 
 from transferable_samplers.data.preprocessing.tica import tica_features
@@ -12,7 +18,7 @@ matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
 
 
-def plot_tic01(ax, tics, tics_lims, cmap="viridis"):
+def plot_tic01(ax: Axes, tics: np.ndarray, tics_lims: np.ndarray, cmap: str = "viridis") -> Axes:
     _ = ax.hist2d(tics[:, 0], tics[:, 1], bins=100, norm=LogNorm(), cmap=cmap, rasterized=True)
     ax.set_xlabel("TIC0", fontsize=45)
     ax.set_ylabel("TIC1", fontsize=45)
@@ -23,7 +29,9 @@ def plot_tic01(ax, tics, tics_lims, cmap="viridis"):
     return ax
 
 
-def plot_tica(log_image_fn, samples, topology, tica_model, prefix=""):
+def plot_tica(
+    log_image_fn: Callable[[Any, str], None], samples: torch.Tensor, topology: Any, tica_model: Any, prefix: str = ""
+) -> None:
     logging.info(f"Plotting TICA for {prefix}")
 
     pred_traj_samples = md.Trajectory(samples.cpu().numpy(), topology=topology)

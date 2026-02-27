@@ -1,15 +1,24 @@
+from __future__ import annotations
+
 import torch
 
 from transferable_samplers.samplers.smc.smc_particles import SMCParticles, merge_particles
 from transferable_samplers.utils.dataclasses import SourceEnergy, TargetEnergy
 
 
-def linear_interpolation(source: torch.Tensor, target: torch.Tensor, t) -> torch.Tensor:
+def linear_interpolation(source: torch.Tensor, target: torch.Tensor, t: float | torch.Tensor) -> torch.Tensor:
     """(1-t)*source + t*target."""
     return (1 - t) * source + t * target
 
 
-def langevin_proposal(particles: SMCParticles, source: SourceEnergy, target: TargetEnergy, t, dt, eps):
+def langevin_proposal(
+    particles: SMCParticles,
+    source: SourceEnergy,
+    target: TargetEnergy,
+    t: float | torch.Tensor,
+    dt: float | torch.Tensor,
+    eps: float,
+) -> SMCParticles:
     """Langevin proposal + SMC weight update. Returns particles with energies/grads at x'."""
     h = eps * dt
     E_interp_grad = linear_interpolation(particles.E_source_grad, particles.E_target_grad, t)
@@ -34,7 +43,9 @@ def langevin_proposal(particles: SMCParticles, source: SourceEnergy, target: Tar
     )
 
 
-def metropolis_accept(current: SMCParticles, proposal: SMCParticles, t, dt, eps):
+def metropolis_accept(
+    current: SMCParticles, proposal: SMCParticles, t: float | torch.Tensor, dt: float | torch.Tensor, eps: float
+) -> tuple[SMCParticles, torch.Tensor]:
     """MH accept/reject for a Langevin proposal, correcting for kernel asymmetry q(x'|x) vs q(x|x').
 
     The log-acceptance ratio is:
@@ -81,11 +92,11 @@ def mcmc_kernel(
     particles: SMCParticles,
     source: SourceEnergy,
     target: TargetEnergy,
-    t,
-    dt,
-    eps,
+    t: float | torch.Tensor,
+    dt: float | torch.Tensor,
+    eps: float,
     use_metropolis: bool = False,
-):
+) -> tuple[SMCParticles, torch.Tensor]:
     """One MCMC step: Langevin proposal, optionally followed by MH correction."""
     proposed = langevin_proposal(particles, source, target, t, dt, eps)
 

@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 from collections import defaultdict
 from itertools import product
 from pathlib import Path
+from typing import Any
 
 import torch
 import yaml
@@ -35,8 +38,13 @@ def standardize_atom_name(atom_name: str, aa_name: str) -> str:
 
 
 def get_permutation(
-    permutations_definition_dict, topology, sequence_ordering, global_type, sidechain_variant, residue_cache=None
-):
+    permutations_definition_dict: dict[str, Any],
+    topology: Any,
+    sequence_ordering: str,
+    global_type: str,
+    sidechain_variant: str,
+    residue_cache: dict[str, Any] | None = None,
+) -> torch.Tensor:
     # Validate input strategy options
     if sequence_ordering not in ["n2c", "c2n"]:
         raise ValueError(f"Unknown sequence ordering: {sequence_ordering}")
@@ -221,7 +229,7 @@ def get_permutation(
     return permutation
 
 
-def get_permutations_dict(topology_dict):
+def get_permutations_dict(topology_dict: dict[str, Any]) -> dict[str, dict[str, torch.Tensor]]:
     # Load the permutations definition from YAML file
     permutations_definition_dict = load_yaml_as_dict(Path(__file__).parent / "permutations.yaml")
 

@@ -9,17 +9,20 @@
 # Modifications Copyright (c) 2025 transferable-samplers contributors
 # Licensed under the MIT License (see LICENSE in the repository root).
 # -------------------------------------------------------------------------
+from __future__ import annotations
 
 import logging
+from typing import Any
 
 import deeptime as dt
 import mdtraj as md
 import numpy as np
+import torch
 
 SELECTION = "symbol == C or symbol == N or symbol == S"
 
 
-def _compute_distances(xyz):
+def _compute_distances(xyz: np.ndarray) -> np.ndarray:
     distance_matrix_ca = np.linalg.norm(xyz[:, None, :, :] - xyz[:, :, None, :], axis=-1)
     n_ca = distance_matrix_ca.shape[-1]
     m, n = np.triu_indices(n_ca, k=1)
@@ -27,11 +30,13 @@ def _compute_distances(xyz):
     return distances_ca
 
 
-def wrap(array):
+def wrap(array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return (np.sin(array), np.cos(array))
 
 
-def tica_features(trajectory, use_dihedrals=True, use_distances=True, selection=SELECTION):
+def tica_features(
+    trajectory: md.Trajectory, use_dihedrals: bool = True, use_distances: bool = True, selection: str = SELECTION
+) -> np.ndarray | list[Any]:
     if trajectory.topology.n_residues == 8:
         logging.warning("The 8AA TICA models no longer use the CA-only selection, aligning with the 2AA / 4AA models.")
     trajectory = trajectory.atom_slice(trajectory.top.select(selection))
@@ -58,24 +63,24 @@ def tica_features(trajectory, use_dihedrals=True, use_distances=True, selection=
 class TicaModel:
     def __init__(
         self,
-        projection,
-        mean,
-        dim=2,
-    ):
+        projection: np.ndarray,
+        mean: np.ndarray,
+        dim: int | np.ndarray = 2,
+    ) -> None:
         self.projection = projection
         self.mean = mean
         self.dim = dim
 
-    def forward(self, x):
+    def forward(self, x: np.ndarray) -> np.ndarray:
         X_centered = x - self.mean
         return X_centered @ self.projection[:, : self.dim]
 
-    def transform(self, x):
+    def transform(self, x: np.ndarray) -> np.ndarray:
         """Compatibility with original tica code from deeptime"""
         return self.forward(x)
 
 
-def _run_tica_cns(trajectory, lagtime=100, dim=2):
+def _run_tica_cns(trajectory: md.Trajectory, lagtime: int = 100, dim: int = 2) -> Any:
     ca_features = tica_features(trajectory)
     tica = dt.decomposition.TICA(dim=dim, lagtime=lagtime)
     koopman_estimator = dt.covariance.KoopmanWeightingEstimator(lagtime=lagtime)
@@ -84,7 +89,7 @@ def _run_tica_cns(trajectory, lagtime=100, dim=2):
     return tica_model
 
 
-def get_tica_model(data, topology):
+def get_tica_model(data: torch.Tensor, topology: md.Topology) -> Any:
     traj_samples = md.Trajectory(data, topology=topology)
 
     tica_model = _run_tica_cns(traj_samples, lagtime=100, dim=2)

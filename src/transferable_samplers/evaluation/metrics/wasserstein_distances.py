@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import math
-from typing import Literal
+from typing import Any, Literal
 
 import mdtraj as md
 import numpy as np
@@ -9,7 +11,7 @@ import torch
 from transferable_samplers.data.preprocessing.tica import tica_features
 
 
-def _wasserstein_distance(x0, x1, power: Literal[1, 2] = 2):
+def _wasserstein_distance(x0: torch.Tensor, x1: torch.Tensor, power: Literal[1, 2] = 2) -> float:
     """Wasserstein distance between two point clouds.
 
     Args:
@@ -33,7 +35,9 @@ def _wasserstein_distance(x0, x1, power: Literal[1, 2] = 2):
     return ret
 
 
-def _torus_wasserstein_distance(x0, x1, power: Literal[1, 2] = 2):
+def _torus_wasserstein_distance(
+    x0: np.ndarray | torch.Tensor, x1: np.ndarray | torch.Tensor, power: Literal[1, 2] = 2
+) -> float:
     """Wasserstein distance on the torus (circular/wrapped distances).
 
     Args:
@@ -60,7 +64,7 @@ def _torus_wasserstein_distance(x0, x1, power: Literal[1, 2] = 2):
     return ret
 
 
-def _get_phi_psi_vectors(samples, topology):
+def _get_phi_psi_vectors(samples: torch.Tensor, topology: Any) -> tuple[np.ndarray, np.ndarray]:
     """Extract phi/psi dihedral angles from samples."""
     samples = samples.cpu()
     traj = md.Trajectory(samples, topology=topology)
@@ -69,7 +73,7 @@ def _get_phi_psi_vectors(samples, topology):
     return phis, psis
 
 
-def energy_wasserstein(pred_energy, true_energy, prefix=""):
+def energy_wasserstein(pred_energy: torch.Tensor, true_energy: torch.Tensor, prefix: str = "") -> dict[str, float]:
     """Compute energy W1 and W2 distances between predicted and true energy distributions."""
     pred = pred_energy.cpu().numpy()
     true = true_energy.cpu().numpy()
@@ -80,7 +84,9 @@ def energy_wasserstein(pred_energy, true_energy, prefix=""):
     }
 
 
-def torus_wasserstein(true_samples, pred_samples, topology, prefix=""):
+def torus_wasserstein(
+    true_samples: torch.Tensor, pred_samples: torch.Tensor, topology: Any, prefix: str = ""
+) -> dict[str, float]:
     """Compute torus Wasserstein W2 on phi/psi dihedral angles."""
     phis_true, psis_true = _get_phi_psi_vectors(true_samples, topology)
     x_true = torch.cat([torch.from_numpy(phis_true), torch.from_numpy(psis_true)], dim=1)
@@ -93,7 +99,9 @@ def torus_wasserstein(true_samples, pred_samples, topology, prefix=""):
     }
 
 
-def tica_wasserstein(true_samples, pred_samples, topology, tica_model, prefix=""):
+def tica_wasserstein(
+    true_samples: torch.Tensor, pred_samples: torch.Tensor, topology: Any, tica_model: Any, prefix: str = ""
+) -> dict[str, float]:
     """Compute Wasserstein W2 on TICA coordinates."""
     true_traj = md.Trajectory(true_samples.cpu().numpy(), topology=topology)
     pred_traj = md.Trajectory(pred_samples.cpu().numpy(), topology=topology)

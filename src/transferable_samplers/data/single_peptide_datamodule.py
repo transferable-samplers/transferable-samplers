@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 
@@ -37,7 +39,7 @@ class SinglePeptideDataModule(BaseDataModule):
         train_from_buffer: bool = False,
         sequence: str = "",
         temperature: float = 310.0,
-    ):
+    ) -> None:
         super().__init__(
             data_dir=data_dir,
             num_dimensions=num_dimensions,
@@ -67,7 +69,7 @@ class SinglePeptideDataModule(BaseDataModule):
         self.val_sequences = [self.sequence]
         self.test_sequences = [self.sequence]
 
-    def prepare_data(self):
+    def prepare_data(self) -> None:
         """Download + preprocessing data. Lightning ensures that `self.prepare_data()` is called only
         within a single process on CPU, so you can safely add your downloading logic within. In
         case of multi-node training, the execution of this hook depends upon
@@ -206,7 +208,7 @@ class SinglePeptideDataModule(BaseDataModule):
             topology=self.topology,
         )
 
-    def _setup_potential(self):
+    def _setup_potential(self) -> OpenMMEnergy:
         """
         Set up the OpenMM potential energy function.
 

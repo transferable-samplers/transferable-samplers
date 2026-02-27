@@ -1,12 +1,16 @@
+from __future__ import annotations
+
 import copy
 from functools import partial
+from typing import Any
 
 import torch
 from torchdyn.core import NeuralODE
 
 from transferable_samplers.models.base_lightning_module import BaseLightningModule
+from transferable_samplers.models.priors.prior import Prior
 from transferable_samplers.nn.wrappers import TorchDynWrapper
-from transferable_samplers.utils.dataclasses import SystemCond
+from transferable_samplers.utils.dataclasses import SourceEnergyConfig, SystemCond
 from transferable_samplers.utils.pylogger import RankedLogger
 
 logger = RankedLogger(__name__, rank_zero_only=False)
@@ -21,9 +25,9 @@ class FlowMatchingModule(BaseLightningModule):
         optimizer: torch.optim.Optimizer,
         # pyrefly: ignore [not-a-type]
         scheduler: torch.optim.lr_scheduler,
-        prior,
+        prior: Prior,
         compile_net: bool = False,
-        source_energy_config=None,
+        source_energy_config: SourceEnergyConfig | None = None,
         train_from_buffer: bool = False,
         mean_free_prior: bool = True,
         sigma: float = 0.0,
@@ -52,7 +56,7 @@ class FlowMatchingModule(BaseLightningModule):
         self.nfe = 0
         self.num_integrations = 0
 
-    def training_step(self, batch, batch_idx: int) -> torch.Tensor:
+    def training_step(self, batch: dict[str, Any], batch_idx: int) -> torch.Tensor:
         if self.train_from_buffer:
             # pyrefly: ignore [missing-attribute]
             batch = self._buffer.sample(batch["x"].shape[0])
@@ -134,12 +138,19 @@ class FlowMatchingModule(BaseLightningModule):
         return -logq  # energy is negative log probability
 
     # pyrefly: ignore [bad-override]
-    def forward(self, t: torch.Tensor, x: torch.Tensor, encodings, mask) -> torch.Tensor:
+    def forward(
+        self, t: torch.Tensor, x: torch.Tensor, encodings: dict[str, torch.Tensor] | None, mask: torch.Tensor | None
+    ) -> torch.Tensor:
         return self.net(t, x, encodings=encodings, node_mask=mask)
 
     def _integrate(
-        self, net: torch.nn.Module, x: torch.Tensor, encodings=None, reverse=False, compute_dlogp=True
-    ) -> torch.Tensor:
+        self,
+        net: torch.nn.Module,
+        x: torch.Tensor,
+        encodings: dict[str, torch.Tensor] | None = None,
+        reverse: bool = False,
+        compute_dlogp: bool = True,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         batch_size = x.shape[0]
         num_atoms = x.shape[1]
 
@@ -180,7 +191,9 @@ class FlowMatchingModule(BaseLightningModule):
         # pyrefly: ignore [bad-return]
         return x, dlogp_out.view(-1)
 
-    def _get_xt(self, x0, x1, t, mask=None):
+    def _get_xt(
+        self, x0: torch.Tensor, x1: torch.Tensor, t: torch.Tensor, mask: torch.Tensor | None = None
+    ) -> torch.Tensor:
         mu_t = (1.0 - t) * x0 + t * x1
 
         if not self.sigma == 0.0:
@@ -197,6 +210,6 @@ class FlowMatchingModule(BaseLightningModule):
 
         return xt
 
-    def _get_flow_targets(self, x0, x1):
+    def _get_flow_targets(self, x0: torch.Tensor, x1: torch.Tensor) -> torch.Tensor:
         vt_flow = x1 - x0
         return vt_flow

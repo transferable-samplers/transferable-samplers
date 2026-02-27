@@ -47,17 +47,21 @@
 # Licensed under the MIT License (see LICENSE in the repository root).
 # -------------------------------------------------------------------------
 
+from __future__ import annotations
+
+from typing import Any
+
 import torch
 from einops import rearrange
 from torch import einsum
 
 
-def exists(val) -> bool:
+def exists(val: Any) -> bool:
     """returns whether val is not none"""
     return val is not None
 
 
-def default(x, y):
+def default(x: Any, y: Any) -> Any:
     """returns x if it exists, otherwise y"""
     return x if exists(x) else y
 
@@ -75,7 +79,7 @@ class Attention(torch.nn.Module):
         use_attn_pair_bias: bool = False,  # false for consistency with tarflow.py
         use_qkln: bool = False,  # false for consistency with tarflow.py
         dropout: float = 0.0,
-    ):
+    ) -> None:
         assert in_channels % head_channels == 0
         super().__init__()
         self.norm = torch.nn.LayerNorm(in_channels)
@@ -97,12 +101,12 @@ class Attention(torch.nn.Module):
 
     def forward_spda(
         self,
-        x,
+        x: torch.Tensor,
         pair: torch.Tensor | None = None,
         mask: torch.Tensor | None = None,
         temp: float = 1.0,
         which_cache: str = "cond",
-    ):
+    ) -> torch.Tensor:
         if (self.use_attn_pair_bias and not exists(pair)) or (not self.use_attn_pair_bias and exists(pair)):
             raise ValueError("pair must be provided if use_attn_pair_bias is True")
 
@@ -150,12 +154,12 @@ class Attention(torch.nn.Module):
 
     def forward_base(
         self,
-        x,
+        x: torch.Tensor,
         pair: torch.Tensor | None = None,
         mask: torch.Tensor | None = None,
         temp: float = 1.0,
         which_cache: str = "cond",
-    ):
+    ) -> torch.Tensor:
         if (self.use_attn_pair_bias and not exists(pair)) or (not self.use_attn_pair_bias and exists(pair)):
             print(self.use_attn_pair_bias, exists(pair))
             raise ValueError("pair must be provided if use_attn_pair_bias is True")
@@ -186,7 +190,15 @@ class Attention(torch.nn.Module):
         x = self.proj(x)
         return x
 
-    def _attn(self, q, k, v, bias, mask: torch.Tensor | None = None, temp: float = 1.0):
+    def _attn(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        bias: torch.Tensor | float,
+        mask: torch.Tensor | None = None,
+        temp: float = 1.0,
+    ) -> torch.Tensor:
         """Perform attention update"""
         scale = self.sqrt_scale**2 / temp
         sim = einsum("b h i d, b h j d -> b h i j", q, k) * scale
@@ -204,12 +216,12 @@ class Attention(torch.nn.Module):
 
     def forward(
         self,
-        x,
+        x: torch.Tensor,
         pair: torch.Tensor | None = None,
         mask: torch.Tensor | None = None,
         temp: float = 1.0,
         which_cache: str = "cond",
-    ):
+    ) -> torch.Tensor:
         if self.USE_SPDA:
             return self.forward_spda(x, pair=pair, mask=mask, temp=temp, which_cache=which_cache)
 
@@ -217,7 +229,7 @@ class Attention(torch.nn.Module):
 
 
 class MLP(torch.nn.Module):
-    def __init__(self, channels: int, expansion: int):
+    def __init__(self, channels: int, expansion: int) -> None:
         super().__init__()
         self.norm = torch.nn.LayerNorm(channels)
         self.main = torch.nn.Sequential(
@@ -239,8 +251,8 @@ class AttentionBlock(torch.nn.Module):
         use_qkln: bool = False,
         use_attn_pair_bias: bool = True,
         dropout: float = 0.0,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         super().__init__()
         self.attention = Attention(
             in_channels=channels,

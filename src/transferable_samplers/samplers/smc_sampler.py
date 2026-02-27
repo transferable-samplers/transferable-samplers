@@ -26,6 +26,10 @@ Proposition 1 of https://arxiv.org/pdf/2410.02711
 Appendix D.2 of https://arxiv.org/pdf/2508.18175
 """
 
+from __future__ import annotations
+
+from typing import Any
+
 import torch
 
 from transferable_samplers.evaluation.metrics.ess import normalized_ess
@@ -67,7 +71,7 @@ class SMCSampler(BaseSampler):
         energy_cutoff_filter: float | None = None,
         logw_quantile_filter: float | None = None,
         log_traj_freq: int = 10,
-    ):
+    ) -> None:
         super().__init__(num_samples)
         logger.warning(
             "init_eps has replaced langevin_eps, and has been reparameterized such that langevin_eps = init_eps * dt"
@@ -89,7 +93,7 @@ class SMCSampler(BaseSampler):
         self,
         source_energy: SourceEnergy,
         target_energy: TargetEnergy,
-    ) -> dict[str, SamplesData]:
+    ) -> tuple[dict[str, SamplesData], dict[str, Any]]:
         # Generate proposal
         world_size = get_world_size()
         loc_num_samples = self.num_samples // world_size
@@ -213,7 +217,7 @@ class SMCSampler(BaseSampler):
         return {"proposal": proposal_data, "smc": smc_data}, {"trajectory": trajectory, "diagnostics": diagnostics}
 
     @staticmethod
-    def _adapt_eps(eps, acceptance_rate):
+    def _adapt_eps(eps: float, acceptance_rate: float | torch.Tensor) -> float:
         """Adapt eps based on acceptance rate."""
         if acceptance_rate > 0.6:
             return eps * 1.1

@@ -47,13 +47,17 @@
 # Licensed under the MIT License (see LICENSE in the repository root).
 # -------------------------------------------------------------------------
 
+from __future__ import annotations
+
+from typing import Any
+
 import torch
 
 # TODO legacy code from SBG project - refactor into tarflow.py
 
 
 class Permutation(torch.nn.Module):
-    def __init__(self, seq_length: int):
+    def __init__(self, seq_length: int) -> None:
         super().__init__()
         self.seq_length = seq_length
 
@@ -74,7 +78,7 @@ class PermutationFlip(Permutation):
 class Attention(torch.nn.Module):
     USE_SPDA: bool = True
 
-    def __init__(self, in_channels: int, head_channels: int, dropout: float = 0.0):
+    def __init__(self, in_channels: int, head_channels: int, dropout: float = 0.0) -> None:
         assert in_channels % head_channels == 0
         super().__init__()
         self.norm = torch.nn.LayerNorm(in_channels)
@@ -150,7 +154,7 @@ class Attention(torch.nn.Module):
 
 
 class MLP(torch.nn.Module):
-    def __init__(self, channels: int, expansion: int, dropout: float = 0.0):
+    def __init__(self, channels: int, expansion: int, dropout: float = 0.0) -> None:
         super().__init__()
         self.norm = torch.nn.LayerNorm(channels)
         self.main = torch.nn.Sequential(
@@ -165,7 +169,7 @@ class MLP(torch.nn.Module):
 
 
 class AttentionBlock(torch.nn.Module):
-    def __init__(self, channels: int, head_channels: int, expansion: int = 4, dropout: float = 0.0):
+    def __init__(self, channels: int, head_channels: int, expansion: int = 4, dropout: float = 0.0) -> None:
         super().__init__()
         self.attention = Attention(channels, head_channels, dropout=dropout)
         self.mlp = MLP(channels, expansion, dropout=dropout)
@@ -197,7 +201,7 @@ class MetaBlock(torch.nn.Module):
         nvp: bool = True,
         num_classes: int = 0,
         dropout: float = 0.0,
-    ):
+    ) -> None:
         super().__init__()
         self.proj_in = torch.nn.Linear(in_channels, channels)
         self.pos_embed = torch.nn.Parameter(torch.randn(num_patches, channels) * 1e-2)
@@ -274,7 +278,7 @@ class MetaBlock(torch.nn.Module):
             xa = torch.zeros_like(x)
         return xa, xb
 
-    def set_sample_mode(self, flag: bool = True):
+    def set_sample_mode(self, flag: bool = True) -> None:
         for m in self.modules():
             if isinstance(m, Attention):
                 m.sample = flag
@@ -330,9 +334,9 @@ class TarFlow(torch.nn.Module):
         nvp: bool = True,
         num_classes: int = 0,
         dropout: float = 0.0,
-        *args,
-        **kwargs,
-    ):
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
         super().__init__()
         self.img_size = img_size
         self.patch_size = patch_size
@@ -363,7 +367,7 @@ class TarFlow(torch.nn.Module):
             assert not self.img_size % self.in_channels
 
     def forward(
-        self, x: torch.Tensor, y: torch.Tensor | None = None, *args, **kwargs
+        self, x: torch.Tensor, y: torch.Tensor | None = None, *args: Any, **kwargs: Any
     ) -> tuple[torch.Tensor, list[torch.Tensor], torch.Tensor]:
         original_channels = x.shape[-1]
         if self.in_channels != original_channels:
@@ -386,8 +390,8 @@ class TarFlow(torch.nn.Module):
         attn_temp: float = 1.0,
         annealed_guidance: bool = False,
         return_sequence: bool = False,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> tuple[torch.Tensor, torch.Tensor] | list[torch.Tensor]:
         seq = [x.detach().clone()]
         original_channels = x.shape[-1]

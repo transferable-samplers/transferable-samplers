@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any
+
 import numpy as np
 import torch
 import webdataset as wds
@@ -10,9 +14,9 @@ def build_webdataset(
     shuffle_buffer: int = 1000,
     num_aa_min: int | None = None,
     num_aa_max: int | None = None,
-    transform=None,
-):
-    def make_sample(sample):
+    transform: Any | None = None,
+) -> wds.WebDataset:
+    def make_sample(sample: tuple[str, bytes]) -> dict[str, Any]:
         key, x = sample
         sequence = key.split("_")[0]
         x = np.frombuffer(x, dtype=np.float32).reshape(-1, num_dimensions)
@@ -22,7 +26,7 @@ def build_webdataset(
             sample_dict = transform(sample_dict)
         return sample_dict
 
-    def seq_len_filter(sample):
+    def seq_len_filter(sample: tuple[str, bytes]) -> bool:
         seq_len = len(sample[0].split("_")[0])
         if num_aa_min is not None and seq_len < num_aa_min:
             return False

@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 import os
+from typing import Any
 
 import numpy as np
 import torch
 
 
-def _to_numpy(x, dtype=np.float64):
+def _to_numpy(x: torch.Tensor, dtype: type = np.float64) -> np.ndarray:
     """Convert a torch.Tensor to a numpy array."""
     return x.detach().cpu().numpy().astype(dtype)
 
@@ -14,7 +17,7 @@ class _OpenMMEnergyGrad(torch.autograd.Function):
 
     @staticmethod
     # pyrefly: ignore [bad-override]
-    def forward(ctx, positions, evaluator):
+    def forward(ctx: Any, positions: torch.Tensor, evaluator: OpenMMEnergy) -> torch.Tensor:
         energies, forces = evaluator._compute(positions)
         neg_forces = torch.tensor(-forces, device=positions.device, dtype=positions.dtype)
         ctx.save_for_backward(neg_forces)
@@ -22,7 +25,7 @@ class _OpenMMEnergyGrad(torch.autograd.Function):
 
     @staticmethod
     # pyrefly: ignore [bad-override]
-    def backward(ctx, grad_output):
+    def backward(ctx: Any, grad_output: torch.Tensor) -> tuple[torch.Tensor, None]:
         (neg_forces,) = ctx.saved_tensors
         # grad_output is (batch, 1); neg_forces may be (batch, n_atoms, 3)
         if neg_forces.ndim == 3:
@@ -49,7 +52,9 @@ class OpenMMEnergy:
         GPU device index for CUDA platform. Ignored for CPU.
     """
 
-    def __init__(self, system, integrator, platform_name="CPU", device_index=None):
+    def __init__(
+        self, system: Any, integrator: Any, platform_name: str = "CPU", device_index: int | None = None
+    ) -> None:
         # pyrefly: ignore [missing-module-attribute]
         from openmm import Context, Platform, unit
 
@@ -72,10 +77,10 @@ class OpenMMEnergy:
         self._context = Context(system, integrator, platform, properties)
 
     @property
-    def n_atoms(self):
+    def n_atoms(self) -> int:
         return self._system.getNumParticles()
 
-    def _compute(self, positions):
+    def _compute(self, positions: torch.Tensor) -> tuple[np.ndarray, np.ndarray]:
         """Compute energies and forces for a batch of positions.
 
         Parameters
@@ -124,7 +129,7 @@ class OpenMMEnergy:
 
         return energies, forces
 
-    def __call__(self, positions):
+    def __call__(self, positions: torch.Tensor) -> torch.Tensor:
         """Compute energies for a batch of positions.
 
         Parameters

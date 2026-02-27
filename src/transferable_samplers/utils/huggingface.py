@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import tarfile
 from pathlib import Path
@@ -135,7 +137,7 @@ TICA_MEAN_SHAPES = {
 }
 
 
-def safe_extract_tar(tar_path, extraction_path):
+def safe_extract_tar(tar_path: str, extraction_path: str) -> None:
     """
     Safely extracts a tar archive to the given path.
 
@@ -174,7 +176,7 @@ def download_weights(destination_dir: str, hf_filepath: str) -> str:
         print(f"Failed to download model weights: {e}")
 
 
-def download_and_extract_pdb_tarfiles(data_dir: str):
+def download_and_extract_pdb_tarfiles(data_dir: str) -> None:
     """
     Downloads and extracts the PDB tarfiles from Hugging Face Hub.
 
@@ -199,7 +201,7 @@ def download_and_extract_pdb_tarfiles(data_dir: str):
         logging.info(f"PDB tarfiles already present in {data_dir}")
 
 
-def download_evaluation_data(data_dir: str):
+def download_evaluation_data(data_dir: str) -> None:
     """
     Downloads and extracts the evaluation trajectories_subsampled from Hugging Face Hub.
 

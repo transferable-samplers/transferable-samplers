@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any
+
 import torch
 from tqdm import tqdm
 
@@ -106,7 +110,7 @@ AA_CODE_CONVERSION = {
 }
 
 
-def get_encodings(topology):
+def get_encodings(topology: Any) -> dict[str, torch.Tensor]:
     aa_pos_encodings = []
     aa_type_encodings = []
     atom_type_encodings = []
@@ -152,7 +156,7 @@ def get_encodings(topology):
     return encodings
 
 
-def get_encodings_dict(topology_dict):
+def get_encodings_dict(topology_dict: dict[str, Any]) -> dict[str, dict[str, torch.Tensor]]:
     encodings_dict = {}
 
     for _i, (sequence, topology) in tqdm(

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -12,7 +14,7 @@ class BaseSampler(ABC):
     - target_energy: TargetEnergy with energy() callable.
     """
 
-    def __init__(self, num_samples: int):
+    def __init__(self, num_samples: int) -> None:
         self.num_samples = num_samples
 
     @abstractmethod

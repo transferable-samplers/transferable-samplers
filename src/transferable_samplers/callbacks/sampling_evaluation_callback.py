@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 from functools import partial
 from pathlib import Path
+from typing import Any
 
 import matplotlib.pyplot as plt
 import torch
 import torch.utils._pytree as pytree
-from lightning import Callback
+from lightning import Callback, LightningModule, Trainer
 
 from transferable_samplers.evaluation.diagnostics.smc_plots import plot_smc_diagnostics
 from transferable_samplers.evaluation.evaluator import PeptideEnsembleEvaluator
@@ -31,24 +34,24 @@ class SamplingEvaluationCallback(Callback):
         self,
         evaluator: PeptideEnsembleEvaluator,
         sampler: BaseSampler | None = None,
-        run_diagnostics_kwargs: dict | None = None,
+        run_diagnostics_kwargs: dict[str, Any] | None = None,
         output_dir: str = "",
-    ):
+    ) -> None:
         super().__init__()
         self.evaluator = evaluator
         self.sampler = sampler
         self.run_diagnostics_kwargs = run_diagnostics_kwargs or {}
         self.output_dir = output_dir
 
-    def on_validation_epoch_end(self, trainer, pl_module):
+    def on_validation_epoch_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
         self.evaluate(trainer, pl_module, "val")
         logger.info("Validation evaluation complete")
 
-    def on_test_epoch_end(self, trainer, pl_module):
+    def on_test_epoch_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
         self.evaluate(trainer, pl_module, "test")
         logger.info("Test evaluation complete")
 
-    def evaluate(self, trainer, pl_module, prefix):
+    def evaluate(self, trainer: Trainer, pl_module: LightningModule, prefix: str) -> None:
         if self.sampler is None:
             return
 
@@ -57,7 +60,7 @@ class SamplingEvaluationCallback(Callback):
 
         base_log_image_fn = make_log_image_fn(trainer)
 
-        all_metrics = {}
+        all_metrics: dict[str, Any] = {}
         for sequence in eval_sequences:
             eval_ctx = datamodule.prepare_eval(sequence=sequence, stage=prefix)
             logger.info(f"Evaluating {sequence} samples")
@@ -108,7 +111,7 @@ class SamplingEvaluationCallback(Callback):
             mean_metrics = compute_mean_metrics(all_metrics, prefix=prefix)
             pl_module.log_dict(mean_metrics)
 
-    def _save_samples(self, seq_prefix: str, samples_dict: dict, diagnostics) -> None:
+    def _save_samples(self, seq_prefix: str, samples_dict: dict[str, Any], diagnostics: Any) -> None:
         """Save samples_dict and diagnostics to disk under output_dir/seq_prefix/."""
         if not self.output_dir:
             return

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import torch
 from torch.distributions import Normal
 
@@ -5,7 +7,7 @@ from transferable_samplers.models.priors.prior import Prior
 
 
 class NormalDistribution(Prior):
-    def __init__(self, num_dimensions: int = 3, mean: float = 0.0, std: float = 1.0, mean_free: bool = False):
+    def __init__(self, num_dimensions: int = 3, mean: float = 0.0, std: float = 1.0, mean_free: bool = False) -> None:
         self.num_dimensions = num_dimensions
         self.mean = mean
         self.std = std
@@ -13,7 +15,9 @@ class NormalDistribution(Prior):
 
         self.distribution = Normal(mean, std)
 
-    def sample(self, num_samples: int, num_atoms: int, mask: torch.Tensor | None = None, device="cpu") -> torch.Tensor:
+    def sample(
+        self, num_samples: int, num_atoms: int, mask: torch.Tensor | None = None, device: str | torch.device = "cpu"
+    ) -> torch.Tensor:
         x = self.distribution.sample((num_samples, num_atoms, self.num_dimensions)).to(device)
         if self.mean_free:
             if mask is None:

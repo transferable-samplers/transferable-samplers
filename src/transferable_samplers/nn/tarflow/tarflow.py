@@ -47,6 +47,8 @@
 # Licensed under the MIT License (see LICENSE in the repository root).
 # -------------------------------------------------------------------------
 
+from __future__ import annotations
+
 from pathlib import Path
 
 import torch
@@ -59,7 +61,7 @@ from transferable_samplers.nn.tarflow.attention import Attention, AttentionBlock
 MAX_SEQ_LEN = 512
 
 
-def write_tensor_to_txt(tensor: torch.Tensor, filename: str, linesize: int = 3):
+def write_tensor_to_txt(tensor: torch.Tensor, filename: str, linesize: int = 3) -> None:
     """HELPFUL FOR DEBUGGING: write a tensor to a text file for easy diffs"""
     tensor = tensor.flatten()
     with Path("0DEBUG_" + filename).open("w") as f:
@@ -70,11 +72,13 @@ def write_tensor_to_txt(tensor: torch.Tensor, filename: str, linesize: int = 3):
 
 
 class PermutationFromDict(torch.nn.Module):
-    def __init__(self, permutation_key: str):
+    def __init__(self, permutation_key: str) -> None:
         super().__init__()
         self.permutation_key = permutation_key
 
-    def forward(self, data: torch.Tensor, data_permutations_dict: dict[str, torch.Tensor], inverse: bool = False):
+    def forward(
+        self, data: torch.Tensor, data_permutations_dict: dict[str, torch.Tensor], inverse: bool = False
+    ) -> torch.Tensor:
         assert self.permutation_key in data_permutations_dict, (
             f"Permutation key {self.permutation_key} not found in data_permutations"
         )
@@ -109,7 +113,7 @@ class MetaBlock(torch.nn.Module):
         pos_embed_type: str = "learned",  # learned, sinusoidal
         debug: bool = False,
         lookahead_conditioning: bool = False,
-    ):
+    ) -> None:
         super().__init__()
         self.proj_in = torch.nn.Linear(in_channels, channels)
         self.lookahead_conditioning = lookahead_conditioning
@@ -308,7 +312,7 @@ class MetaBlock(torch.nn.Module):
 
         return xa, xb
 
-    def set_sample_mode(self, flag: bool = True):
+    def set_sample_mode(self, flag: bool = True) -> None:
         for m in self.modules():
             if isinstance(m, Attention):
                 m.sample = flag
@@ -379,7 +383,7 @@ class TarFlow(torch.nn.Module):
         nvp: bool = True,
         debug: bool = False,  # stops the weight initialization from being zero so tokens are not all the same
         lookahead_conditioning: bool = False,
-    ):
+    ) -> None:
         super().__init__()
         self.input_dimension = input_dimension
         if permutation_keys is None:

@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any
+
 import torch
 
 from transferable_samplers.evaluation.metrics.ess import normalized_ess
@@ -32,7 +37,7 @@ class PeptideEnsembleEvaluator:
         drop_unfixable_symmetry: bool = False,
         num_eval_samples: int = 10_000,
         do_plots: bool = True,
-    ):
+    ) -> None:
         self.fix_symmetry = fix_symmetry
         self.drop_unfixable_symmetry = drop_unfixable_symmetry
         self.num_eval_samples = num_eval_samples
@@ -43,7 +48,7 @@ class PeptideEnsembleEvaluator:
         self,
         samples_data_dict: dict[str, SamplesData],
         eval_context: EvalContext,
-        log_image_fn=None,
+        log_image_fn: Callable[[Any, str], None] | None = None,
         prefix: str = "",
     ) -> dict[str, float]:
         """Evaluate generated samples against reference data.
@@ -151,12 +156,12 @@ class PeptideEnsembleEvaluator:
 
     def _evaluate_peptide_data(
         self,
-        true_data,
-        pred_data,
-        topology,
-        tica_model,
+        true_data: SamplesData,
+        pred_data: SamplesData,
+        topology: Any,
+        tica_model: Any,
         prefix: str = "",
-    ):
+    ) -> dict[str, float]:
         """Computes all metrics between true and predicted data."""
         metrics = {}
         num_eval_samples = self.num_eval_samples
@@ -205,9 +210,9 @@ class PeptideEnsembleEvaluator:
         self,
         pred_data: SamplesData,
         true_data: SamplesData,
-        topology,
+        topology: Any,
         prefix: str,
-    ) -> tuple[SamplesData, dict]:
+    ) -> tuple[SamplesData, dict[str, float]]:
         """Detect and fix chirality issues in generated samples.
 
         Compares chirality signs between true and generated samples.

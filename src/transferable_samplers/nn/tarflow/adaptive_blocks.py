@@ -19,6 +19,8 @@
 # Licensed under the MIT License (see LICENSE in the repository root).
 # -------------------------------------------------------------------------
 
+from __future__ import annotations
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F  # noqa: N812
@@ -36,7 +38,7 @@ class AdaptiveLayerNorm(torch.nn.Module):
     """Adaptive layer norm layer, where scales and biases are learned from some
     conditioning variables."""
 
-    def __init__(self, *, channels: int, channels_cond: int):
+    def __init__(self, *, channels: int, channels_cond: int) -> None:
         super().__init__()
         self.norm = torch.nn.LayerNorm(channels, elementwise_affine=False)
         self.norm_cond = torch.nn.LayerNorm(channels_cond)
@@ -44,7 +46,7 @@ class AdaptiveLayerNorm(torch.nn.Module):
         self.to_gamma = torch.nn.Sequential(torch.nn.Linear(channels_cond, channels), torch.nn.Sigmoid())
         self.to_beta = torch.nn.Linear(channels_cond, channels, bias=False)
 
-    def forward(self, x, cond, mask):
+    def forward(self, x: torch.Tensor, cond: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         """
         Args:
             x: input representation, shape [*, dim]
@@ -68,7 +70,7 @@ class AdaptiveLayerNorm(torch.nn.Module):
 class AdaptiveLayerNormOutputScale(torch.nn.Module):
     """Adaptive scaling of a representation given conditioning variables."""
 
-    def __init__(self, *, channels, channels_cond, adaln_zero_bias_init_value=-2.0):
+    def __init__(self, *, channels: int, channels_cond: int, adaln_zero_bias_init_value: float = -2.0) -> None:
         super().__init__()
 
         adaln_zero_gamma_linear = torch.nn.Linear(channels_cond, channels)
@@ -77,7 +79,7 @@ class AdaptiveLayerNormOutputScale(torch.nn.Module):
 
         self.to_adaln_zero_gamma = torch.nn.Sequential(adaln_zero_gamma_linear, torch.nn.Sigmoid())
 
-    def forward(self, x, cond, mask):
+    def forward(self, x: torch.Tensor, cond: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         """
         Args:
             x: input sequence, shape [*, dim]
@@ -96,7 +98,7 @@ class AdaptiveLayerNormOutputScale(torch.nn.Module):
 class SwiGLU(torch.nn.Module):
     """SwiGLU layer."""
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Args:
             x: input tensor, shape [..., d]
@@ -113,7 +115,7 @@ class SwiGLU(torch.nn.Module):
 class Transition(torch.nn.Module):
     """Transition layer."""
 
-    def __init__(self, channels, expansion_factor=4, layer_norm=False):
+    def __init__(self, channels: int, expansion_factor: int = 4, layer_norm: bool = False) -> None:
         super().__init__()
 
         channels_inner = int(channels * expansion_factor)
@@ -128,7 +130,7 @@ class Transition(torch.nn.Module):
         )
         self.linear_out = torch.nn.Linear(channels_inner, channels, bias=False)
 
-    def forward(self, x, mask):
+    def forward(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         """
         Args:
             x: Input sequence representation, shape [b, n, dim]
@@ -160,7 +162,7 @@ class MultiHeadAttentionADALN(nn.Module):
         use_attn_pair_bias: bool = False,
         dropout: float = 0.0,
         expansion: int = 4,
-    ):
+    ) -> None:
         super().__init__()
 
         assert channels % head_channels == 0, "in_channels must be divisible by head_channels"
@@ -175,7 +177,16 @@ class MultiHeadAttentionADALN(nn.Module):
         )
         self.scale_output = AdaptiveLayerNormOutputScale(channels=channels, channels_cond=channels)
 
-    def forward(self, x, cond, mask, attn_mask, pair=None, attn_temp: float = 1.0, which_cache: str = "cond"):
+    def forward(
+        self,
+        x: torch.Tensor,
+        cond: torch.Tensor,
+        mask: torch.Tensor,
+        attn_mask: torch.Tensor,
+        pair: torch.Tensor | None = None,
+        attn_temp: float = 1.0,
+        which_cache: str = "cond",
+    ) -> torch.Tensor:
         """
         Args:
             x: Input sequence representation, shape [b, n, channels]
@@ -202,13 +213,13 @@ class TransitionADALN(torch.nn.Module):
     """Transition layer with adaptive layer norm applied to input and adaptive
     scaling applied to output."""
 
-    def __init__(self, channels, channels_cond, expansion_factor=4):
+    def __init__(self, channels: int, channels_cond: int, expansion_factor: int = 4) -> None:
         super().__init__()
         self.adaln = AdaptiveLayerNorm(channels=channels, channels_cond=channels_cond)
         self.transition = Transition(channels=channels, expansion_factor=expansion_factor, layer_norm=False)
         self.scale_output = AdaptiveLayerNormOutputScale(channels=channels, channels_cond=channels_cond)
 
-    def forward(self, x, cond, mask):
+    def forward(self, x: torch.Tensor, cond: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         """
         Args:
             x: Input sequence representation, shape [b, n, dim]
@@ -250,9 +261,9 @@ class AdaptiveAttnAndTransition(torch.nn.Module):
         use_qkln: bool = False,  # false for consistency with tarflow.py
         use_attn_pair_bias: bool = False,  # false for consistency with tarflow.py
         use_transition: bool = True,
-        dropout=0.0,
-        expansion=4,
-    ):
+        dropout: float = 0.0,
+        expansion: int = 4,
+    ) -> None:
         super().__init__()
 
         assert channels % head_channels == 0, "in_channels must be divisible by head_dim"
@@ -272,7 +283,16 @@ class AdaptiveAttnAndTransition(torch.nn.Module):
         if use_transition:
             self.transition = TransitionADALN(channels=channels, channels_cond=channels, expansion_factor=expansion)
 
-    def _apply_mha(self, x, cond, mask, pair=None, attn_mask=None, attn_temp: float = 1.0, which_cache: str = "cond"):
+    def _apply_mha(
+        self,
+        x: torch.Tensor,
+        cond: torch.Tensor,
+        mask: torch.Tensor,
+        pair: torch.Tensor | None = None,
+        attn_mask: torch.Tensor | None = None,
+        attn_temp: float = 1.0,
+        which_cache: str = "cond",
+    ) -> torch.Tensor:
         x_attn = self.mha(
             x, cond=cond, pair=pair, mask=mask, attn_mask=attn_mask, attn_temp=attn_temp, which_cache=which_cache
         )
@@ -280,13 +300,22 @@ class AdaptiveAttnAndTransition(torch.nn.Module):
             x_attn = x_attn + x
         return x_attn * mask[..., None]
 
-    def _apply_transition(self, x, cond, mask):
+    def _apply_transition(self, x: torch.Tensor, cond: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         x_tr = self.transition(x, cond, mask)
         if self.residual_transition:
             x_tr = x_tr + x
         return x_tr * mask[..., None]
 
-    def forward(self, x, cond, pair=None, mask=None, attn_mask=None, attn_temp: float = 1.0, which_cache: str = "cond"):
+    def forward(
+        self,
+        x: torch.Tensor,
+        cond: torch.Tensor,
+        pair: torch.Tensor | None = None,
+        mask: torch.Tensor | None = None,
+        attn_mask: torch.Tensor | None = None,
+        attn_temp: float = 1.0,
+        which_cache: str = "cond",
+    ) -> torch.Tensor:
         """
         Args:
             x: Input sequence representation, shape [b, n, dim_token]

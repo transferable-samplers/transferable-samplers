@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import torch
 
 from transferable_samplers.samplers.base_sampler import BaseSampler
@@ -21,7 +23,7 @@ class SNISSampler(BaseSampler):
         self,
         num_samples: int,
         logw_quantile_filter: float | None = None,
-    ):
+    ) -> None:
         super().__init__(num_samples)
         self.logw_quantile_filter = logw_quantile_filter
 
@@ -31,7 +33,7 @@ class SNISSampler(BaseSampler):
         self,
         source_energy: SourceEnergy,
         target_energy: TargetEnergy,
-    ) -> dict[str, SamplesData]:
+    ) -> tuple[dict[str, SamplesData], None]:
         # Generate proposal
         world_size = get_world_size()
         loc_num_samples = self.num_samples // world_size

@@ -1,8 +1,13 @@
+from __future__ import annotations
+
 import logging
+from collections.abc import Callable
+from typing import Any
 
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 from matplotlib.colors import LogNorm
 
 from transferable_samplers.evaluation.metrics.wasserstein_distances import _get_phi_psi_vectors as get_phi_psi_vectors
@@ -11,7 +16,9 @@ matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
 
 
-def plot_ramachandran(log_image_fn, samples, topology, prefix: str = ""):
+def plot_ramachandran(
+    log_image_fn: Callable[[Any, str], None], samples: torch.Tensor, topology: Any, prefix: str = ""
+) -> None:
     logging.info(f"Plotting Ramachandran for {prefix}")
     prefix += "/rama"
 

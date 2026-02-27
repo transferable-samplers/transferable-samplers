@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import inspect
 from abc import abstractmethod
 from copy import deepcopy
@@ -11,6 +13,7 @@ from torchmetrics import MeanMetric
 
 from transferable_samplers.callbacks.ema_weight_averaging import EMAWeightAveraging
 from transferable_samplers.models.buffer import Buffer
+from transferable_samplers.models.priors.prior import Prior
 from transferable_samplers.utils.dataclasses import SourceEnergy, SourceEnergyConfig, SystemCond
 from transferable_samplers.utils.pylogger import RankedLogger
 
@@ -24,7 +27,7 @@ class BaseLightningModule(LightningModule):
         optimizer: torch.optim.Optimizer,
         # pyrefly: ignore [not-a-type]
         scheduler: torch.optim.lr_scheduler,
-        prior,
+        prior: Prior,
         compile_net: bool = False,
         source_energy_config: SourceEnergyConfig | None = None,
         train_from_buffer: bool = False,
@@ -48,7 +51,7 @@ class BaseLightningModule(LightningModule):
 
     @abstractmethod
     # pyrefly: ignore [bad-override]
-    def training_step(self, batch, batch_idx: int) -> torch.Tensor: ...
+    def training_step(self, batch: dict[str, Any], batch_idx: int) -> torch.Tensor: ...
 
     @abstractmethod
     def generate_proposal(
@@ -178,7 +181,7 @@ class BaseLightningModule(LightningModule):
         self.train_metrics.reset()
         logger.info("Train epoch end")
 
-    def on_before_optimizer_step(self, optimizer, *args, **kwargs) -> None:
+    def on_before_optimizer_step(self, optimizer: torch.optim.Optimizer, *args: Any, **kwargs: Any) -> None:
         total_norm = 0.0
         for param in self.trainer.lightning_module.parameters():
             if param.grad is not None:
@@ -194,7 +197,7 @@ class BaseLightningModule(LightningModule):
         logger.info("Validation epoch end")
 
     # pyrefly: ignore [bad-override]
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch: dict[str, Any], batch_idx: int) -> None:
         "NOTE: these only exist for Lightning compatibility. All evaluation is handled by custom callbacks."
         return None
 
@@ -205,6 +208,6 @@ class BaseLightningModule(LightningModule):
         logger.info("Test epoch end")
 
     # pyrefly: ignore [bad-override]
-    def test_step(self, batch, batch_idx):
+    def test_step(self, batch: dict[str, Any], batch_idx: int) -> None:
         "NOTE: these only exist for Lightning compatibility. All evaluation is handled by custom callbacks."
         return None

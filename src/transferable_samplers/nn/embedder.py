@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import math
 
 import torch
@@ -5,7 +7,7 @@ import torch.nn as nn
 
 
 class SinusoidalEmbedding(nn.Module):
-    def __init__(self, embed_size, div_value=10000):
+    def __init__(self, embed_size: int, div_value: float = 10000) -> None:
         # max_len = 20 for long-term goal of oligopeptides
         super().__init__()
         self.embed_size = embed_size
@@ -13,7 +15,7 @@ class SinusoidalEmbedding(nn.Module):
 
         assert self.embed_size % 2 == 0, "embed_size must be even."
 
-    def forward(self, data):
+    def forward(self, data: torch.Tensor) -> torch.Tensor:
         # TODO fix docstring
         position = data.float().unsqueeze(-1)  # Shape: [..., 1]
         div_term = torch.exp(
@@ -35,7 +37,7 @@ class ConditionalEmbedder(nn.Module):
         num_residue_emb: int = 64,
         sinusoid_div_value: float = 0.0,
         embed_time: bool = False,
-    ):
+    ) -> None:
         """
         Input the value of the atom type, residue type, and residue position WITHOUT counting the padding token
         """
@@ -53,7 +55,15 @@ class ConditionalEmbedder(nn.Module):
             nn.Linear(5 if embed_time else 4 * hidden_dim, hidden_dim), nn.GELU(), nn.Linear(hidden_dim, output_dim)
         )
 
-    def forward(self, atom_type, aa_type, aa_pos, seq_len, t=None, mask=None):
+    def forward(
+        self,
+        atom_type: torch.Tensor,
+        aa_type: torch.Tensor,
+        aa_pos: torch.Tensor,
+        seq_len: torch.Tensor,
+        t: torch.Tensor | None = None,
+        mask: torch.Tensor | None = None,
+    ) -> torch.Tensor:
         if mask is None:
             mask = torch.ones_like(atom_type, dtype=torch.bool)
 

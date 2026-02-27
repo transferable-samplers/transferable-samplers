@@ -1,6 +1,9 @@
 """SMC diagnostic plots from trajectory snapshots and per-step diagnostics."""
 
+from __future__ import annotations
+
 from collections.abc import Callable
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,7 +11,7 @@ import torch
 from matplotlib.colors import LogNorm
 
 
-def _plot_particle_survival(survived_lineages, log_image_fn):
+def _plot_particle_survival(survived_lineages: list[float], log_image_fn: Callable[[Any, str], None]) -> None:
     fig, ax = plt.subplots(1, 1, figsize=(7.5, 5))
     ax.plot(range(len(survived_lineages)), survived_lineages, linewidth=1, alpha=0.5)
     ax.set_xlabel("Snapshot", fontsize=12)
@@ -18,7 +21,9 @@ def _plot_particle_survival(survived_lineages, log_image_fn):
     plt.close()
 
 
-def _plot_weights_and_ess(trajectory, ess_list, t_list, log_image_fn):
+def _plot_weights_and_ess(
+    trajectory: list[Any], ess_list: list[float], t_list: list[float], log_image_fn: Callable[[Any, str], None]
+) -> None:
     fig, axs = plt.subplots(1, 2, figsize=(15, 5))
 
     # Plot logw trajectories from snapshots if available
@@ -41,7 +46,7 @@ def _plot_weights_and_ess(trajectory, ess_list, t_list, log_image_fn):
     plt.close()
 
 
-def _plot_sigma(sigma_list, t_list, log_image_fn):
+def _plot_sigma(sigma_list: list[float], t_list: list[float], log_image_fn: Callable[[Any, str], None]) -> None:
     fig, ax = plt.subplots(1, 1, figsize=(7.5, 5))
     ax.plot(t_list, sigma_list, linewidth=1, alpha=0.5)
     ax.set_xlabel("Time", fontsize=12)
@@ -51,7 +56,9 @@ def _plot_sigma(sigma_list, t_list, log_image_fn):
     plt.close()
 
 
-def _plot_acceptance_rate(acceptance_rate_list, t_list, log_image_fn):
+def _plot_acceptance_rate(
+    acceptance_rate_list: list[float], t_list: list[float], log_image_fn: Callable[[Any, str], None]
+) -> None:
     fig, ax = plt.subplots(1, 1, figsize=(7.5, 5))
     ax.plot(t_list, acceptance_rate_list, linewidth=1, alpha=0.5)
     ax.set_xlabel("Time", fontsize=12)
@@ -61,7 +68,12 @@ def _plot_acceptance_rate(acceptance_rate_list, t_list, log_image_fn):
     plt.close()
 
 
-def _plot_stepwise_energy(target_energy_list, interpolation_energy_list, t_list, log_image_fn):
+def _plot_stepwise_energy(
+    target_energy_list: list[np.ndarray],
+    interpolation_energy_list: list[np.ndarray],
+    t_list: list[float],
+    log_image_fn: Callable[[Any, str], None],
+) -> None:
     stepwise_target_energy_np = np.stack(target_energy_list)
     stepwise_interpolation_energy_np = np.stack(interpolation_energy_list)
 
@@ -80,7 +92,12 @@ def _plot_stepwise_energy(target_energy_list, interpolation_energy_list, t_list,
     plt.close()
 
 
-def _plot_stepwise_energy_hist(target_energy_list, interpolation_energy_list, t_list, log_image_fn):
+def _plot_stepwise_energy_hist(
+    target_energy_list: list[np.ndarray],
+    interpolation_energy_list: list[np.ndarray],
+    t_list: list[float],
+    log_image_fn: Callable[[Any, str], None],
+) -> None:
     stepwise_target_energy_np = np.stack(target_energy_list)
     stepwise_interpolation_energy_np = np.stack(interpolation_energy_list)
     t_np = np.array(t_list)
@@ -133,10 +150,10 @@ def _plot_stepwise_energy_hist(target_energy_list, interpolation_energy_list, t_
 
 
 def plot_smc_diagnostics(
-    diagnostics_output: dict,
-    log_image_fn: Callable,
+    diagnostics_output: dict[str, Any],
+    log_image_fn: Callable[[Any, str], None],
     do_energy_plots: bool = False,
-):
+) -> None:
     """Plot all SMC diagnostics.
 
     Args:

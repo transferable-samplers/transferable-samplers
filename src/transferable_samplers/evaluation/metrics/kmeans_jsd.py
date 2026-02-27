@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any
+
 import mdtraj as md
 import numpy as np
 import torch
@@ -7,7 +11,9 @@ from sklearn.cluster import KMeans
 from transferable_samplers.data.preprocessing.tica import tica_features, wrap
 
 
-def _kmeans_jsd(true_features, pred_features, n_clusters=20):
+def _kmeans_jsd(
+    true_features: np.ndarray | torch.Tensor, pred_features: np.ndarray | torch.Tensor, n_clusters: int = 20
+) -> float:
     """Compute JSD between two feature sets via KMeans discretization."""
     kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(true_features)
     true_states = kmeans.labels_
@@ -22,7 +28,7 @@ def _kmeans_jsd(true_features, pred_features, n_clusters=20):
     return jensenshannon(true_dist, pred_dist, base=2) ** 2
 
 
-def _compute_dihedrals(trajectory):
+def _compute_dihedrals(trajectory: md.Trajectory) -> np.ndarray:
     """Compute sin/cos-wrapped phi, psi, omega dihedrals."""
     _, phi = md.compute_phi(trajectory)
     _, psi = md.compute_psi(trajectory)
@@ -30,7 +36,14 @@ def _compute_dihedrals(trajectory):
     return np.concatenate([*wrap(phi), *wrap(psi), *wrap(omega)], axis=-1)
 
 
-def tica_kmeans_jsd(true_samples, pred_samples, topology, tica_model, n_clusters=20, prefix=""):
+def tica_kmeans_jsd(
+    true_samples: torch.Tensor,
+    pred_samples: torch.Tensor,
+    topology: Any,
+    tica_model: Any,
+    n_clusters: int = 20,
+    prefix: str = "",
+) -> dict[str, float]:
     """JSD on KMeans-discretized TICA coordinates."""
     true_traj = md.Trajectory(true_samples.cpu().numpy(), topology=topology)
     pred_traj = md.Trajectory(pred_samples.cpu().numpy(), topology=topology)
@@ -46,7 +59,9 @@ def tica_kmeans_jsd(true_samples, pred_samples, topology, tica_model, n_clusters
     return {f"{prefix}/tica-k-jsd": jsd}
 
 
-def torus_kmeans_jsd(true_samples, pred_samples, topology, n_clusters=20, prefix=""):
+def torus_kmeans_jsd(
+    true_samples: torch.Tensor, pred_samples: torch.Tensor, topology: Any, n_clusters: int = 20, prefix: str = ""
+) -> dict[str, float]:
     """JSD on KMeans-discretized dihedral angles."""
     true_traj = md.Trajectory(true_samples.cpu().numpy(), topology=topology)
     pred_traj = md.Trajectory(pred_samples.cpu().numpy(), topology=topology)

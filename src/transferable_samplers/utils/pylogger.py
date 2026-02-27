@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import logging
 from collections.abc import Mapping
+from typing import Any
 
 from lightning_utilities.core.rank_zero import rank_prefixed_message, rank_zero_only
 
@@ -25,7 +28,7 @@ class RankedLogger(logging.LoggerAdapter):
         self.rank_zero_only = rank_zero_only
 
     # pyrefly: ignore [bad-override]
-    def log(self, level: int, msg: str, rank: int | None = None, *args, **kwargs) -> None:
+    def log(self, level: int, msg: str, rank: int | None = None, *args: Any, **kwargs: Any) -> None:
         """Delegate a log call to the underlying logger, after prefixing its message with the rank
         of the process it's being logged from. If `'rank'` is provided, then the log will only
         occur on that rank/process.

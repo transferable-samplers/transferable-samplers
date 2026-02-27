@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 from copy import deepcopy
-from typing import Optional
+from typing import Any
 
 import torch
 
 from transferable_samplers.models.base_lightning_module import BaseLightningModule
-from transferable_samplers.utils.dataclasses import SystemCond
+from transferable_samplers.models.priors.prior import Prior
+from transferable_samplers.utils.dataclasses import SourceEnergyConfig, SystemCond
 from transferable_samplers.utils.pylogger import RankedLogger
 
 logger = RankedLogger(__name__, rank_zero_only=False)
@@ -17,9 +20,9 @@ class NormalizingFlowModule(BaseLightningModule):
         optimizer: torch.optim.Optimizer,
         # pyrefly: ignore [not-a-type]
         scheduler: torch.optim.lr_scheduler,
-        prior,
+        prior: Prior,
         compile_net: bool = False,
-        source_energy_config=None,
+        source_energy_config: SourceEnergyConfig | None = None,
         train_from_buffer: bool = False,
         mean_free_prior: bool = False,
         teacher_regularize_weight: float = 0.0,
@@ -46,7 +49,7 @@ class NormalizingFlowModule(BaseLightningModule):
                 param.requires_grad_(False)
             self.teacher.eval()
 
-    def training_step(self, batch, batch_idx: int) -> torch.Tensor:
+    def training_step(self, batch: dict[str, Any], batch_idx: int) -> torch.Tensor:
         if self.train_from_buffer:
             assert self._buffer is not None, "Buffer must be set for training from buffer"
             batch = self._buffer.sample(batch["x"].shape[0])
@@ -147,10 +150,10 @@ class NormalizingFlowModule(BaseLightningModule):
     def run_model_diagnostics(
         self,
         prefix: str,
-        system_cond: Optional["SystemCond"] = None,
+        system_cond: SystemCond | None = None,
         num_samples_invert: int = 256,
         num_samples_dlogp: int = 16,
-    ) -> dict:
+    ) -> dict[str, float]:
         """Sample from prior and return invertibility and dlogp diagnostics.
 
         Invertibility: checks that reverse(z) followed by forward gives back z.

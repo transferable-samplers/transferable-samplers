@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 import logging
+from collections.abc import Callable
+from typing import Any
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -11,11 +15,11 @@ COLORS = ["r", "b", "orange", "purple", "brown", "pink"]
 
 
 def plot_com_norms(
-    log_image_fn,
+    log_image_fn: Callable[[Any, str], None],
     samples_dict: dict[str, torch.Tensor],
-    ylim=None,
-    prefix="",
-):
+    ylim: tuple[float, float] | None = None,
+    prefix: str = "",
+) -> None:
     """Plot center-of-mass norm histograms for generated sample sets.
 
     Args:

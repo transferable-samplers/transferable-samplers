@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any
+
 import torch
 
 from transferable_samplers.utils.dataclasses import SystemCond
@@ -19,17 +24,17 @@ class Buffer:
         samples: torch.Tensor,
         normalization_std: torch.Tensor,
         system_cond: SystemCond | None,
-        batch_transform=None,
-    ):
+        batch_transform: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+    ) -> None:
         self.samples = samples
         self.normalization_std = normalization_std
         self.system_cond = system_cond
         self.batch_transform = batch_transform
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.samples)
 
-    def sample(self, batch_size: int) -> dict:
+    def sample(self, batch_size: int) -> dict[str, Any]:
         """Draw a random batch from the buffer.
 
         1. Randomly selects samples and stacks into a batch.

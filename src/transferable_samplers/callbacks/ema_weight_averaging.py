@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from lightning.pytorch.callbacks import WeightAveraging
 from torch.optim.swa_utils import get_ema_avg_fn
 
@@ -12,8 +14,8 @@ from torch.optim.swa_utils import get_ema_avg_fn
 
 
 class EMAWeightAveraging(WeightAveraging):
-    def __init__(self, decay: float = 0.999):
+    def __init__(self, decay: float = 0.999) -> None:
         super().__init__(avg_fn=get_ema_avg_fn(decay=decay))
 
-    def should_update(self, step_idx=None, epoch_idx=None):
+    def should_update(self, step_idx: int | None = None, epoch_idx: int | None = None) -> bool:
         return step_idx is not None

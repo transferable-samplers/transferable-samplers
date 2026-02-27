@@ -1,8 +1,12 @@
+from __future__ import annotations
+
+from typing import Any
+
 import numpy as np
 import torch
 
 
-def _get_atom_types(topology):
+def _get_atom_types(topology: Any) -> torch.Tensor:
     atom_dict = {"C": 0, "H": 1, "N": 2, "O": 3, "S": 4}
     atom_types = []
     for atom_name in topology.atoms:
@@ -12,7 +16,7 @@ def _get_atom_types(topology):
     return atom_types
 
 
-def _get_adj_list(topology):
+def _get_adj_list(topology: Any) -> torch.Tensor:
     adj_list = torch.from_numpy(
         np.array(
             [(b.atom1.index, b.atom2.index) for b in topology.bonds],
@@ -68,7 +72,12 @@ def _compute_chirality_sign(coords: torch.Tensor, chirality_centers: torch.Tenso
     return torch.sign(perm_sign)
 
 
-def _check_symmetry_change(true_coords: torch.Tensor, pred_coords: torch.Tensor, adj_list, atom_types) -> torch.Tensor:
+def _check_symmetry_change(
+    true_coords: torch.Tensor,
+    pred_coords: torch.Tensor,
+    adj_list: torch.Tensor,
+    atom_types: torch.Tensor,
+) -> torch.Tensor:
     """
     Check for a batch if the chirality changed wrt to some reference reference_signs.
     If the signs for two configurations are different for the same center, the chirality changed.
@@ -86,7 +95,7 @@ def _check_symmetry_change(true_coords: torch.Tensor, pred_coords: torch.Tensor,
     return (perm_sign != reference_signs.to(pred_coords)).any(dim=-1)
 
 
-def get_symmetry_change(true_samples, pred_samples, topology):
+def get_symmetry_change(true_samples: torch.Tensor, pred_samples: torch.Tensor, topology: Any) -> torch.Tensor:
     true_samples = true_samples[: len(pred_samples)]
 
     adj_list = _get_adj_list(topology)

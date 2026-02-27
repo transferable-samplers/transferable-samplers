@@ -1,5 +1,11 @@
+from __future__ import annotations
+
+from typing import TypeVar
+
 import torch
 import torch.distributed as dist
+
+T = TypeVar("T")
 
 
 def is_distributed() -> bool:
@@ -41,7 +47,7 @@ def broadcast_tensor(tensor: torch.Tensor, src: int = 0) -> torch.Tensor:
     return tensor
 
 
-def shard_tensor(x):
+def shard_tensor(x: T) -> T:
     """Shard x across DDP ranks, asserts number of particles exactly divisible by world size.
 
     Works for any object supporting len() and slicing (tensors, SMCParticles, etc.).

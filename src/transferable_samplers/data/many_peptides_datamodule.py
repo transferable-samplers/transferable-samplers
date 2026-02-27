@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import logging
 import pickle
 from pathlib import Path
+from typing import Any
 
 import mdtraj as md
 import numpy as np
@@ -56,7 +59,7 @@ class ManyPeptidesDataModule(BaseDataModule):
         num_aa_min: int = 2,
         num_aa_max: int = 8,
         system_cond_ids: list[str] | None = None,
-    ):
+    ) -> None:
         super().__init__(
             data_dir=data_dir,
             num_dimensions=num_dimensions,
@@ -233,7 +236,7 @@ class ManyPeptidesDataModule(BaseDataModule):
             )
 
     # pyrefly: ignore [bad-function-definition]
-    def prepare_eval(self, sequence: str, stage: str = None) -> EvalContext:
+    def prepare_eval(self, sequence: str, stage: str | None = None) -> EvalContext:
         """Prepare evaluation data and energy function for a given peptide sequence.
 
         Loads PDB directly from disk — no cache loading since it can be slow and
@@ -328,7 +331,7 @@ class ManyPeptidesDataModule(BaseDataModule):
         logging.info(f"Using WebDataset cache dir: {self.wds_cache_dir}")
         return urls
 
-    def _load_pdb(self, sequence: str, stage: str):
+    def _load_pdb(self, sequence: str, stage: str) -> Any:
         """Load PDB file for a sequence directly from disk.
 
         Args:
@@ -340,7 +343,7 @@ class ManyPeptidesDataModule(BaseDataModule):
             raise FileNotFoundError(f"No PDB file found at {pdb_path}")
         return openmm.app.PDBFile(str(pdb_path))
 
-    def _setup_potential(self, pdb):
+    def _setup_potential(self, pdb: Any) -> OpenMMEnergy:
         """Set up an OpenMM potential energy function from a PDB object."""
         forcefield = openmm.app.ForceField("amber14-all.xml", "implicit/obc1.xml")
         system = forcefield.createSystem(

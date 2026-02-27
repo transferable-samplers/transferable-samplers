@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 
 import torch
@@ -6,7 +8,7 @@ import torch
 class Prior(ABC):
     @abstractmethod
     def sample(
-        self, num_samples: int, num_atoms: int, mask: torch.Tensor | None = None, device="cpu"
+        self, num_samples: int, num_atoms: int, mask: torch.Tensor | None = None, device: str | torch.device = "cpu"
     ) -> torch.Tensor: ...
 
     @abstractmethod

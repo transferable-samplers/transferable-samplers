@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import statistics as stats
 from collections import defaultdict
 from collections.abc import Callable
 from typing import Any
 
 import torch
+from lightning import Trainer
 from lightning.pytorch.loggers import WandbLogger
 from lightning_utilities.core.rank_zero import rank_zero_only
 from omegaconf import OmegaConf
@@ -13,9 +16,9 @@ from transferable_samplers.utils.pylogger import RankedLogger
 logger = RankedLogger(__name__, rank_zero_only=False)
 
 
-def compute_mean_metrics(metrics: dict, prefix: str = "val") -> dict:
+def compute_mean_metrics(metrics: dict[str, Any], prefix: str = "val") -> dict[str, float]:
     """Aggregate metrics across all sequences by computing mean."""
-    mean_dict_list = defaultdict(list)
+    mean_dict_list: defaultdict[str, list[float]] = defaultdict(list)
 
     for key, value in metrics.items():
         if key.startswith(prefix):
@@ -32,7 +35,7 @@ def compute_mean_metrics(metrics: dict, prefix: str = "val") -> dict:
     return {k: stats.mean(v) for k, v in mean_dict_list.items()}
 
 
-def make_log_image_fn(trainer) -> Callable[[Any, str | None], None]:
+def make_log_image_fn(trainer: Trainer) -> Callable[[Any, str | None, str], None]:
     """Return a safe image logger function.
 
     - Logs only on global rank 0
@@ -52,7 +55,7 @@ def make_log_image_fn(trainer) -> Callable[[Any, str | None], None]:
         # pyrefly: ignore [bad-return]
         return lambda img, title=None, title_prefix="": None
 
-    def log_image(img, title: str | None = None, title_prefix: str = ""):
+    def log_image(img: Any, title: str | None = None, title_prefix: str = "") -> None:
         full_title = f"{title_prefix}/{title}" if title_prefix and title else (title or title_prefix)
         # pyrefly: ignore [missing-attribute]
         wandb_logger.log_image(full_title, [img])
@@ -72,7 +75,7 @@ def log_hyperparameters(object_dict: dict[str, Any], resolve: bool = True) -> No
         - `"model"`: The Lightning model.
         - `"trainer"`: The Lightning trainer.
     """
-    hparams = {}
+    hparams: dict[str, Any] = {}
     cfg = OmegaConf.to_container(object_dict["cfg"], resolve=resolve)
     model = object_dict["model"]
     trainer = object_dict["trainer"]

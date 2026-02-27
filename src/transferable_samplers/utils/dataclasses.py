@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import math
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 import scipy.special
 import torch
@@ -83,7 +86,7 @@ class SourceEnergy:
             com_norms**2 / (math.sqrt(2) * com_std_analytic**3 * scipy.special.gamma(1.5))
         )
 
-    def sample(self, num_samples: int, **kwargs) -> tuple[torch.Tensor, torch.Tensor]:
+    def sample(self, num_samples: int, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
         """Generate num_samples proposals in batches.
 
         If use_com_adjustment is True, applies a CoM energy adjustment
@@ -155,13 +158,13 @@ class SystemCond:
     Stores unbatched conditioning tensors. Use for_batch() to expand to batch size.
     """
 
-    permutations: dict | None = None
-    encodings: dict | None = None
+    permutations: dict[str, torch.Tensor] | None = None
+    encodings: dict[str, torch.Tensor] | None = None
 
-    def for_batch(self, batch_size: int, device=None) -> "SystemCond":
+    def for_batch(self, batch_size: int, device: torch.device | None = None) -> SystemCond:
         """Expand unbatched conditioning tensors to batch_size and move to device."""
 
-        def expand(v):
+        def expand(v: torch.Tensor) -> torch.Tensor:
             v = v.unsqueeze(0).expand(batch_size, *v.shape)
             return v.to(device) if device is not None else v
 
@@ -178,15 +181,15 @@ class SamplesData:
     # pyrefly: ignore [bad-assignment]
     logw: torch.Tensor = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         assert len(self.samples) == len(self.E_target)
         if self.logw is not None:
             assert len(self.samples) == len(self.logw)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int | slice | torch.Tensor) -> SamplesData:
         return SamplesData(
             self.samples[index],
             self.E_target[index],
@@ -197,7 +200,7 @@ class SamplesData:
 
 @dataclass
 class EvalContext:
-    true_data: "SamplesData"
+    true_data: SamplesData
     target_energy: TargetEnergy
     normalization_std: torch.Tensor
     system_cond: SystemCond | None

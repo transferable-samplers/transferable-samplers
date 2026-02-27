@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 import torch
@@ -21,7 +23,7 @@ class SMCParticles:
     E_source_grad: torch.Tensor  # (batch, atoms, 3)
     E_target_grad: torch.Tensor  # (batch, atoms, 3)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         batch = self.x.shape[0]
         assert self.logw.shape == (batch,), f"logw shape {self.logw.shape}, expected ({batch},)"
         assert self.lineage.shape == (batch,), f"lineage shape {self.lineage.shape}, expected ({batch},)"
@@ -34,10 +36,10 @@ class SMCParticles:
             f"E_target_grad shape {self.E_target_grad.shape}, expected {self.x.shape}"
         )
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.x)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int | slice | torch.Tensor) -> SMCParticles:
         return SMCParticles(
             x=self.x[index],
             logw=self.logw[index],

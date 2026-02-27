@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 import logging
+from collections.abc import Callable
+from typing import Any
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -11,7 +15,7 @@ matplotlib.rcParams["font.family"] = "STIXGeneral"
 COLORS = ["r", "b", "orange", "purple", "brown", "pink"]
 
 
-def interatomic_dist(x, flatten=True):
+def interatomic_dist(x: torch.Tensor, flatten: bool = True) -> torch.Tensor:
     assert len(x.shape) == 3, f"Expected 3D array, got {x.shape}"
 
     num_atoms = x.shape[1]
@@ -31,12 +35,12 @@ def interatomic_dist(x, flatten=True):
 
 
 def plot_atom_distances(
-    log_image_fn,
-    true_samples,
+    log_image_fn: Callable[[Any, str], None],
+    true_samples: torch.Tensor,
     samples_dict: dict[str, torch.Tensor],
-    ylim=None,
-    prefix="",
-):
+    ylim: tuple[float, float] | None = None,
+    prefix: str = "",
+) -> None:
     """Plot interatomic distance histograms for ground truth and generated sample sets.
 
     Args:

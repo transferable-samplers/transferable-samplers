@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import torch
 
 
@@ -11,12 +13,12 @@ class DummyDataset(torch.utils.data.Dataset):
     """
 
     # Default size is large enough to be safely divisible across multiple devices.
-    def __init__(self, size: int = 256):
+    def __init__(self, size: int = 256) -> None:
         self.size = size
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.size
 
     # pyrefly: ignore [bad-param-name-override]
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         return {"x": torch.zeros(1)}

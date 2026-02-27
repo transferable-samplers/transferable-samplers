@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any
+
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,13 +15,13 @@ COLORS = ["r", "b", "orange", "purple", "brown", "pink"]
 
 
 def plot_energies(
-    log_image_fn,
-    true_energy,
+    log_image_fn: Callable[[Any, str], None],
+    true_energy: torch.Tensor,
     samples_energy_dict: dict[str, torch.Tensor],
-    max_energy=100,
-    ylim=None,
-    prefix="",
-):
+    max_energy: float | None = 100,
+    ylim: tuple[float, float] | None = None,
+    prefix: str = "",
+) -> None:
     """Plot energy histograms for ground truth and generated sample sets.
 
     Args:

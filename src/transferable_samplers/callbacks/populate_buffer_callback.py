@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 from functools import partial
 
 import matplotlib.pyplot as plt
 import torch
 import torch.utils._pytree as pytree
-from lightning import Callback
+from lightning import Callback, LightningModule, Trainer
 
 from transferable_samplers.callbacks.ema_weight_averaging import EMAWeightAveraging
 from transferable_samplers.evaluation.evaluator import PeptideEnsembleEvaluator
@@ -26,12 +28,12 @@ class PopulateBufferCallback(Callback):
     5. Stores the resampled samples in the model's buffer
     """
 
-    def __init__(self, sampler: BaseSampler, evaluator: PeptideEnsembleEvaluator | None = None):
+    def __init__(self, sampler: BaseSampler, evaluator: PeptideEnsembleEvaluator | None = None) -> None:
         super().__init__()
         self.sampler = sampler
         self.evaluator = evaluator
 
-    def on_train_epoch_start(self, trainer, pl_module) -> None:
+    def on_train_epoch_start(self, trainer: Trainer, pl_module: LightningModule) -> None:
         assert pl_module.train_from_buffer, "PopulateBufferCallback requires model.train_from_buffer=True."
         assert not self._has_ema_callback(trainer), (
             "EMAWeightAveraging callback should not be used with self-improvement."
@@ -83,7 +85,7 @@ class PopulateBufferCallback(Callback):
         logger.info(f"Buffer populated with {len(pl_module._buffer)} resampled samples for sequence '{sequence}'")
 
     @staticmethod
-    def _has_ema_callback(trainer) -> bool:
+    def _has_ema_callback(trainer: Trainer) -> bool:
         """Check if an EMAWeightAveraging callback is present in the trainer."""
         for cb in trainer.callbacks:
             if isinstance(cb, EMAWeightAveraging):

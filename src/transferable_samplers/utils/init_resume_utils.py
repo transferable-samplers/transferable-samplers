@@ -1,5 +1,7 @@
 """Utilities for resolving checkpoint / init-weight loading at training time."""
 
+from __future__ import annotations
+
 from copy import deepcopy
 from pathlib import Path
 
@@ -11,7 +13,7 @@ from transferable_samplers.utils.pylogger import RankedLogger
 logger = RankedLogger(__name__, rank_zero_only=False)
 
 
-def load_state_dict_from_ckpt(path: str) -> dict:
+def load_state_dict_from_ckpt(path: str) -> dict[str, torch.Tensor]:
     """Extract a state dict from a Lightning checkpoint file (``state_dict`` key).
 
     Args:
@@ -33,7 +35,7 @@ def load_state_dict_from_ckpt(path: str) -> dict:
     return ckpt["state_dict"]
 
 
-def load_state_dict_from_file(path: str) -> dict:
+def load_state_dict_from_file(path: str) -> dict[str, torch.Tensor]:
     """Load a raw state dict from a ``.pth`` file.
 
     Args:
@@ -46,7 +48,7 @@ def load_state_dict_from_file(path: str) -> dict:
     return torch.load(path, map_location="cpu")
 
 
-def load_state_dict_from_hf(hf_filepath: str, scratch_dir: str) -> dict:
+def load_state_dict_from_hf(hf_filepath: str, scratch_dir: str) -> dict[str, torch.Tensor]:
     """Download a state dict from HuggingFace Hub and return it.
 
     Args:
@@ -61,7 +63,11 @@ def load_state_dict_from_hf(hf_filepath: str, scratch_dir: str) -> dict:
     return load_state_dict_from_file(local_path)
 
 
-def augment_state_dict_for_teacher(sd: dict, student_prefix="net.", teacher_prefix="teacher."):
+def augment_state_dict_for_teacher(
+    sd: dict[str, torch.Tensor],
+    student_prefix: str = "net.",
+    teacher_prefix: str = "teacher.",
+) -> dict[str, torch.Tensor]:
     """
     If teacher keys are missing but student keys exist, synthesize teacher keys
     by copying tensors from the student keys. Returns a NEW dict.
@@ -86,7 +92,7 @@ def resolve_init(
     init_ckpt_path: str | None,
     init_hf_state_dict_path: str | None,
     scratch_dir: str,
-) -> dict | None:
+) -> dict[str, torch.Tensor] | None:
     """Resolve init weights from a checkpoint or HuggingFace state dict.
 
     Args:
@@ -128,7 +134,7 @@ def resolve_init_or_resume(
     init_ckpt_path: str | None,
     init_hf_state_dict_path: str | None,
     scratch_dir: str,
-) -> tuple[str | None, dict | None]:
+) -> tuple[str | None, dict[str, torch.Tensor] | None]:
     """Determine whether to resume from a checkpoint or apply init weights.
 
     Implements preemptible semantics:
