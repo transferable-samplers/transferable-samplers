@@ -1,4 +1,3 @@
----
 _target_: src.models.flow_matching_module.FlowMatchingModule
 compile_net: false
 output_dir: ${paths.output_dir}

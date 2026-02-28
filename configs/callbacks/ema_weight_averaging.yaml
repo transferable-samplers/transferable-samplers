@@ -1,4 +1,3 @@
----
 ema:
-  _target_: src.callbacks.ema_weight_averaging.EMAWeightAveraging
+  _target_: transferable_samplers.callbacks.ema_weight_averaging.EMAWeightAveraging
   decay: 0.999

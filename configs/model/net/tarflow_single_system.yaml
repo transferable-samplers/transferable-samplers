@@ -1,4 +1,3 @@
----
 _target_: src.nn.tarflow.tarflow_single_system.TarFlow
 in_channels: 3
 channels: 256

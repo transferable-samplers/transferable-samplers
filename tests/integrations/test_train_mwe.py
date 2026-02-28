@@ -3,7 +3,6 @@ Tests for the training pipelines.
 NOTE: A very basic test that only checks a single iteration and non-NaN loss.
 """
 
-import os
 from math import isnan
 from pathlib import Path
 
@@ -11,8 +10,9 @@ import pytest
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, open_dict
 
-from src.train import train
+# pyrefly: ignore [missing-import]
 from tests.helpers.utils import compose_config, get_config_stem
+from transferable_samplers.train import train
 
 EXPERIMENT_NAMES = [
     f"training/{cfg_path}"
@@ -25,7 +25,8 @@ EXPERIMENT_NAMES = [
 ]
 
 
-@pytest.fixture(params=EXPERIMENT_NAMES, ids=get_config_stem, scope="function")
+@pytest.fixture(params=EXPERIMENT_NAMES, ids=get_config_stem)
+# pyrefly: ignore [bad-return]
 def cfg_test_train_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tmp_path: Path) -> DictConfig:
     """
     Hydra-composed config for the training experiments.
@@ -51,7 +52,7 @@ def cfg_test_train_mwe(request: pytest.FixtureRequest, trainer_name_param: str, 
     with open_dict(cfg):
         cfg.paths.output_dir = str(tmp_path)
         cfg.paths.log_dir = str(tmp_path)
-        cfg.paths.work_dir = os.getcwd()
+        cfg.paths.work_dir = str(Path.cwd())
         cfg.trainer.num_sanity_val_steps = 0  # disable val sanity checks
         cfg.test = False  # disable test stage during training tests
         cfg.trainer.max_epochs = 1

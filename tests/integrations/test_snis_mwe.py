@@ -8,15 +8,15 @@ NOTE: This test only considers SNIS for each dataset/model. SMC tests are in tes
 A very loose threshold on median proposal energy is used to catch major issues.
 """
 
-import os
 from pathlib import Path
 
 import pytest
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, OmegaConf, open_dict
 
-from src.eval import eval
+# pyrefly: ignore [missing-import]
 from tests.helpers.utils import compose_config, extract_test_sequence, get_config_stem
+from transferable_samplers.eval import eval
 
 MEDIAN_PROPOSAL_ENERGY_THRESHOLDS = {  # these are intentionally loose, just to catch major issues
     "Ace-A-Nme": -10,
@@ -46,7 +46,8 @@ EXPERIMENT_NAMES = [
 ]
 
 
-@pytest.fixture(params=EXPERIMENT_NAMES, ids=get_config_stem, scope="function")
+@pytest.fixture(params=EXPERIMENT_NAMES, ids=get_config_stem)
+# pyrefly: ignore [bad-return]
 def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tmp_path: Path) -> DictConfig:
     """
     Hydra-composed config for the evaluation experiments.
@@ -72,19 +73,22 @@ def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, t
     with open_dict(cfg):
         cfg.paths.output_dir = str(tmp_path)
         cfg.paths.log_dir = str(tmp_path)
-        cfg.paths.work_dir = os.getcwd()
+        cfg.paths.work_dir = str(Path.cwd())
         cfg.callbacks.sampling_evaluation.sampler.num_samples = 25
         if trainer_name_param == "cpu":
             cfg.callbacks.sampling_evaluation.run_diagnostics_kwargs = {
-                "num_samples_invert": 8, "num_samples_dlogp": 2,
+                "num_samples_invert": 8,
+                "num_samples_dlogp": 2,
             }
         if "ula" in experiment_name or "mala" in experiment_name:
             # Replace SMC sampler with SNIS for this test — we only test weight loading here.
             # TODO probably indicative that the tests should be refactored.
-            cfg.callbacks.sampling_evaluation.sampler = OmegaConf.create({
-                "_target_": "src.samplers.snis_sampler.SNISSampler",
-                "num_samples": 25,
-            })
+            cfg.callbacks.sampling_evaluation.sampler = OmegaConf.create(
+                {
+                    "_target_": "transferable_samplers.samplers.snis_sampler.SNISSampler",
+                    "num_samples": 25,
+                }
+            )
         if "transferable" in experiment_name:
             cfg.data.test_sequences = "AA"
         cfg.data.num_workers = 0  # avoid multiprocessing issues in tests

@@ -1,6 +1,6 @@
 # Contributing Guide
 
-Thank you for your interest in contributing 🌟 
+Thank you for your interest in contributing 🌟
 
 We welcome bug reports, pull requests, and improvements of all kinds.
 
@@ -13,16 +13,44 @@ Clone the repository and install the development environment:
 ```bash
 git clone https://github.com/transferable-samplers/transferable-samplers.git
 cd transferable-samplers
-pip install -r requirements-dev.txt
+uv pip install -r requirements-dev.txt
 ```
 
 ### Enable pre-commit hooks
 
 ```bash
+uv pip install pre-commit
 pre-commit install
 ```
 
-## 🧪 Running Tests
+Hooks will now run automatically on every `git commit`.
+
+## Running Tools Manually
+
+**Format + lint (auto-fix):**
+
+```bash
+ruff format .
+ruff check --fix .
+```
+
+**Type checking (Pyrefly):**
+
+```bash
+# Via pre-commit (manual stage):
+pre-commit run pyrefly-check --all-files
+
+# Or directly:
+pyrefly check .
+```
+
+**Run all pre-commit hooks on the entire repo:**
+
+```bash
+pre-commit run --all-files
+```
+
+## Running Tests
 
 This project uses **pytest** with Hydra integration. Currently the tests all require at least a single GPU, due to OpenMM + CPU issues.
 
@@ -32,7 +60,7 @@ This project uses **pytest** with Hydra integration. Currently the tests all req
 PYTEST_TRAINER=gpu pytest -v
 ```
 
-### Run DDP tests (requires ≥2 GPUs)
+### Run DDP tests (requires 2+ GPUs)
 
 ```bash
 PYTEST_TRAINER=ddp pytest -v

@@ -4,7 +4,6 @@ Only a basic test to ensure SMC runs end-to-end for single-system / transferable
 NOTE: A very loose threshold on median SMC energy is used to catch major issues.
 """
 
-import os
 from pathlib import Path
 
 import pytest
@@ -12,8 +11,9 @@ import torch
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, open_dict
 
-from src.eval import eval
+# pyrefly: ignore [missing-import]
 from tests.helpers.utils import compose_config, extract_test_sequence, get_config_stem
+from transferable_samplers.eval import eval
 
 MEDIAN_SMC_ENERGY_THRESHOLDS = {  # these are intentionally loose, just to catch major issues
     "AAA": -120,
@@ -29,7 +29,8 @@ EXPERIMENT_NAMES = [
 ]
 
 
-@pytest.fixture(params=EXPERIMENT_NAMES, ids=get_config_stem, scope="function")
+@pytest.fixture(params=EXPERIMENT_NAMES, ids=get_config_stem)
+# pyrefly: ignore [bad-return]
 def cfg_test_smc_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tmp_path: Path) -> DictConfig:
     """
     Hydra-composed config for the evaluation experiments.
@@ -37,7 +38,7 @@ def cfg_test_smc_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tm
     Args:
         request: pytest request object to get the experiment override parameter.
         trainer_name_param: trainer name parameter supplied by parametrization fixtures.
-            (currently unused, need to impelement DDP SMC)
+            (currently unused, need to implement DDP SMC)
         tmp_path: pytest-provided temporary directory path.
 
     Returns:
@@ -56,12 +57,13 @@ def cfg_test_smc_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tm
     with open_dict(cfg):
         cfg.paths.output_dir = str(tmp_path)
         cfg.paths.log_dir = str(tmp_path)
-        cfg.paths.work_dir = os.getcwd()
+        cfg.paths.work_dir = str(Path.cwd())
         cfg.callbacks.sampling_evaluation.sampler.num_samples = 32
         cfg.callbacks.sampling_evaluation.sampler.num_annealing_steps = 10
         if trainer_name_param == "cpu":
             cfg.callbacks.sampling_evaluation.run_diagnostics_kwargs = {
-                "num_samples_invert": 8, "num_samples_dlogp": 2,
+                "num_samples_invert": 8,
+                "num_samples_dlogp": 2,
             }
         cfg.data.num_workers = 0  # avoid multiprocessing issues in tests
         if "transferable" in experiment_name:
@@ -85,6 +87,7 @@ def test_smc_mwe(cfg_test_smc_mwe: DictConfig) -> None:
     Asserts:
     - 'test/{sequence}/smc/median_energy' is present and below threshold.
     """
+    # pyrefly: ignore [bad-argument-type]
     metrics, _ = eval(cfg_test_smc_mwe)
 
     test_sequence = extract_test_sequence(cfg_test_smc_mwe)

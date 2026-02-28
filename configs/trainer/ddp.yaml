@@ -1,4 +1,3 @@
----
 defaults: [default]
 strategy: ddp
 accelerator: gpu

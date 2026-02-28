@@ -1,4 +1,3 @@
----
 defaults: [model_summary, sampling_evaluation, _self_]
 model_summary:
   max_depth: 2

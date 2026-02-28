@@ -1,40 +1,33 @@
----
 # @package _global_
 # specify here default configuration
 # order of defaults determines the order in which configs override each other
 defaults:
-  - _self_  # keep this first so that it can be overridden by experiment configs
+  - _self_ # keep this first so that it can be overridden by experiment configs
   - data: transferable/up_to_8aa
   - model: flow_matching
   - callbacks: default_train
-  - logger: many_loggers  # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
+  - logger: many_loggers # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: default
   - paths: default
   - extras: default
   - hydra: default
   - launcher:
-
   # experiment configs allow for version control of specific hyperparameters
   # e.g. best hyperparameters for given model and datamodule
   - experiment:
-
   # config for hyperparameter optimization
   - hparams_search:
-
   # optional local config for machine/user specific settings
   # it's optional since it doesn't need to exist and is excluded from version control
   - optional local: default
-
   # debugging config (enable through command line, e.g. `python train.py debug=default)
   - debug:
 # task name, determines output directory path
 task_name: train
-
 # tags to help you identify your experiments
 # you can overwrite this in experiment configs
 # overwrite from command line with `python train.py tags="[first_tag, second_tag]"`
 tags: [dev]
-
 # provide weights for finetuning (mutually exclusive)
 init_hf_state_dict_path:
 init_ckpt_path:
@@ -46,6 +39,5 @@ torch_num_threads: 2
 seed:
 # don't do any sanity val steps at the start of training
 num_sanity_val_steps: 0
-
 # by default never check val during training (can be slow!)
 check_val_every_n_epoch: 100_000

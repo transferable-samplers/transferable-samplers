@@ -175,3 +175,5 @@ ___*.py
 # Pytest outputs
 *.xml
 *.html
+
+CLAUDE.md

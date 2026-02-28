@@ -1,0 +1,123 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/transferable_samplers"]
+
+[project]
+name = "transferable-samplers"
+version = "0.0.0"
+requires-python = ">= 3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+# ----------------------------------------
+# Ruff configuration (migrated from ruff.toml)
+# ----------------------------------------
+[tool.ruff]
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+    "notebooks/",
+    "src/transferable_samplers/nn/egnn/",
+]
+
+line-length = 120
+indent-width = 4
+
+# Assume Python 3.11+
+target-version = "py311"
+
+# ----------------------------------------
+# Linting configuration
+# ----------------------------------------
+[tool.ruff.lint]
+select = [
+    # Core flake8
+    "E",      # pycodestyle errors
+    "F",      # pyflakes (logical issues)
+    "W",      # pycodestyle warnings
+
+    # Additional useful plugins
+    "B",      # flake8-bugbear (common bugs, recommended)
+    "I",      # isort (import sorting)
+    "UP",     # pyupgrade (modern Python syntax)
+    "N",      # pep8-naming
+    "S",      # bandit (security rules)
+
+    # Ruff-native rules
+    "ANN",    # flake8-annotations (type annotations)
+    "COM",    # flake8-commas
+    "ISC",    # implicit string concatenation
+    "PT",     # pytest style
+    "PTH",    # pathlib usage recommendations
+    "T10",    # debugger detection (replaces debug-statements hook)
+
+]
+
+ignore = [
+    "E203",   # whitespace before ':', black compatibility
+    "E731",   # assigning a lambda to a variable (stylistic preference)
+    "S101",   # use of assert (allowed in your code)
+    "COM812", # trailing comma - conflicts with ruff formatter
+    "ANN401", # dynamically typed expressions (Any) are disallowed - too strict for this codebase
+]
+
+# Allow fix for all enabled rules (when `--fix` is passed).
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables if underscore-prefixed or common loop indices.
+dummy-variable-rgx = "^(_.*|[ijk])$"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "ANN", "D"]
+"scripts/**" = ["S", "ANN", "D"]
+"src/transferable_samplers/samplers/**" = ["N803", "N806"]
+"src/transferable_samplers/utils/dataclasses.py" = ["N806"]
+
+[tool.ruff.lint.flake8-annotations]
+allow-star-arg-any = true
+suppress-none-returning = false
+
+# ----------------------------------------
+# Formatting (Black-compatible)
+# ----------------------------------------
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+# ----------------------------------------
+# Pyrefly configuration
+# ----------------------------------------
+[tool.pyrefly]
+search_path = ["src", "tests"]
+python_interpreter = ".venv/bin/python"

@@ -1,6 +1,5 @@
----
 _target_: src.nn.tarflow.tarflow.TarFlow
-input_dimension: 3  # 3D coordinates
+input_dimension: 3 # 3D coordinates
 channels: 384
 max_num_tokens: ${data.num_atoms}
 num_blocks: 8
@@ -18,7 +17,7 @@ cond_embed:
   _target_: src.nn.embedder.ConditionalEmbedder
   hidden_dim: ${model.net.channels}
   output_dim: ${model.net.channels}
-  sinusoid_div_value: 1000  # for sinusoidal positional embedding
+  sinusoid_div_value: 1000 # for sinusoidal positional embedding
 use_adapt_ln: true
 use_transition: true
 lookahead_conditioning: true
