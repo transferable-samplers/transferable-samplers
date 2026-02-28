@@ -2,23 +2,20 @@ import hydra
 import pytest
 import torch
 from dotenv import load_dotenv
-
-load_dotenv(override=True)
-
-import logging
-
 from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
 from torch.utils.data import default_collate
 
-from src.models.priors.normal_distribution import NormalDistribution
 from src.data.transforms.padding import PaddingTransform
+from src.models.priors.normal_distribution import NormalDistribution
+
+load_dotenv(override=True)
 
 # Didn't see any slowdown for TarFlow with BF16 enabled, once had issues with invertibility
 torch.set_float32_matmul_precision("highest")
 
 # Constant parameters for all tests
-NUM_SAMPLES = 32 # number of data samples to use per test
+NUM_SAMPLES = 32  # number of data samples to use per test
 TEST_SEQUENCES = [
     "AA",
 ]
@@ -276,6 +273,4 @@ def test_fwd_vs_rev_dlogp_no_pad(net, test_data):
         _, rev_dlogp = net.reverse(z_pred, permutations=permutations, encodings=encodings)
 
         max_abs_error = torch.max(torch.abs(fwd_dlogp + rev_dlogp)).item()
-        assert max_abs_error < DLOGP_ATOL, (
-            f"fwd vs rev dlogp test (unpadded data) failed for sequence '{sequence}' "
-        )
+        assert max_abs_error < DLOGP_ATOL, f"fwd vs rev dlogp test (unpadded data) failed for sequence '{sequence}' "

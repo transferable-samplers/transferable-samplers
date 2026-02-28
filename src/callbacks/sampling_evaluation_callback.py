@@ -29,7 +29,7 @@ class SamplingEvaluationCallback(Callback):
     def __init__(
         self,
         evaluator: PeptideEnsembleEvaluator,
-        sampler: Optional[BaseSampler] = None,
+        sampler: BaseSampler,
         run_diagnostics_kwargs: Optional[dict] = None,
     ):
         super().__init__()
@@ -46,9 +46,6 @@ class SamplingEvaluationCallback(Callback):
         logger.info("Test evaluation complete")
 
     def evaluate(self, trainer, pl_module, prefix):
-        if self.sampler is None:
-            return
-
         datamodule = trainer.datamodule
         eval_sequences = datamodule.val_sequences if prefix == "val" else datamodule.test_sequences
 
@@ -56,7 +53,9 @@ class SamplingEvaluationCallback(Callback):
 
         all_metrics = {}
         for sequence in eval_sequences:
-            eval_ctx = datamodule.prepare_eval(sequence=sequence, stage=prefix)
+            eval_ctx = datamodule.prepare_eval(
+                sequence=sequence, stage=prefix, num_eval_samples=self.evaluator.NUM_EVAL_SAMPLES
+            )
             logger.info(f"Evaluating {sequence} samples")
 
             seq_prefix = f"{prefix}/{sequence}"
@@ -87,11 +86,13 @@ class SamplingEvaluationCallback(Callback):
                 )
 
                 if hasattr(pl_module, "run_model_diagnostics"):
-                    seq_metrics.update(pl_module.run_model_diagnostics(
-                        prefix=seq_prefix,
-                        system_cond=eval_ctx.system_cond,
-                        **self.run_diagnostics_kwargs,
-                    ))
+                    seq_metrics.update(
+                        pl_module.run_model_diagnostics(
+                            prefix=seq_prefix,
+                            system_cond=eval_ctx.system_cond,
+                            **self.run_diagnostics_kwargs,
+                        )
+                    )
 
                 pl_module.log_dict(seq_metrics)
                 all_metrics.update(seq_metrics)

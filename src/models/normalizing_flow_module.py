@@ -44,7 +44,7 @@ class NormalizingFlowModule(BaseLightningModule):
         self.teacher_regularize_weight = teacher_regularize_weight
 
         if self.teacher_regularize_weight > 0:
-            logger.info("Using teacher regularization with weight {:.3f}".format(self.teacher_regularize_weight))
+            logger.info(f"Using teacher regularization with weight {self.teacher_regularize_weight:.3f}")
             self.teacher = deepcopy(self.net)
             for param in self.teacher.parameters():
                 param.requires_grad_(False)
@@ -55,7 +55,9 @@ class NormalizingFlowModule(BaseLightningModule):
     def on_train_epoch_start(self) -> None:
         super().on_train_epoch_start()
         if self.teacher_regularize_weight > 0:
-            assert not self._has_ema_callback(), "EMAWeightAveraging callback should not be used with teacher regularization."
+            assert not self._has_ema_callback(), (
+                "EMAWeightAveraging callback should not be used with teacher regularization."
+            )
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         if self.train_from_buffer:
@@ -83,7 +85,9 @@ class NormalizingFlowModule(BaseLightningModule):
 
         if self.teacher_regularize_weight > 0:
             with torch.inference_mode():
-                z_pred_teacher, dlogp_teacher = self.teacher(x1, permutations=permutations, encodings=encodings, mask=mask)
+                z_pred_teacher, dlogp_teacher = self.teacher(
+                    x1, permutations=permutations, encodings=encodings, mask=mask
+                )
 
             logp_z_pred_teacher = self.prior.logp(z_pred_teacher, mask=mask)
             logq_teacher = logp_z_pred_teacher + dlogp_teacher
@@ -97,7 +101,10 @@ class NormalizingFlowModule(BaseLightningModule):
         return loss
 
     def proposal_energy(
-        self, net: torch.nn.Module, x: torch.Tensor, system_cond: Optional[SystemCond] = None,
+        self,
+        net: torch.nn.Module,
+        x: torch.Tensor,
+        system_cond: Optional[SystemCond] = None,
     ) -> torch.Tensor:
         permutations = system_cond.permutations if system_cond else None
         encodings = system_cond.encodings if system_cond else None
@@ -130,7 +137,9 @@ class NormalizingFlowModule(BaseLightningModule):
         return -logq  # energy is negative log probability
 
     def generate_proposal(
-        self, net: torch.nn.Module, num_samples: int,
+        self,
+        net: torch.nn.Module,
+        num_samples: int,
         system_cond: Optional[SystemCond] = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         permutations = system_cond.permutations if system_cond else None
@@ -154,8 +163,7 @@ class NormalizingFlowModule(BaseLightningModule):
         _encodings = None
         if encodings is not None:
             _encodings = {
-                key: tensor.unsqueeze(0).repeat(num_samples, 1).to(self.device)
-                for key, tensor in encodings.items()
+                key: tensor.unsqueeze(0).repeat(num_samples, 1).to(self.device) for key, tensor in encodings.items()
             }
 
         x_pred, dlogp_rev = net.reverse(z, _permutations, encodings=_encodings)

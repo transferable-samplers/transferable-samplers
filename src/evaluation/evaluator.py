@@ -1,13 +1,12 @@
 import torch
 
-from src.utils.standardization import destandardize_coords
+from src.evaluation.metrics.ess import normalized_ess
+from src.evaluation.metrics.kmeans_jsd import tica_kmeans_jsd, torus_kmeans_jsd
 from src.evaluation.metrics.wasserstein_distances import (
     energy_wasserstein,
     tica_wasserstein,
     torus_wasserstein,
 )
-from src.evaluation.metrics.ess import normalized_ess
-from src.evaluation.metrics.kmeans_jsd import tica_kmeans_jsd, torus_kmeans_jsd
 from src.evaluation.plots.plot_atom_distances import plot_atom_distances
 from src.evaluation.plots.plot_com_norms import plot_com_norms
 from src.evaluation.plots.plot_energies import plot_energies
@@ -16,6 +15,7 @@ from src.evaluation.plots.plot_tica import plot_tica
 from src.utils.chirality import get_symmetry_change
 from src.utils.dataclasses import EvalContext, SamplesData
 from src.utils.pylogger import RankedLogger
+from src.utils.standardization import destandardize_coords
 
 logger = RankedLogger(__name__, rank_zero_only=False)
 
@@ -26,16 +26,16 @@ class PeptideEnsembleEvaluator:
     Handles chirality fixing, metric computation, and plot generation.
     """
 
+    NUM_EVAL_SAMPLES = 10_000
+
     def __init__(
         self,
         fix_symmetry: bool = True,
         drop_unfixable_symmetry: bool = False,
-        num_eval_samples: int = 10_000,
         do_plots: bool = True,
     ):
         self.fix_symmetry = fix_symmetry
         self.drop_unfixable_symmetry = drop_unfixable_symmetry
-        self.num_eval_samples = num_eval_samples
         self.do_plots = do_plots
 
     @torch.no_grad()  # eval-only: metric computation, no training
@@ -82,9 +82,7 @@ class PeptideEnsembleEvaluator:
         # Fix chirality on proposal samples if present
         proposal_data = samples_data_dict.get("proposal")
         if proposal_data is not None:
-            proposal_data, symmetry_metrics = self._fix_chirality(
-                proposal_data, true_data, topology, prefix
-            )
+            proposal_data, symmetry_metrics = self._fix_chirality(proposal_data, true_data, topology, prefix)
             metrics.update(symmetry_metrics)
             samples_data_dict = {**samples_data_dict, "proposal": proposal_data}
 
@@ -105,7 +103,7 @@ class PeptideEnsembleEvaluator:
             logger.info(f"Evaluating {prefix + name} samples")
 
             # Slice to avoid computing metrics on too many samples
-            data = data[: self.num_eval_samples * 2]
+            data = data[: self.NUM_EVAL_SAMPLES * 2]
 
             metrics.update(
                 self._evaluate_peptide_data(
@@ -124,9 +122,9 @@ class PeptideEnsembleEvaluator:
         # Aggregate plots (energies, atom distances, CoM norms)
         if self.do_plots and log_image_fn is not None:
             # Reduce size so plotting doesn't crash with many samples
-            true_plot = true_data[: self.num_eval_samples]
+            true_plot = true_data[: self.NUM_EVAL_SAMPLES]
             plot_dict = {
-                name: data[: self.num_eval_samples]
+                name: data[: self.NUM_EVAL_SAMPLES]
                 for name, data in samples_data_dict.items()
                 if data is not None and len(data) > 0
             }
@@ -161,7 +159,7 @@ class PeptideEnsembleEvaluator:
     ):
         """Computes all metrics between true and predicted data."""
         metrics = {}
-        num_eval_samples = self.num_eval_samples
+        num_eval_samples = self.NUM_EVAL_SAMPLES
 
         if len(pred_data) < 0.9 * num_eval_samples:
             logger.warning(r"Less than 90% of required eval samples supplied.")
@@ -189,7 +187,9 @@ class PeptideEnsembleEvaluator:
         metrics.update(tica_wasserstein(true_data.samples, pred_data.samples, topology, tica_model, prefix=prefix))
         logger.info("TICA wasserstein computed")
 
-        metrics.update(tica_kmeans_jsd(true_data.samples, pred_data.samples, topology, tica_model=tica_model, prefix=prefix))
+        metrics.update(
+            tica_kmeans_jsd(true_data.samples, pred_data.samples, topology, tica_model=tica_model, prefix=prefix)
+        )
         metrics.update(torus_kmeans_jsd(true_data.samples, pred_data.samples, topology, prefix=prefix))
         logger.info("kMeans JSD computed")
 

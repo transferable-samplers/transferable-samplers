@@ -1,5 +1,3 @@
+---
 # train with many loggers at once
-
-defaults:
-  - csv
-  - wandb
+defaults: [csv, wandb]

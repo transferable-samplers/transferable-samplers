@@ -1,0 +1,43 @@
+---
+# @package _global_
+# ──────────────────────────────────────────────────────────────
+# Description: Train transferable ECNF++ on ManyPeptidesMD (<= 4aa)
+# Reference:   Table 2, Amortized Sampling with Transferable Normalizing Flows
+#              https://arxiv.org/abs/2508.18175
+# Notes:       Run as:
+#                python src/train.py \
+#                experiment=transferable/train/ecnf++_up_to_4aa.yaml
+# ──────────────────────────────────────────────────────────────
+defaults:
+  - override /model: flow_matching
+  - override /model/net: egnn_dynamics_transferable_md
+  - override /data: transferable/up_to_4aa
+  - override /trainer: gpu
+model:
+  sigma: 0.0
+  net:
+    channels: 256
+    num_layers: 9
+  optimizer:
+    _target_: torch.optim.AdamW
+    lr: 5e-4
+    betas: [0.9, 0.999]
+    weight_decay: 1e-4
+  scheduler:
+    _target_: torch.optim.lr_scheduler.OneCycleLR
+    _partial_: true
+    max_lr: ${model.optimizer.lr}
+    total_steps: ${trainer.max_epochs}
+    pct_start: 0.05
+    anneal_strategy: cos
+    cycle_momentum: false
+    div_factor: 5e2
+    final_div_factor: 1.0
+data:
+  batch_size: 512
+  com_augmentation: false
+callbacks:
+  sampling_evaluation:
+trainer:
+  limit_train_batches: 1000
+  max_epochs: 500

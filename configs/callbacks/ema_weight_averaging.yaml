@@ -1,3 +1,4 @@
+---
 ema:
   _target_: src.callbacks.ema_weight_averaging.EMAWeightAveraging
   decay: 0.999

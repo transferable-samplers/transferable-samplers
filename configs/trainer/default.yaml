@@ -1,10 +1,8 @@
+---
 _target_: lightning.pytorch.trainer.Trainer
-
 default_root_dir: ${paths.output_dir}
-
-min_epochs: 1 # prevents early stopping
+min_epochs: 1  # prevents early stopping
 max_epochs: 40
-
 accelerator: cpu
 devices: 1
 
@@ -16,10 +14,8 @@ check_val_every_n_epoch: 10
 
 # set True to to ensure deterministic results
 # makes training slower but gives more reproducibility than just setting seeds
-deterministic: False
-
+deterministic: false
 limit_val_batches: 1
 limit_test_batches: 1
-
 gradient_clip_val: 1.0
-inference_mode: False
+inference_mode: false

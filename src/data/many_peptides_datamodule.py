@@ -16,14 +16,14 @@ from src.data.base_datamodule import BaseDataModule
 from src.data.datasets.dummy_dataset import DummyDataset
 from src.data.datasets.webdataset import build_webdataset
 from src.data.energy.openmm_energy import OpenMMEnergy
-from src.data.preprocessing.encodings import get_encodings
-from src.data.preprocessing.permutations import get_permutations_dict
 from src.data.preprocessing.cache import (
     prepare_and_cache_encodings_dict,
     prepare_and_cache_pdb_dict,
     prepare_and_cache_permutations_dict,
     prepare_and_cache_topology_dict,
 )
+from src.data.preprocessing.encodings import get_encodings
+from src.data.preprocessing.permutations import get_permutations_dict
 from src.data.preprocessing.tica import TicaModel
 from src.data.transforms.add_encodings import AddEncodingsTransform
 from src.data.transforms.add_permutations import AddPermutationsTransform
@@ -50,7 +50,6 @@ class ManyPeptidesDataModule(BaseDataModule):
         precomputed_std: float,
         system_cond_ids: list[str] | None = None,
         com_augmentation: bool = False,
-        num_eval_samples: int = 10000,
         val_sequences: Union[str, list[str]] = None,
         test_sequences: Union[str, list[str]] = None,
         train_from_buffer: bool = False,
@@ -59,7 +58,9 @@ class ManyPeptidesDataModule(BaseDataModule):
         persistent_workers: bool = False,
         pin_memory: bool = False,
     ):
-        super().__init__(batch_size=batch_size, num_workers=num_workers, persistent_workers=persistent_workers,  pin_memory=pin_memory)
+        super().__init__(
+            batch_size=batch_size, num_workers=num_workers, persistent_workers=persistent_workers, pin_memory=pin_memory
+        )
 
         self.data_dir = data_dir
         self.num_aa_min = num_aa_min
@@ -68,7 +69,6 @@ class ManyPeptidesDataModule(BaseDataModule):
         self.num_atoms = num_atoms
         self.precomputed_std = precomputed_std
         self.com_augmentation = com_augmentation
-        self.num_eval_samples = num_eval_samples
 
         self.pdb_dir = os.path.join(data_dir, "pdbs")
 
@@ -148,10 +148,7 @@ class ManyPeptidesDataModule(BaseDataModule):
         return None
 
     def _resolve_hf_tar_urls(self) -> list[str]:
-        hf_url_prefix = (
-            f"https://huggingface.co/datasets/"
-            f"{self.HF_REPO_ID}/resolve/main/{self.WDS_REPO_PATH}"
-        )
+        hf_url_prefix = f"https://huggingface.co/datasets/{self.HF_REPO_ID}/resolve/main/{self.WDS_REPO_PATH}"
         return [f"{hf_url_prefix}/{i:04d}.tar" for i in range(self.NUM_TARFILES)]
 
     def _resolve_tar_urls(self) -> list[str]:
@@ -217,7 +214,7 @@ class ManyPeptidesDataModule(BaseDataModule):
 
         if self.train_from_buffer:
             # Buffer transforms: batchable geometric transforms.
-            # Stored to be accessed by the model for buffer sampling.
+            # Stored to be accessed by the model for buffer sampling.
             buffer_transform_list = list(base_transform_list)
             self.buffer_transforms = torchvision.transforms.Compose(buffer_transform_list)
 
@@ -274,8 +271,7 @@ class ManyPeptidesDataModule(BaseDataModule):
         device_index = torch.cuda.current_device() if torch.cuda.is_available() else None
         return OpenMMEnergy(system, integrator, platform_name=platform_name, device_index=device_index)
 
-
-    def prepare_eval(self, sequence: str, stage: str = None) -> EvalContext:
+    def prepare_eval(self, sequence: str, stage: str = None, num_eval_samples: int = None) -> EvalContext:
         """Prepare evaluation data and energy function for a given peptide sequence.
 
         Loads PDB directly from disk — no cache loading since it can be slow and
@@ -291,7 +287,9 @@ class ManyPeptidesDataModule(BaseDataModule):
         is_val = sequence in self.val_sequences
         is_test = sequence in self.test_sequences
         assert is_val or is_test, f"Sequence {sequence} not found in val or test sequences."
-        assert stage == ("val" if is_val else "test"), f"Stage '{stage}' does not match sequence '{sequence}' (found in {'val' if is_val else 'test'})."
+        assert stage == ("val" if is_val else "test"), (
+            f"Stage '{stage}' does not match sequence '{sequence}' (found in {'val' if is_val else 'test'})."
+        )
 
         data_path = self.val_data_path if is_val else self.test_data_path
         subsampled_trajectory_npz = np.load(
@@ -314,7 +312,11 @@ class ManyPeptidesDataModule(BaseDataModule):
         system_cond = None
         if "encodings" in self.system_cond_ids or "permutations" in self.system_cond_ids:
             encodings = get_encodings(topology) if "encodings" in self.system_cond_ids else None
-            permutations = get_permutations_dict({sequence: topology})[sequence] if "permutations" in self.system_cond_ids else None
+            permutations = (
+                get_permutations_dict({sequence: topology})[sequence]
+                if "permutations" in self.system_cond_ids
+                else None
+            )
             system_cond = SystemCond(
                 permutations=permutations,
                 encodings=encodings,
@@ -333,4 +335,3 @@ class ManyPeptidesDataModule(BaseDataModule):
             tica_model=tica_model,
             topology=topology,
         )
-

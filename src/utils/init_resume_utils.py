@@ -1,14 +1,13 @@
 """Utilities for resolving checkpoint / init-weight loading at training time."""
 
 import os
+from copy import deepcopy
 from typing import Optional
 
 import torch
 
 from src.utils.huggingface import download_weights
 from src.utils.pylogger import RankedLogger
-
-from copy import deepcopy
 
 logger = RankedLogger(__name__, rank_zero_only=False)
 
@@ -25,7 +24,8 @@ def load_state_dict_from_ckpt(path: str) -> dict:
     Raises:
         KeyError: If the checkpoint does not contain a ``state_dict`` key.
 
-    NOTE: If the model was trained using EMAWeightAveraging, the EMA weights will be in the checkpoint's ``state_dict`` field.
+    NOTE: If the model was trained using EMAWeightAveraging, the EMA weights will be in the
+    checkpoint's ``state_dict`` field.
     """
     assert path.endswith(".ckpt"), f"Expected a .ckpt file, got: {path}"
     ckpt = torch.load(path, map_location="cpu")
@@ -137,32 +137,24 @@ def resolve_init_or_resume(
     if resume_ckpt_path and os.path.exists(resume_ckpt_path):
         try:
             _ = torch.load(resume_ckpt_path, map_location="cpu")
-            logger.info(
-                f"Found resume checkpoint at {resume_ckpt_path}. "
-                "Resuming training; ignoring init_*."
-            )
+            logger.info(f"Found resume checkpoint at {resume_ckpt_path}. Resuming training; ignoring init_*.")
             return resume_ckpt_path, None
         except Exception:
             logger.exception(
-                f"Resume checkpoint exists but could not be loaded: {resume_ckpt_path}. "
-                "Falling back to init/scratch."
+                f"Resume checkpoint exists but could not be loaded: {resume_ckpt_path}. Falling back to init/scratch."
             )
 
     # 2. No valid resume checkpoint — resolve init weights or start from scratch
     if resume_ckpt_path and not os.path.exists(resume_ckpt_path):
-        logger.warning(
-            f"resume_ckpt_path set but not found: {resume_ckpt_path}. "
-        )
+        logger.warning(f"resume_ckpt_path set but not found: {resume_ckpt_path}. ")
 
     init_state_dict = resolve_init(init_ckpt_path, init_hf_state_dict_path, scratch_dir)
 
     if init_state_dict is None:
-        logger.info(
-            "No resume checkpoint found and no init weights provided; "
-            "training from random initialization."
-        )
+        logger.info("No resume checkpoint found and no init weights provided; training from random initialization.")
 
     return None, init_state_dict
+
 
 def augment_state_dict_for_teacher(sd: dict, student_prefix="net.", teacher_prefix="teacher."):
     """

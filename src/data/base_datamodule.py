@@ -1,4 +1,3 @@
-import logging
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
@@ -61,7 +60,7 @@ class BaseDataModule(LightningDataModule, ABC):
         ...
 
     @abstractmethod
-    def prepare_eval(self, sequence: str, stage: str) -> EvalContext:
+    def prepare_eval(self, sequence: str, stage: str, num_eval_samples: int) -> EvalContext:
         """Prepare evaluation data and energy function for a given peptide sequence.
 
         Args:
@@ -77,8 +76,7 @@ class BaseDataModule(LightningDataModule, ABC):
         """Validate batch size is divisible by world size and set per-device batch size."""
         if self.batch_size % self.trainer.world_size != 0:
             raise RuntimeError(
-                f"Batch size ({self.batch_size}) is not divisible by the number "
-                f"of devices ({self.trainer.world_size})."
+                f"Batch size ({self.batch_size}) is not divisible by the number of devices ({self.trainer.world_size})."
             )
         self.batch_size_per_device = self.batch_size // self.trainer.world_size
 
@@ -124,4 +122,3 @@ class BaseDataModule(LightningDataModule, ABC):
         """
         world_size = self.trainer.world_size if self.trainer is not None else 1
         return DataLoader(dataset=self.data_test, batch_size=world_size)
-

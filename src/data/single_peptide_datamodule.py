@@ -20,6 +20,7 @@ from src.data.transforms.rotation import Random3DRotationTransform
 from src.data.transforms.standardize import StandardizeTransform
 from src.utils.dataclasses import EvalContext, SamplesData, TargetEnergy
 
+
 class SinglePeptideDataModule(BaseDataModule):
     HF_REPO_ID = "transferable-samplers/sequential-boltzmann-generators-data"
 
@@ -31,14 +32,15 @@ class SinglePeptideDataModule(BaseDataModule):
         num_dimensions: int,
         num_atoms: int,
         com_augmentation: bool = False,
-        num_eval_samples: int = 10_000,
         train_from_buffer: bool = False,
         batch_size: int = 64,
         num_workers: int = 0,
         persistent_workers: bool = False,
         pin_memory: bool = False,
     ):
-        super().__init__(batch_size=batch_size, num_workers=num_workers, persistent_workers=persistent_workers,  pin_memory=pin_memory)
+        super().__init__(
+            batch_size=batch_size, num_workers=num_workers, persistent_workers=persistent_workers, pin_memory=pin_memory
+        )
 
         self.sequence = sequence
         self.temperature = temperature
@@ -46,8 +48,6 @@ class SinglePeptideDataModule(BaseDataModule):
         self.num_dimensions = num_dimensions
         self.num_atoms = num_atoms
         self.com_augmentation = com_augmentation
-        self.num_eval_samples = num_eval_samples
-
         self.repo_name = self.HF_REPO_ID.split("/")[-1]
         self.trajectory_name = f"{self.sequence}_{self.temperature}K"
 
@@ -139,7 +139,7 @@ class SinglePeptideDataModule(BaseDataModule):
 
             # Placeholder dataset; model owns the buffer and samples from it
             assert isinstance(self.trainer.limit_train_batches, int), (
-                "trainer.limit_train_batches must be set to an integer when using " 
+                "trainer.limit_train_batches must be set to an integer when using "
                 "train_from_buffer (the model needs to know how many batches to sample from the buffer each epoch)."
             )
             limit = self.trainer.limit_train_batches
@@ -172,9 +172,7 @@ class SinglePeptideDataModule(BaseDataModule):
             temperature = 300
             integrator = openmm.LangevinMiddleIntegrator(
                 temperature * openmm.unit.kelvin,
-                0.3 / openmm.unit.picosecond
-                if self.sequence == "Ace-AAA-Nme"
-                else 1.0 / openmm.unit.picosecond,
+                0.3 / openmm.unit.picosecond if self.sequence == "Ace-AAA-Nme" else 1.0 / openmm.unit.picosecond,
                 1.0 * openmm.unit.femtosecond,
             )
             platform_name = "CUDA" if torch.cuda.is_available() else "CPU"
@@ -203,11 +201,13 @@ class SinglePeptideDataModule(BaseDataModule):
 
         return potential
 
-    def prepare_eval(self, sequence: str, stage: str) -> EvalContext:
+    def prepare_eval(self, sequence: str, stage: str, num_eval_samples: int) -> EvalContext:
         """
         Prepare evaluation data and energy function for validation or test trajectories.
         """
-        assert sequence == self.sequence, f"Requested eval sequence '{sequence}' does not match datamodule sequence '{self.sequence}'"
+        assert sequence == self.sequence, (
+            f"Requested eval sequence '{sequence}' does not match datamodule sequence '{self.sequence}'"
+        )
         if stage == "test":
             true_samples = torch.from_numpy(np.load(self.test_data_path))
         elif stage == "val":
@@ -227,7 +227,7 @@ class SinglePeptideDataModule(BaseDataModule):
         tica_model = get_tica_model(true_samples, self.topology)
 
         # Subsample the true trajectory
-        true_samples = true_samples[:: len(true_samples) // self.num_eval_samples]
+        true_samples = true_samples[:: len(true_samples) // num_eval_samples]
 
         potential = self._setup_potential()
         energy_fn = lambda x: potential(x)

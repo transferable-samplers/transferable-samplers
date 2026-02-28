@@ -17,9 +17,9 @@ from tests.helpers.utils import compose_config, get_config_stem
 EXPERIMENT_NAMES = [
     f"training/{cfg_path}"
     for cfg_path in [
-        "single_system/ecnf++_AAA.yaml",  # single system ecnf
+        "single_system/ecnf++_AAA.yaml",  # single system ecnf (uses flow_matching_pp)
         "single_system/tarflow_AAA.yaml",  # single system nf
-        "transferable/ecnf++_up_to_4aa.yaml",  # transferable ecnf
+        "transferable/ecnf++_up_to_4aa.yaml",  # transferable ecnf (uses flow_matching_pp)
         "transferable/prose_up_to_8aa.yaml",  # transferable nf
     ]
 ]
@@ -60,7 +60,8 @@ def cfg_test_train_mwe(request: pytest.FixtureRequest, trainer_name_param: str, 
         cfg.data.batch_size = 4
         if trainer_name_param == "cpu":
             cfg.callbacks.sampling_evaluation.run_diagnostics_kwargs = {
-                "num_samples_invert": 8, "num_samples_dlogp": 2,
+                "num_samples_invert": 8,
+                "num_samples_dlogp": 2,
             }
         cfg.tags = ["pytest", f"test_train_mwe_{trainer_name_param}"]
 

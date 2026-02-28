@@ -1,0 +1,46 @@
+---
+# @package _global_
+# ──────────────────────────────────────────────────────────────
+# Description: Train ECNF++ on AAA
+# Reference:   Table 2, Scalable Equilibrium Sampling with Sequential Boltzmann Generators
+#              https://arxiv.org/abs/2502.18462
+# Notes:       ECNF++ is a retraining of Transferable Boltzmann Generator
+#              https://arxiv.org/abs/2406.1442
+#              Run as:
+#                python src/train.py \
+#                experiment=single_system/train/ecnf++_AAA.yaml
+# ──────────────────────────────────────────────────────────────
+defaults:
+  - override /model: flow_matching
+  - override /model/net: egnn_dynamics_ad2_cat
+  - override /data: single_system/AAA
+  - override /trainer: gpu
+model:
+  net:
+    channels: 256  # bigger network than TBG
+    num_layers: 5
+  optimizer:
+    _target_: torch.optim.AdamW
+    lr: 5e-4
+    betas: [0.9, 0.999]
+    weight_decay: 1e-4  # use weight decay
+  scheduler:
+    # Warmup from max_lr / 500 -> max_lr, anneal to max_lr / 500 again
+    _target_: torch.optim.lr_scheduler.OneCycleLR
+    _partial_: true
+    max_lr: ${model.optimizer.lr}
+    total_steps: ${trainer.max_epochs}
+    pct_start: 0.05
+    anneal_strategy: cos
+    cycle_momentum: false
+    div_factor: 5e2
+    final_div_factor: 1.0
+  sigma: 0.0  # no noise
+data:
+  batch_size: 512
+callbacks:
+  sampling_evaluation:
+  ema:
+    decay: 0.999  # use EMA
+trainer:
+  max_epochs: 1000

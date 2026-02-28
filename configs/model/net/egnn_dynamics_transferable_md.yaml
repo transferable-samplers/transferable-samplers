@@ -1,3 +1,4 @@
+---
 _target_: src.nn.egnn.egnn_dynamics_transferable_md.EGNNDynamicsTransferableMD
 num_atoms: ${data.num_atoms}
 num_dimensions: ${data.num_dimensions}

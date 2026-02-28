@@ -1,0 +1,43 @@
+---
+# @package _global_
+# ──────────────────────────────────────────────────────────────
+# Description: Evaluate TarFlow on Ace-A-Nme with SMC (SBG)
+# Reference:   Table 2, Scalable Equilibrium Sampling with Sequential Boltzmann Generators
+#              https://arxiv.org/abs/2502.18462
+# Notes:       Run as:
+#                python src/transferable_samplers/eval.py \
+#                experiment=single_system/eval/tarflow_Ace-A-Nme_ula.yaml
+#              Defaults to the model:
+#                https://huggingface.co/transferable-samplers/model-weights/tree/main/single_system/tarflow_Ace-A-Nme_0.pth
+#              Change the seed with _0 -> _1, _2 to load models with different training seeds
+#              As in the paper we use the continuous-time formulation of SMC
+# ──────────────────────────────────────────────────────────────
+defaults:
+  - override /model: normalizing_flow
+  - override /model/net: tarflow_single_system
+  - override /data: single_system/Ace-A-Nme
+  - override /trainer: gpu
+hf_state_dict_path: single_system/tarflow_Ace-A-Nme_0.pth
+model:
+  net:
+    channels: 256
+    in_channels: 1
+    img_size: 66
+    num_blocks: 4
+    layers_per_block: 4
+  source_energy_config:
+    sample_batch_size: 2048
+    energy_batch_size: 512
+    grad_batch_size: 512
+    use_com_adjustment: true
+callbacks:
+  sampling_evaluation:
+    sampler:
+      _target_: src.samplers.smc_sampler.SMCSampler
+      num_samples: 10_000
+      init_eps: 1e-5
+      num_annealing_steps: 100
+      ess_threshold: 0.5
+      resampling_method: multinomial
+      energy_cutoff_filter: 10.0
+      log_traj_freq: 1

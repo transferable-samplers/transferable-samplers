@@ -1,0 +1,56 @@
+---
+# @package _global_
+# ──────────────────────────────────────────────────────────────
+# Description: Train TarFlow on Ace-AAA-Nme
+# Reference:   Table 3, Scalable Equilibrium Sampling with Sequential Boltzmann Generators
+#              https://arxiv.org/abs/2502.18462
+# Notes:       Run as:
+#                python src/train.py \
+#                experiment=single_system/train/tarflow_Ace-AAA-Nme.yaml
+# ──────────────────────────────────────────────────────────────
+defaults:
+  - override /model: normalizing_flow
+  - override /model/net: tarflow_single_system
+  - override /data: single_system/Ace-AAA-Nme
+  - override /trainer: gpu
+model:
+  net:
+    channels: 256
+    img_size: 126
+    num_blocks: 6
+    layers_per_block: 6
+  optimizer:
+    _target_: torch.optim.AdamW
+    lr: 1e-4
+    betas: [0.9, 0.95]
+    weight_decay: 4e-4
+  scheduler:
+    # Warmup from max_lr / 500 -> max_lr, anneal to max_lr / 500 again
+    _target_: torch.optim.lr_scheduler.OneCycleLR
+    _partial_: true
+    max_lr: ${model.optimizer.lr}
+    total_steps: ${trainer.max_epochs}
+    pct_start: 0.05
+    anneal_strategy: cos
+    cycle_momentum: false
+    div_factor: 5e2
+    final_div_factor: 1.0
+  source_energy_config:
+    sample_batch_size: 10_000
+    energy_batch_size: 10_000
+    grad_batch_size: 10_000
+    use_com_adjustment: true
+data:
+  batch_size: 512
+  com_augmentation: true
+callbacks:
+  sampling_evaluation:
+    sampler:
+      _target_: src.samplers.snis_sampler.SNISSampler
+      num_samples: 10_000
+      logw_quantile_filter: 0.002
+  ema:
+    decay: 0.999  # use EMA
+trainer:
+  max_epochs: 1000
+  check_val_every_n_epoch: 50  # used for early stopping

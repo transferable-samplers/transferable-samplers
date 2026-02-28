@@ -1,6 +1,6 @@
 import math
 from dataclasses import dataclass
-from typing import Callable, Optional, Tuple
+from typing import Callable, Optional
 
 import scipy.special
 import torch
@@ -11,9 +11,10 @@ from src.utils.standardization import destandardize_coords
 @dataclass(frozen=True)
 class SourceEnergyConfig:
     """Configuration for SourceEnergy batch sizes. Passed via Hydra configs."""
-    sample_batch_size: int
-    energy_batch_size: int
-    grad_batch_size: int
+
+    sample_batch_size: int = 8
+    energy_batch_size: int = 8
+    grad_batch_size: int = 8
     use_com_adjustment: bool = False
 
 
@@ -24,13 +25,14 @@ class TargetEnergy:
     Handles unnormalization internally: callers pass normalized samples,
     and the energy function receives unnormalized positions.
     """
+
     energy_fn: Callable  # (x_unnormalized) -> energy (batch,)
     normalization_std: torch.Tensor
 
     def energy(self, x: torch.Tensor) -> torch.Tensor:
         return self.energy_fn(destandardize_coords(x, self.normalization_std))
 
-    def energy_and_grad(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def energy_and_grad(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         if torch.is_grad_enabled():
             raise RuntimeError(
                 "TargetEnergy.energy_and_grad() is non-differentiable by design."
@@ -51,8 +53,9 @@ class SourceEnergy:
     Created via BaseLightningModule.build_source_energy(). Handles batching
     internally for sample, energy, and energy_and_grad.
     """
-    sample_fn: Callable        # (num_samples) -> (samples, E_source)
-    energy_fn: Callable        # (x) -> energy (batch,)
+
+    sample_fn: Callable  # (num_samples) -> (samples, E_source)
+    energy_fn: Callable  # (x) -> energy (batch,)
     sample_batch_size: int
     energy_batch_size: int
     grad_batch_size: int
@@ -75,12 +78,11 @@ class SourceEnergy:
         # Compute the Norms of the CoM for each sample in the batch.
         com_norms = x.mean(dim=1).norm(dim=-1)
 
-        return (
-            com_norms ** 2 / (2 * com_std_analytic ** 2)
-            - torch.log(com_norms**2 / (math.sqrt(2) * com_std_analytic**3 * scipy.special.gamma(1.5)))
+        return com_norms**2 / (2 * com_std_analytic**2) - torch.log(
+            com_norms**2 / (math.sqrt(2) * com_std_analytic**3 * scipy.special.gamma(1.5))
         )
 
-    def sample(self, num_samples: int, **kwargs) -> Tuple[torch.Tensor, torch.Tensor]:
+    def sample(self, num_samples: int, **kwargs) -> tuple[torch.Tensor, torch.Tensor]:
         """Generate num_samples proposals in batches.
 
         If use_com_adjustment is True, applies a CoM energy adjustment
@@ -117,9 +119,7 @@ class SourceEnergy:
             out[i : i + bs] = out_batch
         return out
 
-    def energy_and_grad(
-        self, x: torch.Tensor, batch_size: Optional[int] = None
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    def energy_and_grad(self, x: torch.Tensor, batch_size: Optional[int] = None) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Compute energy and gradient in batches.
         If use_com_adjustment is True, applies a CoM energy adjustment
@@ -127,7 +127,8 @@ class SourceEnergy:
         """
         if torch.is_grad_enabled():
             raise RuntimeError(
-                "SourceEnergy.energy_and_grad() is non-differentiable by convention with TargetEnergy.energy_and_grad()."
+                "SourceEnergy.energy_and_grad() is non-differentiable by convention "
+                "with TargetEnergy.energy_and_grad()."
                 "Use SourceEnergy.energy() for differentiable energy evaluations."
                 "Take care to test well if removing this!"
             )

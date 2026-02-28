@@ -1,16 +1,12 @@
+---
 # @package _global_
-
-defaults:
-  - default
-
+defaults: [default]
 trainer:
   max_epochs: 2
   limit_train_batches: 2
   limit_val_batches: 1
   limit_test_batches: 1
   accelerator: gpu
-
 callbacks:
   sampling_evaluation:
-    evaluator:
-      num_eval_samples: 100
+    evaluator: {}
