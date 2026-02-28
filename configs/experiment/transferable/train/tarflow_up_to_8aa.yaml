@@ -1,4 +1,3 @@
----
 # @package _global_
 # ──────────────────────────────────────────────────────────────
 # Description: Train TarFlow on ManyPeptidesMD
@@ -43,6 +42,6 @@ callbacks:
       _target_: src.samplers.snis_sampler.SNISSampler
       num_samples: 5_000
 trainer:
-  limit_train_batches: 1000  # need to set an "epoch" length
+  limit_train_batches: 1000 # need to set an "epoch" length
   max_epochs: 500
   check_val_every_n_epoch: 50

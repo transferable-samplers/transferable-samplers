@@ -24,8 +24,8 @@ EXPERIMENT_DIR = CONFIGS_DIR / "experiment"
 REFERENCE_DIR = Path(__file__).resolve().parent / "reference_configs"
 
 # Auto-discover all experiment YAML files
-TRAINING_EXPERIMENTS = sorted(str(p.relative_to(EXPERIMENT_DIR)) for p in EXPERIMENT_DIR.glob("training/**/*.yaml"))
-EVALUATION_EXPERIMENTS = sorted(str(p.relative_to(EXPERIMENT_DIR)) for p in EXPERIMENT_DIR.glob("evaluation/**/*.yaml"))
+TRAINING_EXPERIMENTS = sorted(str(p.relative_to(EXPERIMENT_DIR)) for p in EXPERIMENT_DIR.glob("*/train/**/*.yaml"))
+EVALUATION_EXPERIMENTS = sorted(str(p.relative_to(EXPERIMENT_DIR)) for p in EXPERIMENT_DIR.glob("*/eval/**/*.yaml"))
 ALL_EXPERIMENTS = [("train", exp) for exp in TRAINING_EXPERIMENTS] + [("eval", exp) for exp in EVALUATION_EXPERIMENTS]
 ALL_EXPERIMENT_IDS = [Path(exp).stem for _, exp in ALL_EXPERIMENTS]
 
@@ -71,7 +71,7 @@ def _clear_hydra():
     GlobalHydra.instance().clear()
 
 
-@pytest.mark.parametrize("config_name,experiment_path", ALL_EXPERIMENTS, ids=ALL_EXPERIMENT_IDS)
+@pytest.mark.parametrize(("config_name", "experiment_path"), ALL_EXPERIMENTS, ids=ALL_EXPERIMENT_IDS)
 def test_experiment_config_drift(config_name: str, experiment_path: str, request) -> None:
     """Test that the composed config matches the reference JSON snapshot."""
     update = request.config.getoption("--update-reference")
@@ -82,7 +82,7 @@ def test_experiment_config_drift(config_name: str, experiment_path: str, request
 
     if update:
         REFERENCE_DIR.mkdir(parents=True, exist_ok=True)
-        with open(reference_path, "w") as f:
+        with reference_path.open("w") as f:
             json.dump(composed, f, indent=2, default=str, sort_keys=True)
             f.write("\n")
         pytest.skip(f"Updated reference file: {reference_path.name}")
@@ -91,7 +91,7 @@ def test_experiment_config_drift(config_name: str, experiment_path: str, request
         f"Reference file missing: {reference_path}\nRun with --update-reference to generate it."
     )
 
-    with open(reference_path) as f:
+    with reference_path.open() as f:
         expected = json.load(f)
 
     actual_json = json.dumps(composed, indent=2, default=str, sort_keys=True)
@@ -102,7 +102,7 @@ def test_experiment_config_drift(config_name: str, experiment_path: str, request
     )
 
 
-@pytest.mark.parametrize("config_name,experiment_path", ALL_EXPERIMENTS, ids=ALL_EXPERIMENT_IDS)
+@pytest.mark.parametrize(("config_name", "experiment_path"), ALL_EXPERIMENTS, ids=ALL_EXPERIMENT_IDS)
 def test_experiment_targets_importable(config_name: str, experiment_path: str) -> None:
     """Test that all _target_ paths in the config are importable."""
     cfg = compose_config(

@@ -1,4 +1,3 @@
----
 # @package _global_
 # ──────────────────────────────────────────────────────────────
 # Description: Train ECNF++ on Ace-A-Nme
@@ -17,13 +16,13 @@ defaults:
   - override /trainer: gpu
 model:
   net:
-    channels: 256  # bigger network than TBG
+    channels: 256 # bigger network than TBG
     num_layers: 5
   optimizer:
     _target_: torch.optim.AdamW
     lr: 5e-4
     betas: [0.9, 0.999]
-    weight_decay: 1e-4  # use weight decay
+    weight_decay: 1e-4 # use weight decay
   scheduler:
     # Warmup from max_lr / 500 -> max_lr, anneal to max_lr / 500 again
     _target_: torch.optim.lr_scheduler.OneCycleLR
@@ -35,12 +34,12 @@ model:
     cycle_momentum: false
     div_factor: 5e2
     final_div_factor: 1.0
-  sigma: 0.0  # no noise
+  sigma: 0.0 # no noise
 data:
   batch_size: 512
 callbacks:
   sampling_evaluation:
   ema:
-    decay: 0.999  # use EMA
+    decay: 0.999 # use EMA
 trainer:
   max_epochs: 1000

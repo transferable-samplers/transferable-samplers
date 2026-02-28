@@ -1,4 +1,3 @@
----
 # @package _global_
 # ──────────────────────────────────────────────────────────────
 # Description: Train transferable ECNF++ on ManyPeptidesMD (<= 4aa)

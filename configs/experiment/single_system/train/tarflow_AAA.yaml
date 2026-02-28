@@ -1,4 +1,3 @@
----
 # @package _global_
 # ──────────────────────────────────────────────────────────────
 # Description: Train TarFlow on AAA
@@ -50,7 +49,7 @@ callbacks:
       num_samples: 10_000
       logw_quantile_filter: 0.002
   ema:
-    decay: 0.999  # use EMA
+    decay: 0.999 # use EMA
 trainer:
   max_epochs: 1000
-  check_val_every_n_epoch: 50  # used for early stopping
+  check_val_every_n_epoch: 50 # used for early stopping

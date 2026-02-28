@@ -1,3 +1,5 @@
+defaults:
+  - net: tarflow_single_system
 _target_: src.models.normalizing_flow_module.NormalizingFlowModule
 compile_net: false
 output_dir: ${paths.output_dir}
