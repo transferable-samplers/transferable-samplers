@@ -36,4 +36,5 @@ callbacks:
       adaptive_step_size: true
       resampling_method: systematic
       energy_cutoff_filter: 100
+      logw_quantile_filter: 0.002
       log_traj_freq: 1

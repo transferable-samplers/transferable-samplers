@@ -4,7 +4,7 @@
 # Reference:   Table 2, Amortized Sampling with Transferable Normalizing Flows
 #              https://arxiv.org/abs/2508.18175
 # Notes:       Run as:
-#                python src/train.py \
+#                python src/transferable_samplers/train.py \
 #                experiment=transferable/train/tarflow_up_to_8aa.yaml
 # ──────────────────────────────────────────────────────────────
 defaults:

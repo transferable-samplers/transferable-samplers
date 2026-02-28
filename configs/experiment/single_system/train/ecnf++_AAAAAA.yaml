@@ -6,7 +6,7 @@
 # Notes:       ECNF++ is a retraining of Transferable Boltzmann Generator
 #              https://arxiv.org/abs/2406.1442
 #              Run as:
-#                python src/train.py \
+#                python src/transferable_samplers/train.py \
 #                experiment=single_system/train/ecnf++_AAAAAA.yaml
 # ──────────────────────────────────────────────────────────────
 defaults:

@@ -38,4 +38,5 @@ callbacks:
       ess_threshold: 0.5
       resampling_method: multinomial
       energy_cutoff_filter: -20.0
+      logw_quantile_filter: 0.002
       log_traj_freq: 1
