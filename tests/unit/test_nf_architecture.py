@@ -23,7 +23,7 @@ TEST_SEQUENCES = [
     "AA",
 ]
 EXPERIMENT_OVERRIDE = [
-    "experiment=training/transferable/prose_up_to_8aa",
+    "experiment=transferable/train/prose_up_to_8aa",
     "data.num_aa_max=8",
     "++model.net.debug=True",
 ]

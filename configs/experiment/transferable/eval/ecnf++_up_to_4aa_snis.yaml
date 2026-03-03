@@ -26,6 +26,6 @@ model:
 callbacks:
   sampling_evaluation:
     sampler:
-      _target_: src.samplers.snis_sampler.SNISSampler
+      _target_: transferable_samplers.samplers.snis_sampler.SNISSampler
       num_samples: 10_000
       logw_quantile_filter: 0.002

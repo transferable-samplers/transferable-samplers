@@ -1,4 +1,4 @@
-_target_: src.nn.tarflow.tarflow_single_system.TarFlow
+_target_: transferable_samplers.nn.tarflow.tarflow_single_system.TarFlow
 in_channels: 3
 channels: 256
 patch_size: 1

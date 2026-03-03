@@ -1,14 +1,13 @@
 defaults:
   - net: tarflow_single_system
-_target_: src.models.normalizing_flow_module.NormalizingFlowModule
+_target_: transferable_samplers.models.normalizing_flow_module.NormalizingFlowModule
 compile_net: false
-output_dir: ${paths.output_dir}
 train_from_buffer: false
 mean_free_prior: false
 source_energy_config:
-  _target_: src.utils.dataclasses.SourceEnergyConfig
+  _target_: transferable_samplers.utils.dataclasses.SourceEnergyConfig
 prior:
-  _target_: src.models.priors.normal_distribution.NormalDistribution
+  _target_: transferable_samplers.models.priors.normal_distribution.NormalDistribution
   num_dimensions: ${data.num_dimensions}
   mean_free: false
 optimizer:

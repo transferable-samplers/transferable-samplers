@@ -39,7 +39,7 @@ data:
 callbacks:
   sampling_evaluation:
     sampler:
-      _target_: src.samplers.snis_sampler.SNISSampler
+      _target_: transferable_samplers.samplers.snis_sampler.SNISSampler
       num_samples: 5_000
 trainer:
   limit_train_batches: 1000 # need to set an "epoch" length

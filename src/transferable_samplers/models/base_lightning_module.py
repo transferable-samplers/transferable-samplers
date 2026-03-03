@@ -25,9 +25,8 @@ class BaseLightningModule(LightningModule):
         self,
         net: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
-        # pyrefly: ignore [not-a-type]
-        scheduler: torch.optim.lr_scheduler,
         prior: Prior,
+        scheduler: Any = None,
         compile_net: bool = False,
         source_energy_config: SourceEnergyConfig | None = None,
         train_from_buffer: bool = False,

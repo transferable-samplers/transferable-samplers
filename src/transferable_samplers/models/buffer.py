@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import Any
 
 import torch
+import torch.utils._pytree as pytree
 
 from transferable_samplers.utils.dataclasses import SystemCond
 from transferable_samplers.utils.standardization import destandardize_coords
@@ -34,12 +35,13 @@ class Buffer:
     def __len__(self) -> int:
         return len(self.samples)
 
-    def sample(self, batch_size: int) -> dict[str, Any]:
+    def sample(self, batch_size: int, device: torch.device | str | None = None) -> dict[str, Any]:
         """Draw a random batch from the buffer.
 
         1. Randomly selects samples and stacks into a batch.
         2. Applies batch_transform to the entire batch at once.
         3. Adds system_cond fields (expanded to batch_size).
+        4. Moves all tensors to `device` if provided.
         """
         indices = torch.randint(0, len(self.samples), (batch_size,))
         batch = {"x": destandardize_coords(self.samples[indices], self.normalization_std)}
@@ -55,5 +57,8 @@ class Buffer:
             if batched_cond.permutations is not None:
                 # pyrefly: ignore [unsupported-operation]
                 batch["permutations"] = batched_cond.permutations
+
+        if device is not None:
+            batch = pytree.tree_map(lambda x: x.to(device) if isinstance(x, torch.Tensor) else x, batch)
 
         return batch

@@ -14,7 +14,7 @@ from omegaconf import DictConfig, open_dict
 from tests.helpers.utils import compose_config, get_config_stem
 from transferable_samplers.train import train
 
-EXPERIMENT_NAMES = ["evaluation/transferable/prose_up_to_8aa_self_improve.yaml"]
+EXPERIMENT_NAMES = ["transferable/eval/prose_up_to_8aa_self_improve.yaml"]
 
 
 @pytest.fixture(params=EXPERIMENT_NAMES, ids=get_config_stem)

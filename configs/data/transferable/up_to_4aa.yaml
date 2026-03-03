@@ -1,4 +1,4 @@
-_target_: src.data.many_peptides_datamodule.ManyPeptidesDataModule
+_target_: transferable_samplers.data.many_peptides_datamodule.ManyPeptidesDataModule
 data_dir: ${paths.data_dir}
 system_cond_ids: [encodings, permutations] # Can remove permutations if not needed for startup / memory efficiency.
 num_dimensions: 3

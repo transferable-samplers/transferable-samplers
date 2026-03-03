@@ -21,11 +21,8 @@ MEDIAN_SMC_ENERGY_THRESHOLDS = {  # these are intentionally loose, just to catch
 }
 
 EXPERIMENT_NAMES = [
-    f"evaluation/{cfg_path}"
-    for cfg_path in [
-        "single_system/tarflow_AAA_ula.yaml",
-        "transferable/prose_up_to_8aa_mala.yaml",
-    ]
+    "single_system/eval/tarflow_AAA_ula.yaml",
+    "transferable/eval/prose_up_to_8aa_mala.yaml",
 ]
 
 

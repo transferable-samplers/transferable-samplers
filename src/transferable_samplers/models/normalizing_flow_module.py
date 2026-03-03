@@ -18,9 +18,8 @@ class NormalizingFlowModule(BaseLightningModule):
         self,
         net: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
-        # pyrefly: ignore [not-a-type]
-        scheduler: torch.optim.lr_scheduler,
         prior: Prior,
+        scheduler: Any = None,
         compile_net: bool = False,
         source_energy_config: SourceEnergyConfig | None = None,
         train_from_buffer: bool = False,
@@ -52,7 +51,7 @@ class NormalizingFlowModule(BaseLightningModule):
     def training_step(self, batch: dict[str, Any], batch_idx: int) -> torch.Tensor:
         if self.train_from_buffer:
             assert self._buffer is not None, "Buffer must be set for training from buffer"
-            batch = self._buffer.sample(batch["x"].shape[0])
+            batch = self._buffer.sample(batch["x"].shape[0], device=self.device)
 
         assert len(batch["x"].shape) == 3, "molecules must be a pointcloud (batch_size, num_atoms, 3)"
 

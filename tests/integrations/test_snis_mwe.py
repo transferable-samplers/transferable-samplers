@@ -28,21 +28,18 @@ MEDIAN_PROPOSAL_ENERGY_THRESHOLDS = {  # these are intentionally loose, just to 
 }
 
 EXPERIMENT_NAMES = [
-    f"evaluation/{cfg_path}"
-    for cfg_path in [
-        "single_system/ecnf++_Ace-A-Nme_snis.yaml",
-        "single_system/ecnf++_AAA_snis.yaml",
-        "single_system/ecnf++_Ace-AAA-Nme_snis.yaml",
-        "single_system/ecnf++_AAAAAA_snis.yaml",
-        "single_system/tarflow_Ace-A-Nme_ula.yaml",
-        "single_system/tarflow_AAA_ula.yaml",
-        "single_system/tarflow_Ace-AAA-Nme_ula.yaml",
-        "single_system/tarflow_AAAAAA_ula.yaml",
-        "single_system/tarflow_GYDPETGTWG_ula.yaml",
-        "transferable/ecnf++_up_to_4aa_snis.yaml",
-        "transferable/tarflow_up_to_8aa_snis.yaml",
-        "transferable/prose_up_to_8aa_snis.yaml",
-    ]
+    "single_system/eval/ecnf++_Ace-A-Nme_snis.yaml",
+    "single_system/eval/ecnf++_AAA_snis.yaml",
+    "single_system/eval/ecnf++_Ace-AAA-Nme_snis.yaml",
+    "single_system/eval/ecnf++_AAAAAA_snis.yaml",
+    "single_system/eval/tarflow_Ace-A-Nme_ula.yaml",
+    "single_system/eval/tarflow_AAA_ula.yaml",
+    "single_system/eval/tarflow_Ace-AAA-Nme_ula.yaml",
+    "single_system/eval/tarflow_AAAAAA_ula.yaml",
+    "single_system/eval/tarflow_GYDPETGTWG_ula.yaml",
+    "transferable/eval/ecnf++_up_to_4aa_snis.yaml",
+    "transferable/eval/tarflow_up_to_8aa_snis.yaml",
+    "transferable/eval/prose_up_to_8aa_snis.yaml",
 ]
 
 

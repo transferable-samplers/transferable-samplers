@@ -27,7 +27,7 @@ model:
 callbacks:
   sampling_evaluation:
     sampler:
-      _target_: src.samplers.smc_sampler.SMCSampler
+      _target_: transferable_samplers.samplers.smc_sampler.SMCSampler
       num_samples: 10_000
       use_metropolis: true
       init_eps: 5e-4

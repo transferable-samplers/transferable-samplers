@@ -166,10 +166,13 @@ def plot_smc_diagnostics(
     diagnostics = diagnostics_output["diagnostics"]
     trajectory = diagnostics_output["trajectory"]
 
-    t_list = diagnostics["t"]
-    ess_list = diagnostics["ess"]
-    sigma_list = diagnostics["eps"]
-    acceptance_rate_list = diagnostics["acceptance_rate"]
+    def _to_scalar(x: Any) -> float:
+        return x.item() if isinstance(x, torch.Tensor) else x
+
+    t_list = [_to_scalar(t) for t in diagnostics["t"]]
+    ess_list = [_to_scalar(e) for e in diagnostics["ess"]]
+    sigma_list = [_to_scalar(s) for s in diagnostics["eps"]]
+    acceptance_rate_list = [_to_scalar(a) for a in diagnostics["acceptance_rate"]]
 
     # Lineage survival from trajectory snapshots
     if trajectory:

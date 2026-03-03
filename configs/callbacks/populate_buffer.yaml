@@ -1,5 +1,5 @@
 populate_buffer:
-  _target_: src.callbacks.populate_buffer_callback.PopulateBufferCallback
+  _target_: transferable_samplers.callbacks.populate_buffer_callback.PopulateBufferCallback
   sampler:
   evaluator:
-    _target_: src.evaluation.evaluator.PeptideEnsembleEvaluator
+    _target_: transferable_samplers.evaluation.evaluator.PeptideEnsembleEvaluator
