@@ -20,10 +20,15 @@ Path(report_dir).mkdir(parents=True, exist_ok=True)
 def trainer_name_param(request):
     trainer = request.param
 
-    if trainer == "ddp" and torch.cuda.device_count() < 2:
+    if trainer in ("ddp", "ddp_fork") and torch.cuda.device_count() < 2:
         pytest.skip("DDP requires >=2 GPUs")
     if trainer == "gpu" and torch.cuda.device_count() < 1:
         pytest.skip("No GPU available")
+
+    # ddp strategy requires torchrun/SLURM launcher; use ddp_fork in tests so
+    # Lightning forks worker processes itself without an external launcher.
+    if trainer == "ddp":
+        return "ddp_fork"
     return trainer
 
 

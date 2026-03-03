@@ -7,7 +7,6 @@ NOTE: A very loose threshold on median SMC energy is used to catch major issues.
 from pathlib import Path
 
 import pytest
-import torch
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, open_dict
 
@@ -35,7 +34,6 @@ def cfg_test_smc_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tm
     Args:
         request: pytest request object to get the experiment override parameter.
         trainer_name_param: trainer name parameter supplied by parametrization fixtures.
-            (currently unused, need to implement DDP SMC)
         tmp_path: pytest-provided temporary directory path.
 
     Returns:
@@ -76,7 +74,6 @@ def cfg_test_smc_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tm
 
 @pytest.mark.forked  # prevents OpenMM issues
 @pytest.mark.pipeline
-@pytest.mark.skipif(torch.cuda.device_count() > 1, reason="Not yet implemented for DDP")
 def test_smc_mwe(cfg_test_smc_mwe: DictConfig) -> None:
     """
     Run eval() for every experiment config provided by the `cfg_test_smc_mwe` fixture.
