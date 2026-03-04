@@ -48,39 +48,42 @@ class NormalizingFlowModule(BaseLightningModule):
                 param.requires_grad_(False)
             self.teacher.eval()
 
+    def compute_primary_loss(self, batch: dict[str, Any]) -> torch.Tensor:
+        x = batch["x"]
+        assert len(x.shape) == 3, "molecules must be a pointcloud (batch_size, num_atoms, 3)"
+
+        encodings = batch.get("encodings")
+        permutations = batch.get("permutations")
+        mask = batch.get("mask")
+
+        z_pred, dlogp = self.net(x, permutations=permutations, encodings=encodings, mask=mask)
+        logp_pred_z = self.prior.logp(z_pred, mask=mask)
+        logq = logp_pred_z + dlogp
+        return -logq
+
     def training_step(self, batch: dict[str, Any], batch_idx: int) -> torch.Tensor:
         if self.train_from_buffer:
             assert self._buffer is not None, "Buffer must be set for training from buffer"
             batch = self._buffer.sample(batch["x"].shape[0], device=self.device)
 
-        assert len(batch["x"].shape) == 3, "molecules must be a pointcloud (batch_size, num_atoms, 3)"
-
-        x1 = batch["x"]
-        encodings = batch.get("encodings")
-        permutations = batch.get("permutations")
-        mask = batch.get("mask")
-
-        if mask is not None:
-            data_dim = mask.sum(dim=-1) * x1.shape[-1]
-        else:
-            data_dim = x1.shape[-2] * x1.shape[-1]
-
-        z_pred, dlogp = self.net(x1, permutations=permutations, encodings=encodings, mask=mask)
-        logp_pred_z = self.prior.logp(z_pred, mask=mask)
-        logq = logp_pred_z + dlogp
-        loss = -(logq / data_dim).mean()
+        per_sample_loss = self.compute_primary_loss(batch)
+        loss = self.normalize_by_system_dim(per_sample_loss, batch["x"], batch.get("mask"))
 
         self.log("train/mle_loss", loss.item(), prog_bar=True, sync_dist=True)
 
         if self.teacher_regularize_weight > 0:
+            x = batch["x"]
+            encodings = batch.get("encodings")
+            permutations = batch.get("permutations")
+            mask = batch.get("mask")
+
             with torch.inference_mode():
                 z_pred_teacher, dlogp_teacher = self.teacher(
-                    x1, permutations=permutations, encodings=encodings, mask=mask
+                    x, permutations=permutations, encodings=encodings, mask=mask
                 )
+                logq_teacher = self.prior.logp(z_pred_teacher, mask=mask) + dlogp_teacher
 
-            logp_z_pred_teacher = self.prior.logp(z_pred_teacher, mask=mask)
-            logq_teacher = logp_z_pred_teacher + dlogp_teacher
-
+            logq = -per_sample_loss  # per_sample_loss is -logq
             teacher_reg = (logq - logq_teacher).pow(2).mean()
             loss = loss + self.teacher_regularize_weight * teacher_reg
             self.log("finetune/teacher_regularization", teacher_reg.item(), prog_bar=True, sync_dist=True)

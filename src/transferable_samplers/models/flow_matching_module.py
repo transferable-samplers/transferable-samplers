@@ -55,39 +55,39 @@ class FlowMatchingModule(BaseLightningModule):
         self.nfe = 0
         self.num_integrations = 0
 
-    def training_step(self, batch: dict[str, Any], batch_idx: int) -> torch.Tensor:
-        if self.train_from_buffer:
-            # pyrefly: ignore [missing-attribute]
-            batch = self._buffer.sample(batch["x"].shape[0], device=self.device)
+    def compute_primary_loss(self, batch: dict[str, Any]) -> torch.Tensor:
+        x = batch["x"]
+        assert len(x.shape) == 3, "molecules must be a pointcloud (batch_size, num_atoms, 3)"
 
-        assert len(batch["x"].shape) == 3, "molecules must be a pointcloud (batch_size, num_atoms, 3)"
-
-        x1 = batch["x"]
-
-        num_samples = x1.shape[0]
-        num_tokens = x1.shape[1]
+        num_samples = x.shape[0]
+        num_tokens = x.shape[1]
 
         encodings = batch.get("encodings", None)
         mask = batch.get("mask", None)
 
-        t = torch.rand(num_samples, 1, device=x1.device)
-        z = self.prior.sample(num_samples, num_tokens, mask, device=x1.device)
+        t = torch.rand(num_samples, 1, device=x.device)
+        z = self.prior.sample(num_samples, num_tokens, mask, device=x.device)
 
-        x1 = x1.flatten(start_dim=1)
+        x = x.flatten(start_dim=1)
         z = z.flatten(start_dim=1)
 
-        xt = self._get_xt(z, x1, t, mask)
-        vt_flow = self._get_flow_targets(z, x1)
+        xt = self._get_xt(z, x, t, mask)
+        vt_flow = self._get_flow_targets(z, x)
 
         vt_pred = self.forward(t, xt, encodings=encodings, mask=mask)
 
         assert len(vt_pred.shape) == 2
         assert len(vt_flow.shape) == 2
 
-        loss = torch.sum((vt_pred - vt_flow) ** 2, dim=-1)
-        if mask is not None:
-            loss = loss / mask.int().sum(-1)
-        loss = loss.mean()
+        return torch.sum((vt_pred - vt_flow) ** 2, dim=-1)
+
+    def training_step(self, batch: dict[str, Any], batch_idx: int) -> torch.Tensor:
+        if self.train_from_buffer:
+            # pyrefly: ignore [missing-attribute]
+            batch = self._buffer.sample(batch["x"].shape[0], device=self.device)
+
+        per_sample_loss = self.compute_primary_loss(batch)
+        loss = self.normalize_by_system_dim(per_sample_loss, batch["x"], batch.get("mask"))
 
         batch_value = self.train_metrics(loss)
         self.log_dict(batch_value, prog_bar=True)

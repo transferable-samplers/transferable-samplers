@@ -53,6 +53,24 @@ class BaseLightningModule(LightningModule):
     def training_step(self, batch: dict[str, Any], batch_idx: int) -> torch.Tensor: ...
 
     @abstractmethod
+    def compute_primary_loss(self, batch: dict[str, Any]) -> torch.Tensor:
+        """Compute per-sample primary loss (the quantity to minimize), without
+        system-size normalization or auxiliary losses (e.g. teacher regularization).
+
+        Called by both ``training_step`` (which adds system-size normalization and
+        auxiliary losses) and ``LossEvaluationCallback`` (which averages directly
+        to monitor model fit on held-out true samples).
+
+        Args:
+            batch: Dict with "x" (batch, num_atoms, 3) and optional
+                   "encodings", "permutations", "mask".
+
+        Returns:
+            Per-sample loss of shape (batch,).
+        """
+        ...
+
+    @abstractmethod
     def generate_proposal(
         self,
         net: torch.nn.Module,
@@ -179,6 +197,19 @@ class BaseLightningModule(LightningModule):
     def on_train_epoch_end(self) -> None:
         self.train_metrics.reset()
         logger.info("Train epoch end")
+
+    @staticmethod
+    def normalize_by_system_dim(
+        per_sample_loss: torch.Tensor,
+        x: torch.Tensor,
+        mask: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        """Normalize per-sample loss by system dimensionality (active_tokens * spatial_dim)."""
+        if mask is not None:
+            system_dim = mask.int().sum(-1) * x.shape[-1]
+        else:
+            system_dim = x.shape[-2] * x.shape[-1]
+        return (per_sample_loss / system_dim).mean()
 
     def on_before_optimizer_step(self, optimizer: torch.optim.Optimizer, *args: Any, **kwargs: Any) -> None:
         total_norm = 0.0
