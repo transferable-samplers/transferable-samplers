@@ -19,7 +19,7 @@ defaults:
 hf_state_dict_path: single_system/tarflow_GYDPETGTWG_0.pth
 model:
   net:
-    channels: 512
+    channels: 384
     img_size: 414
     num_blocks: 8
     layers_per_block: 8

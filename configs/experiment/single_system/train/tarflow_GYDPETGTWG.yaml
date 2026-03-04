@@ -14,7 +14,7 @@ defaults:
   - override /trainer: gpu
 model:
   net:
-    channels: 512
+    channels: 384
     img_size: 414
     num_blocks: 8
     layers_per_block: 8

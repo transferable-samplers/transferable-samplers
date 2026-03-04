@@ -23,9 +23,10 @@ class LossEvaluationCallback(Callback):
     get the global mean. Only rank 0 logs metrics.
     """
 
-    def __init__(self, batch_size: int = 256) -> None:
+    def __init__(self, batch_size: int = 256, max_samples: int | None = None) -> None:
         super().__init__()
         self.batch_size = batch_size
+        self.max_samples = max_samples
 
     def on_validation_epoch_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
         self._evaluate(trainer, pl_module, "val")
@@ -45,6 +46,8 @@ class LossEvaluationCallback(Callback):
             eval_ctx = datamodule.prepare_eval(sequence=sequence, stage=prefix)
 
             samples = eval_ctx.true_data.samples
+            if self.max_samples is not None:
+                samples = samples[: self.max_samples]
             x = standardize_coords(samples, eval_ctx.normalization_std).to(
                 device=pl_module.device, dtype=pl_module.dtype
             )
