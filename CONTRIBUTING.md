@@ -54,6 +54,24 @@ pre-commit run --all-files
 
 This project uses **pytest** with Hydra integration. Currently the tests all require at least a single GPU, due to OpenMM + CPU issues.
 
+### Config drift tests
+
+Config tests run on CPU and verify that Hydra experiment configs haven't changed unexpectedly:
+
+```bash
+pytest tests/configs/test_experiment_configs.py -v
+```
+
+These tests compare each composed experiment config against a reference JSON snapshot in `tests/configs/reference_configs/`. They also check that all `_target_` paths are importable.
+
+If you intentionally change a config (e.g., add a new callback or modify defaults), update the reference files:
+
+```bash
+pytest tests/configs/test_experiment_configs.py --update-reference
+```
+
+Then commit the updated JSON snapshots alongside your config changes.
+
 ### Run GPU tests
 
 ```bash
