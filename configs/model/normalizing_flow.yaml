@@ -6,6 +6,9 @@ train_from_buffer: false
 mean_free_prior: false
 source_energy_config:
   _target_: transferable_samplers.utils.dataclasses.SourceEnergyConfig
+  sample_batch_size: 128
+  energy_batch_size: 128
+  grad_batch_size: 128
 prior:
   _target_: transferable_samplers.models.priors.normal_distribution.NormalDistribution
   num_dimensions: ${data.num_dimensions}

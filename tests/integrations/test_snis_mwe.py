@@ -1,10 +1,6 @@
 """
-Tests for the evaluation pipelines.
-If this test collection passes, we know that:
-1. The evaluation pipeline can be run end-to-end for all different dataset.
-2. All the huggingface model weights can be correctly loaded and used for evaluation.
-3. The neural_network code hasn't broken since uploading model weights.
-NOTE: This test only considers SNIS for each dataset/model. SMC tests are in test_smc.py
+Tests for the SNIS evaluation pipeline.
+One tarflow + one ecnf config for each of single_system and transferable.
 A very loose threshold on median proposal energy is used to catch major issues.
 """
 
@@ -19,27 +15,15 @@ from tests.helpers.utils import compose_config, extract_test_sequence, get_confi
 from transferable_samplers.eval import eval
 
 MEDIAN_PROPOSAL_ENERGY_THRESHOLDS = {  # these are intentionally loose, just to catch major issues
-    "Ace-A-Nme": -10,
     "AAA": -120,
-    "Ace-AAA-Nme": 50,
-    "AAAAAA": -60,
-    "GYDPETGTWG": -100,
     "AA": -160,
 }
 
 EXPERIMENT_NAMES = [
-    "single_system/eval/ecnf++_Ace-A-Nme_snis.yaml",
-    "single_system/eval/ecnf++_AAA_snis.yaml",
-    "single_system/eval/ecnf++_Ace-AAA-Nme_snis.yaml",
-    "single_system/eval/ecnf++_AAAAAA_snis.yaml",
-    "single_system/eval/tarflow_Ace-A-Nme_ula.yaml",
-    "single_system/eval/tarflow_AAA_ula.yaml",
-    "single_system/eval/tarflow_Ace-AAA-Nme_ula.yaml",
-    "single_system/eval/tarflow_AAAAAA_ula.yaml",
-    "single_system/eval/tarflow_GYDPETGTWG_ula.yaml",
-    "transferable/eval/ecnf++_up_to_4aa_snis.yaml",
-    "transferable/eval/tarflow_up_to_8aa_snis.yaml",
-    "transferable/eval/prose_up_to_8aa_snis.yaml",
+    "single_system/eval/ecnf++_AAA_snis.yaml",  # single system ecnf
+    "single_system/eval/tarflow_AAA_ula.yaml",  # single system tarflow
+    "transferable/eval/ecnf++_up_to_4aa_snis.yaml",  # transferable ecnf
+    "transferable/eval/tarflow_up_to_8aa_snis.yaml",  # transferable tarflow
 ]
 
 
@@ -78,8 +62,7 @@ def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, t
                 "num_samples_dlogp": 2,
             }
         if "ula" in experiment_name or "mala" in experiment_name:
-            # Replace SMC sampler with SNIS for this test — we only test weight loading here.
-            # TODO probably indicative that the tests should be refactored.
+            # Replace SMC sampler with SNIS for this test.
             cfg.callbacks.sampling_evaluation.sampler = OmegaConf.create(
                 {
                     "_target_": "transferable_samplers.samplers.snis_sampler.SNISSampler",

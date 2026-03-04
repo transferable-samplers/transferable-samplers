@@ -12,7 +12,11 @@ prior:
   num_dimensions: ${data.num_dimensions}
   mean_free: true
 sigma: 0.0
-source_energy_config: null
+source_energy_config:
+  _target_: transferable_samplers.utils.dataclasses.SourceEnergyConfig
+  sample_batch_size: 8
+  energy_batch_size: 8
+  grad_batch_size: 8
 optimizer:
   _target_: torch.optim.AdamW
   _partial_: true
