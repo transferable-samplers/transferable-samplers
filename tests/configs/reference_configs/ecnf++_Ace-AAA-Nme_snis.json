@@ -92,6 +92,9 @@
     "rtol": 0.0001,
     "sigma": 0.0,
     "source_energy_config": {
+      "_target_": "transferable_samplers.utils.dataclasses.SourceEnergyConfig",
+      "energy_batch_size": 8,
+      "grad_batch_size": 8,
       "sample_batch_size": 8
     },
     "train_from_buffer": false

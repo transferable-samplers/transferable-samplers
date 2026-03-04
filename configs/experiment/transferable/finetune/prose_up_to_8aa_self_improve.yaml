@@ -1,11 +1,11 @@
 # @package _global_
 # ──────────────────────────────────────────────────────────────
-# Description: Self-improve SNIS Prose on ManyPeptidesMD
+# Description: Finetune (self-improve) SNIS Prose on ManyPeptidesMD
 # Reference:   Table 4, Amortized Sampling with Transferable Normalizing Flows
 #              https://arxiv.org/abs/2508.18175
 # Notes:       Run as:
-#                python src/transferable_samplers/eval.py \
-#                experiment=transferable/eval/prose_up_to_8aa_self_improve.yaml
+#                python src/transferable_samplers/train.py \
+#                experiment=transferable/finetune/prose_up_to_8aa_self_improve.yaml
 #              Defaults to the model:
 #                https://huggingface.co/transferable-samplers/model-weights/tree/main/transferable/prose_up_to_8aa.pth
 # ──────────────────────────────────────────────────────────────

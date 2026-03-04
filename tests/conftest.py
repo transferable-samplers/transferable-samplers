@@ -39,5 +39,8 @@ def pytest_addoption(parser):
 
 
 def pytest_configure(config):
-    config.addinivalue_line("markers", "pipeline: long-running pipeline tests")
+    config.addinivalue_line("markers", "essential: must-pass tests (config, assets, algorithms)")
+    config.addinivalue_line("markers", "benchmark: long-running runs that validate metrics against a paper")
+    config.addinivalue_line("markers", "benchmark_ddp: benchmark runs under DDP to verify parity with single-GPU")
+    config.addinivalue_line("markers", "optional: architectural/design tests")
     config.addinivalue_line("markers", "forked: force forked execution via pytest-forked")

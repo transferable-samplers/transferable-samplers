@@ -81,7 +81,7 @@ def cfg_and_experiment_name(request: pytest.FixtureRequest, tmp_path: Path) -> t
 
 
 @pytest.mark.forked
-@pytest.mark.pipeline
+@pytest.mark.essential
 def test_model_loss(cfg_and_experiment_name: tuple[DictConfig, str]) -> None:
     """
     Run eval() for every experiment config and check that:

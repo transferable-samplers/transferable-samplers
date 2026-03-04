@@ -14,7 +14,7 @@ from omegaconf import DictConfig, open_dict
 from tests.helpers.utils import compose_config, get_config_stem
 from transferable_samplers.train import train
 
-EXPERIMENT_NAMES = ["transferable/eval/prose_up_to_8aa_self_improve.yaml"]
+EXPERIMENT_NAMES = ["transferable/finetune/prose_up_to_8aa_self_improve.yaml"]
 
 
 @pytest.fixture(params=EXPERIMENT_NAMES, ids=get_config_stem)
@@ -66,7 +66,7 @@ def cfg_test_self_improve_mwe(request: pytest.FixtureRequest, trainer_name_param
 
 
 @pytest.mark.forked  # prevents OpenMM issues
-@pytest.mark.pipeline
+@pytest.mark.essential
 def test_self_improve_mwe(cfg_test_self_improve_mwe: DictConfig) -> None:
     """
     Run the self-improvement pipeline for a single iteration and check basic metrics.

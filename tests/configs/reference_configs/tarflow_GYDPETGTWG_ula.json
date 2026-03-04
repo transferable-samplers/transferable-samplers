@@ -73,7 +73,7 @@
     "mean_free_prior": false,
     "net": {
       "_target_": "transferable_samplers.nn.tarflow.tarflow_single_system.TarFlow",
-      "channels": 512,
+      "channels": 384,
       "img_size": 414,
       "in_channels": 3,
       "layers_per_block": 8,

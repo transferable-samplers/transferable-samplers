@@ -52,17 +52,68 @@ pre-commit run --all-files
 
 ## Running Tests
 
-This project uses **pytest** with Hydra integration. Currently the tests all require at least a single GPU, due to OpenMM + CPU issues.
+This project uses **pytest** with Hydra integration. Tests are organised into three marker categories:
+
+| Marker | Description | Location |
+|---|---|---|
+| `essential` | Must-pass tests: config validation, model asset checks, and MWE pipeline tests | `tests/configs/`, `tests/assets/`, `tests/mwe/` |
+| `benchmark` | Long-running runs that validate metrics against the paper (GPU) | `tests/benchmark/` |
+| `benchmark_ddp` | Same as `benchmark` but under DDP to verify parity with single-GPU | `tests/benchmark/` |
+| `optional` | Architectural / design tests (e.g. NF invertibility, dlogp consistency) | `tests/unit/` |
+
+### Hardware modes
+
+Config tests (`tests/configs/`) and asset tests (`tests/assets/`) are **CPU-only**.
+
+MWE pipeline tests (`tests/mwe/`) run on the trainer specified by the `PYTEST_TRAINER` environment variable (defaults to `gpu`):
+
+```bash
+PYTEST_TRAINER=cpu pytest -m essential -v   # CPU
+PYTEST_TRAINER=gpu pytest -m essential -v   # single GPU (default)
+PYTEST_TRAINER=ddp pytest -m essential -v   # DDP (requires 2+ GPUs)
+```
+
+### Quick reference
+
+**Run all essential tests (config + assets + MWE) on GPU:**
+
+```bash
+pytest -m essential -v
+```
+
+**Run only config drift tests (CPU):**
+
+```bash
+pytest tests/configs/ -v
+```
+
+**Run only asset / model-weight tests (CPU):**
+
+```bash
+pytest tests/assets/ -v
+```
+
+**Run benchmark tests on GPU (full experiment configs):**
+
+```bash
+PYTEST_TRAINER=gpu pytest -m benchmark -v
+```
+
+**Run benchmark DDP parity tests (requires 2+ GPUs):**
+
+```bash
+PYTEST_TRAINER=ddp pytest -m benchmark_ddp -v
+```
+
+**Run optional architecture tests:**
+
+```bash
+pytest -m optional -v
+```
 
 ### Config drift tests
 
-Config tests run on CPU and verify that Hydra experiment configs haven't changed unexpectedly:
-
-```bash
-pytest tests/configs/test_experiment_configs.py -v
-```
-
-These tests compare each composed experiment config against a reference JSON snapshot in `tests/configs/reference_configs/`. They also check that all `_target_` paths are importable.
+Config tests verify that Hydra experiment configs haven't changed unexpectedly. They compare each composed config against a reference JSON snapshot in `tests/configs/reference_configs/` and check that all `_target_` paths are importable.
 
 If you intentionally change a config (e.g., add a new callback or modify defaults), update the reference files:
 
@@ -71,18 +122,6 @@ pytest tests/configs/test_experiment_configs.py --update-reference
 ```
 
 Then commit the updated JSON snapshots alongside your config changes.
-
-### Run GPU tests
-
-```bash
-PYTEST_TRAINER=gpu pytest -v
-```
-
-### Run DDP tests (requires 2+ GPUs)
-
-```bash
-PYTEST_TRAINER=ddp pytest -v
-```
 
 ### Testing with SLURM
 

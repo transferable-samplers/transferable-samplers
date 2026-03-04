@@ -73,7 +73,7 @@ def cfg_test_smc_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tm
 
 
 @pytest.mark.forked  # prevents OpenMM issues
-@pytest.mark.pipeline
+@pytest.mark.essential
 def test_smc_mwe(cfg_test_smc_mwe: DictConfig) -> None:
     """
     Run eval() for every experiment config provided by the `cfg_test_smc_mwe` fixture.

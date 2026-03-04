@@ -70,7 +70,7 @@ def cfg_test_train_mwe(request: pytest.FixtureRequest, trainer_name_param: str, 
 
 
 @pytest.mark.forked  # prevents OpenMM issues
-@pytest.mark.pipeline
+@pytest.mark.essential
 def test_train_mwe(cfg_test_train_mwe: DictConfig) -> None:
     """
     Runs train() for every experiment config discovered via the fixture.

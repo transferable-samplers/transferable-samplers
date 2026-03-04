@@ -13,9 +13,10 @@ requires-python = ">= 3.11"
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 markers = [
-    "pipeline: medium test for pipeline correctness",
-    "experiment: slow, full-experiment tests",
-    "unit: fast tests",
+    "essential: must-pass tests (config, assets, algorithms)",
+    "benchmark: long-running runs that validate metrics against a paper",
+    "benchmark_ddp: benchmark runs under DDP to verify parity with single-GPU",
+    "optional: architectural/design tests",
 ]
 
 # ----------------------------------------

@@ -23,7 +23,7 @@ EXPERIMENT_NAMES = [
     "single_system/eval/ecnf++_AAA_snis.yaml",  # single system ecnf
     "single_system/eval/tarflow_AAA_ula.yaml",  # single system tarflow
     "transferable/eval/ecnf++_up_to_4aa_snis.yaml",  # transferable ecnf
-    "transferable/eval/tarflow_up_to_8aa_snis.yaml",  # transferable tarflow
+    "transferable/eval/prose_up_to_8aa_snis.yaml",  # transferable tarflow
 ]
 
 
@@ -82,7 +82,7 @@ def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, t
 
 
 @pytest.mark.forked  # prevents OpenMM issues
-@pytest.mark.pipeline
+@pytest.mark.essential
 def test_snis_mwe(cfg_test_snis_mwe):
     """
     Run eval() for every experiment config provided by the `cfg_test_snis_mwe` fixture.

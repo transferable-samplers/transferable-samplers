@@ -25,8 +25,13 @@ REFERENCE_DIR = Path(__file__).resolve().parent / "reference_configs"
 
 # Auto-discover all experiment YAML files
 TRAINING_EXPERIMENTS = sorted(str(p.relative_to(EXPERIMENT_DIR)) for p in EXPERIMENT_DIR.glob("*/train/**/*.yaml"))
+FINETUNE_EXPERIMENTS = sorted(str(p.relative_to(EXPERIMENT_DIR)) for p in EXPERIMENT_DIR.glob("*/finetune/**/*.yaml"))
 EVALUATION_EXPERIMENTS = sorted(str(p.relative_to(EXPERIMENT_DIR)) for p in EXPERIMENT_DIR.glob("*/eval/**/*.yaml"))
-ALL_EXPERIMENTS = [("train", exp) for exp in TRAINING_EXPERIMENTS] + [("eval", exp) for exp in EVALUATION_EXPERIMENTS]
+ALL_EXPERIMENTS = (
+    [("train", exp) for exp in TRAINING_EXPERIMENTS]
+    + [("train", exp) for exp in FINETUNE_EXPERIMENTS]  # finetune uses the train entrypoint
+    + [("eval", exp) for exp in EVALUATION_EXPERIMENTS]
+)
 ALL_EXPERIMENT_IDS = [Path(exp).stem for _, exp in ALL_EXPERIMENTS]
 
 
@@ -71,6 +76,7 @@ def _clear_hydra():
     GlobalHydra.instance().clear()
 
 
+@pytest.mark.essential
 @pytest.mark.parametrize(("config_name", "experiment_path"), ALL_EXPERIMENTS, ids=ALL_EXPERIMENT_IDS)
 def test_experiment_config_drift(config_name: str, experiment_path: str, request) -> None:
     """Test that the composed config matches the reference JSON snapshot."""
@@ -102,6 +108,7 @@ def test_experiment_config_drift(config_name: str, experiment_path: str, request
     )
 
 
+@pytest.mark.essential
 @pytest.mark.parametrize(("config_name", "experiment_path"), ALL_EXPERIMENTS, ids=ALL_EXPERIMENT_IDS)
 def test_experiment_targets_importable(config_name: str, experiment_path: str) -> None:
     """Test that all _target_ paths in the config are importable."""

@@ -110,6 +110,7 @@ def net(request):
     GlobalHydra.instance().clear()
 
 
+@pytest.mark.optional
 @torch.no_grad()
 def test_invert_no_pad(net, test_data):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -134,6 +135,7 @@ def test_invert_no_pad(net, test_data):
         )
 
 
+@pytest.mark.optional
 @torch.no_grad()
 def test_invert_from_prior_no_pad(net, test_data):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -164,6 +166,7 @@ def test_invert_from_prior_no_pad(net, test_data):
         )
 
 
+@pytest.mark.optional
 @torch.no_grad()
 def test_fwd_pad_vs_no_pad(net, test_data):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -197,6 +200,7 @@ def test_fwd_pad_vs_no_pad(net, test_data):
         )
 
 
+@pytest.mark.optional
 @torch.no_grad()
 def test_fwd_dlogp_no_pad(net, test_data):
     """Verify forward dlogp against true Jacobian dlogp, sample by sample."""
@@ -225,6 +229,7 @@ def test_fwd_dlogp_no_pad(net, test_data):
             )
 
 
+@pytest.mark.optional
 @torch.no_grad()
 def test_fwd_dlogp_pad_vs_no_pad(net, test_data):
     """Verify forward dlogp is consistent between padded and unpadded inputs."""
@@ -257,6 +262,7 @@ def test_fwd_dlogp_pad_vs_no_pad(net, test_data):
         )
 
 
+@pytest.mark.optional
 @torch.no_grad()
 def test_fwd_vs_rev_dlogp_no_pad(net, test_data):
     """Verify that fwd_dlogp + rev_dlogp = 0."""
