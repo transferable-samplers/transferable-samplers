@@ -139,3 +139,4 @@ line-ending = "auto"
 [tool.pyrefly]
 search_path = ["src", "tests"]
 python_interpreter = ".venv/bin/python"
+exclude = ["src/transferable_samplers/nn/egnn/"]

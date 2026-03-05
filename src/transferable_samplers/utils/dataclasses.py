@@ -196,8 +196,7 @@ class SamplesData:
 
     samples: torch.Tensor
     E_target: torch.Tensor
-    # pyrefly: ignore [bad-assignment]
-    logw: torch.Tensor = None
+    logw: torch.Tensor | None = None
 
     def __post_init__(self) -> None:
         assert len(self.samples) == len(self.E_target)
@@ -211,7 +210,6 @@ class SamplesData:
         return SamplesData(
             self.samples[index],
             self.E_target[index],
-            # pyrefly: ignore [bad-argument-type]
             self.logw[index] if self.logw is not None else None,
         )
 

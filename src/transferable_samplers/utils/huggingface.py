@@ -156,7 +156,6 @@ def safe_extract_tar(tar_path: str, extraction_path: str) -> None:
         tar.extractall(extraction_path)  # noqa: S202 - safe, paths validated above
 
 
-# pyrefly: ignore [bad-return]
 def download_weights(destination_dir: str, hf_filepath: str) -> str:
     """Download model weights from Hugging Face Hub.
 
@@ -166,6 +165,9 @@ def download_weights(destination_dir: str, hf_filepath: str) -> str:
 
     Returns:
         Local path to the downloaded weights file.
+
+    Raises:
+        RuntimeError: If the download fails.
     """
     try:
         Path(destination_dir).mkdir(parents=True, exist_ok=True)
@@ -173,7 +175,7 @@ def download_weights(destination_dir: str, hf_filepath: str) -> str:
         print(f"Model weights downloaded successfully to {destination_dir}")
         return local_path
     except Exception as e:
-        print(f"Failed to download model weights: {e}")
+        raise RuntimeError(f"Failed to download model weights: {e}") from e
 
 
 def download_and_extract_pdb_tarfiles(data_dir: str) -> None:

@@ -59,7 +59,7 @@ class PeptideEnsembleEvaluator:
         eval_context: EvalContext,
         log_image_fn: Callable[[Any, str], None] | None = None,
         prefix: str = "",
-    ) -> dict[str, float]:
+    ) -> dict[str, Any]:
         """Evaluate generated samples against reference data.
 
         Args:
@@ -76,7 +76,7 @@ class PeptideEnsembleEvaluator:
         if len(prefix) > 0 and prefix[-1] != "/":
             prefix += "/"
 
-        metrics = {}
+        metrics: dict[str, Any] = {}
         topology = eval_context.topology
         tica_model = eval_context.tica_model
         true_data = eval_context.true_data
@@ -170,7 +170,7 @@ class PeptideEnsembleEvaluator:
         topology: Any,
         tica_model: Any,
         prefix: str = "",
-    ) -> dict[str, float]:
+    ) -> dict[str, Any]:
         """Compute all metrics between true and predicted conformation data.
 
         Metrics include: ESS (if importance weights present), mean/median energy,
@@ -187,7 +187,7 @@ class PeptideEnsembleEvaluator:
         Returns:
             Dict mapping metric names to computed values.
         """
-        metrics = {}
+        metrics: dict[str, Any] = {}
         num_eval_samples = self.num_eval_samples
 
         if len(pred_data) < 0.9 * num_eval_samples:
@@ -202,29 +202,23 @@ class PeptideEnsembleEvaluator:
         # Compute effective sample size
         if pred_data.logw is not None:
             ess = normalized_ess(pred_data.logw)
-            # pyrefly: ignore [unsupported-operation]
             metrics[f"{prefix}/effective_sample_size"] = ess
 
         metrics[f"{prefix}/mean_energy"] = pred_data.E_target.mean().cpu()
         metrics[f"{prefix}/median_energy"] = pred_data.E_target.median().cpu()
 
-        # pyrefly: ignore [no-matching-overload]
         metrics.update(energy_wasserstein(true_data.E_target, pred_data.E_target, prefix=prefix))
         logger.info("Energy wasserstein computed")
 
-        # pyrefly: ignore [no-matching-overload]
         metrics.update(torus_wasserstein(true_data.samples, pred_data.samples, topology, prefix=prefix))
         logger.info("Torus wasserstein computed")
 
-        # pyrefly: ignore [no-matching-overload]
         metrics.update(tica_wasserstein(true_data.samples, pred_data.samples, topology, tica_model, prefix=prefix))
         logger.info("TICA wasserstein computed")
 
-        # pyrefly: ignore [no-matching-overload]
         metrics.update(
             tica_kmeans_jsd(true_data.samples, pred_data.samples, topology, tica_model=tica_model, prefix=prefix)
         )
-        # pyrefly: ignore [no-matching-overload]
         metrics.update(torus_kmeans_jsd(true_data.samples, pred_data.samples, topology, prefix=prefix))
         logger.info("kMeans JSD computed")
 
@@ -290,7 +284,6 @@ class PeptideEnsembleEvaluator:
                 energy = energy[keep_mask]
                 logw = logw[keep_mask] if logw is not None else None
 
-            # pyrefly: ignore [bad-argument-type]
             pred_data = SamplesData(samples, energy, logw=logw)
 
         return pred_data, metrics

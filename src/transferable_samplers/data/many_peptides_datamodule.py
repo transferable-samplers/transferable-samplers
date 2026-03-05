@@ -9,6 +9,7 @@ import mdtraj as md
 import numpy as np
 import openmm
 import openmm.app
+import openmm.unit
 import torch
 import torchvision
 from omegaconf import ListConfig, OmegaConf
@@ -370,17 +371,17 @@ class ManyPeptidesDataModule(BaseDataModule):
         system = forcefield.createSystem(
             pdb.topology,
             nonbondedMethod=openmm.app.CutoffNonPeriodic,
-            # pyrefly: ignore [implicit-import, missing-attribute]
+            # pyrefly: ignore [missing-attribute]
             nonbondedCutoff=2.0 * openmm.unit.nanometer,
             constraints=None,
         )
         # pyrefly: ignore [missing-attribute]
         integrator = openmm.LangevinMiddleIntegrator(
-            # pyrefly: ignore [implicit-import, unsupported-operation]
+            # pyrefly: ignore [unsupported-operation]
             310 * openmm.unit.kelvin,
-            # pyrefly: ignore [implicit-import, missing-attribute]
+            # pyrefly: ignore [missing-attribute]
             0.3 / openmm.unit.picosecond,
-            # pyrefly: ignore [implicit-import, missing-attribute]
+            # pyrefly: ignore [missing-attribute]
             1.0 * openmm.unit.femtosecond,
         )
         platform_name = "CUDA" if torch.cuda.is_available() else "CPU"

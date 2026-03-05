@@ -91,7 +91,7 @@ def log_hyperparameters(object_dict: dict[str, Any], resolve: bool = True) -> No
         resolve: Whether to resolve OmegaConf references when converting the config.
     """
     hparams: dict[str, Any] = {}
-    cfg = OmegaConf.to_container(object_dict["cfg"], resolve=resolve)
+    cfg: dict[str, Any] = OmegaConf.to_container(object_dict["cfg"], resolve=resolve)  # type: ignore[assignment]
     model = object_dict["model"]
     trainer = object_dict["trainer"]
 
@@ -99,7 +99,6 @@ def log_hyperparameters(object_dict: dict[str, Any], resolve: bool = True) -> No
         logger.warning("Logger not found! Skipping hyperparameter logging...")
         return
 
-    # pyrefly: ignore [bad-index, unsupported-operation]
     hparams["model"] = cfg["model"]
 
     # save number of model parameters
@@ -107,25 +106,16 @@ def log_hyperparameters(object_dict: dict[str, Any], resolve: bool = True) -> No
     hparams["model/params/trainable"] = sum(p.numel() for p in model.parameters() if p.requires_grad)
     hparams["model/params/non_trainable"] = sum(p.numel() for p in model.parameters() if not p.requires_grad)
 
-    # pyrefly: ignore [bad-index, unsupported-operation]
     hparams["data"] = cfg["data"]
-    # pyrefly: ignore [bad-index, unsupported-operation]
     hparams["trainer"] = cfg["trainer"]
 
-    # pyrefly: ignore [missing-attribute]
     hparams["callbacks"] = cfg.get("callbacks")
-    # pyrefly: ignore [missing-attribute]
     hparams["extras"] = cfg.get("extras")
 
-    # pyrefly: ignore [missing-attribute]
     hparams["task_name"] = cfg.get("task_name")
-    # pyrefly: ignore [missing-attribute]
     hparams["tags"] = cfg.get("tags")
-    # pyrefly: ignore [missing-attribute]
     hparams["ckpt_path"] = cfg.get("ckpt_path")
-    # pyrefly: ignore [missing-attribute]
     hparams["seed"] = cfg.get("seed")
-    # pyrefly: ignore [missing-attribute]
     hparams["paths"] = cfg.get("paths")
 
     # send hparams to all loggers

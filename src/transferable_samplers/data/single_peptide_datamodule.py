@@ -7,6 +7,7 @@ import mdtraj as md
 import numpy as np
 import openmm
 import openmm.app
+import openmm.unit
 import torch
 import torchvision
 from huggingface_hub import snapshot_download
@@ -232,18 +233,18 @@ class SinglePeptideDataModule(BaseDataModule):
             system = forcefield.createSystem(
                 self.pdb.topology,
                 nonbondedMethod=openmm.app.NoCutoff,
-                # pyrefly: ignore [implicit-import, missing-attribute]
+                # pyrefly: ignore [missing-attribute]
                 nonbondedCutoff=0.9 * openmm.unit.nanometer,
                 constraints=None,
             )
             temperature = 300
             # pyrefly: ignore [missing-attribute]
             integrator = openmm.LangevinMiddleIntegrator(
-                # pyrefly: ignore [implicit-import, unsupported-operation]
+                # pyrefly: ignore [unsupported-operation]
                 temperature * openmm.unit.kelvin,
-                # pyrefly: ignore [implicit-import, missing-attribute]
+                # pyrefly: ignore [missing-attribute]
                 0.3 / openmm.unit.picosecond if self.sequence == "Ace-AAA-Nme" else 1.0 / openmm.unit.picosecond,
-                # pyrefly: ignore [implicit-import, missing-attribute]
+                # pyrefly: ignore [missing-attribute]
                 1.0 * openmm.unit.femtosecond,
             )
             platform_name = "CUDA" if torch.cuda.is_available() else "CPU"
@@ -256,17 +257,17 @@ class SinglePeptideDataModule(BaseDataModule):
             system = forcefield.createSystem(
                 self.pdb.topology,
                 nonbondedMethod=openmm.app.CutoffNonPeriodic,
-                # pyrefly: ignore [implicit-import, missing-attribute]
+                # pyrefly: ignore [missing-attribute]
                 nonbondedCutoff=2.0 * openmm.unit.nanometer,
                 constraints=None,
             )
             # pyrefly: ignore [missing-attribute]
             integrator = openmm.LangevinMiddleIntegrator(
-                # pyrefly: ignore [implicit-import, unsupported-operation]
+                # pyrefly: ignore [unsupported-operation]
                 temperature * openmm.unit.kelvin,
-                # pyrefly: ignore [implicit-import, missing-attribute]
+                # pyrefly: ignore [missing-attribute]
                 0.3 / openmm.unit.picosecond,
-                # pyrefly: ignore [implicit-import, missing-attribute]
+                # pyrefly: ignore [missing-attribute]
                 1.0 * openmm.unit.femtosecond,
             )
 

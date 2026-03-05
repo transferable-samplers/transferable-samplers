@@ -154,7 +154,6 @@ class GCL_kholer(GCL_basic):
             m_ij = torch.clamp(m_ij, min=-100, max=100)
         return m_ij
 
-    # pyrefly: ignore [bad-param-name-override]
     def node_model(self, x, edge_index, edge_attr):
         row, col = edge_index
         agg = unsorted_segment_mean(edge_attr, row, num_segments=x.size(0))
@@ -214,11 +213,9 @@ class E_GCL(nn.Module):
 
         coord_mlp = []
         coord_mlp.append(nn.Linear(hidden_nf, hidden_nf))
-        # pyrefly: ignore [bad-argument-type]
         coord_mlp.append(act_fn)
         coord_mlp.append(layer)
         if self.tanh:
-            # pyrefly: ignore [bad-argument-type]
             coord_mlp.append(nn.Tanh())
             self.coords_range = coords_range
 
@@ -350,27 +347,22 @@ class E_GCL_vel(E_GCL):
             input_nf,
             output_nf,
             hidden_nf,
-            # pyrefly: ignore [unexpected-keyword]
             K=K,
             edges_in_d=edges_in_d,
             nodes_att_dim=nodes_att_dim,
             act_fn=act_fn,
             recurrent=recurrent,
-            # pyrefly: ignore [unexpected-keyword]
             coords_weight=coords_weight,
             attention=attention,
         )
 
         self.coord_mlp_vel = nn.Sequential(nn.Linear(input_nf, hidden_nf), act_fn, nn.Linear(hidden_nf, 1))
 
-    # pyrefly: ignore [bad-override]
     def forward(self, h, edge_index, coord, vel, edge_attr=None, node_attr=None):
         row, col = edge_index
         radial, coord_diff = self.coord2radial(edge_index, coord)
 
-        # pyrefly: ignore [missing-argument]
         edge_feat = self.edge_model(h[row], h[col], radial, edge_attr)
-        # pyrefly: ignore [missing-argument]
         coord = self.coord_model(coord, edge_index, coord_diff, edge_feat)
         coord += self.coord_mlp_vel(h) * vel
         h, agg = self.node_model(h, edge_index, edge_feat, node_attr)

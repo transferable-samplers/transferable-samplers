@@ -68,7 +68,6 @@ class EGNN(nn.Module):
         # Edit Emiel: Remove velocity as input
         h = self.embedding(h)
         for i in range(0, self.n_layers):
-            # pyrefly: ignore [not-callable]
             h, x, _ = self._modules[f"gcl_{i}"](
                 h,
                 edges,
@@ -117,7 +116,6 @@ class TEGNN(EGNN):
         )
         self.t_embedder = TimestepEmbedder(hidden_size=self.hidden_nf)
 
-    # pyrefly: ignore [bad-override]
     def forward(self, h, x, t, edges, edge_attr=None, node_mask=None, edge_mask=None):
         # h is shape (num_atoms, n_features)
         # t_emb is shape (n_batch * n_atoms, n_hidden)
@@ -126,7 +124,6 @@ class TEGNN(EGNN):
         h = self.embedding(h).unsqueeze(0).repeat(t.shape[0], 1, 1).reshape(-1, self.hidden_nf)
         for i in range(0, self.n_layers):
             h = h + t_emb
-            # pyrefly: ignore [not-callable]
             h, x, _ = self._modules[f"gcl_{i}"](
                 h,
                 edges,

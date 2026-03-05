@@ -93,7 +93,6 @@ class EGNN_dynamics_AD2_cat(nn.Module):
             atom_types[[37, 38, 39]] = 38
             atom_types[[47, 48, 49]] = 48
             atom_types[[57, 58, 59]] = 58
-        # pyrefly: ignore [unbound-name]
         h_initial = torch.nn.functional.one_hot(torch.tensor(atom_types))
         return h_initial
 
@@ -123,7 +122,6 @@ class EGNN_dynamics_AD2_cat(nn.Module):
         atom_types = []
         amino_idx = []
         amino_types = []
-        # pyrefly: ignore [missing-attribute]
         for i, amino in enumerate(self.topology.residues):
             for atom_name in amino.atoms:
                 amino_idx.append(i)
@@ -141,17 +139,14 @@ class EGNN_dynamics_AD2_cat(nn.Module):
                 if atom_name.name[:2] == "OE" or atom_name.name[:2] == "OD":
                     atom_name.name = atom_name.name[:-1]
                 atom_types.append(atom_name.name)
-        # pyrefly: ignore [bad-index]
         atom_types_dict = np.array([self.atom_types_encodings[atom_type] for atom_type in atom_types])
         atom_onehot = torch.nn.functional.one_hot(
-            # pyrefly: ignore [bad-argument-type]
             torch.tensor(atom_types_dict), num_classes=len(self.atom_types_encodings)
         )
         if self._n_particles == 53:
             num_classes = 5
         elif self._n_particles == 63:
             num_classes = 6
-        # pyrefly: ignore [unbound-name]
         amino_idx_onehot = torch.nn.functional.one_hot(torch.tensor(amino_idx), num_classes=num_classes)
         amino_types_onehot = torch.nn.functional.one_hot(torch.tensor(amino_types), num_classes=20)
 
