@@ -68,7 +68,7 @@ class SourceEnergy:
 
     @staticmethod
     def com_energy_adjustment(x: torch.Tensor) -> torch.Tensor:
-        """CoM energy adjustment with std = 1/sqrt(num_atoms).
+        """CoM energy adjustment to add to from E_source (= subtract from log q).
 
         Introduced in Prop. 1 of https://arxiv.org/pdf/2502.18462.
         x: (batch, num_atoms, 3) -> energy adjustment (batch,) to add to E_source.
@@ -82,7 +82,7 @@ class SourceEnergy:
         # Compute the Norms of the CoM for each sample in the batch.
         com_norms = x.mean(dim=1).norm(dim=-1)
 
-        return com_norms**2 / (2 * com_std_analytic**2) - torch.log(
+        return -(com_norms**2) / (2 * com_std_analytic**2) + torch.log(
             com_norms**2 / (math.sqrt(2) * com_std_analytic**3 * scipy.special.gamma(1.5))
         )
 
