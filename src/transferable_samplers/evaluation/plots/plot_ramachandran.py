@@ -19,6 +19,17 @@ matplotlib.rcParams["font.family"] = "STIXGeneral"
 def plot_ramachandran(
     log_image_fn: Callable[[Any, str], None], samples: torch.Tensor, topology: Any, prefix: str = ""
 ) -> None:
+    """Plot per-residue Ramachandran (phi/psi) density maps.
+
+    Generates two versions per residue: a free-energy-scaled plot and a
+    simple count-based plot.
+
+    Args:
+        log_image_fn: Callable to log the figure.
+        samples: Conformation tensor ``(batch, num_atoms, 3)``.
+        topology: mdtraj topology for dihedral computation.
+        prefix: Metric key prefix.
+    """
     logging.info(f"Plotting Ramachandran for {prefix}")
     prefix += "/rama"
 

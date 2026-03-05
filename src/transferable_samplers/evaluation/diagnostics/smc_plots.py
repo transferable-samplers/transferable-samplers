@@ -10,6 +10,7 @@ from matplotlib.colors import LogNorm
 
 
 def _plot_particle_survival(survived_lineages: list[float], log_image_fn: Callable[[Any, str], None]) -> None:
+    """Plot percentage of unique particle lineages surviving over SMC steps."""
     fig, ax = plt.subplots(1, 1, figsize=(7.5, 5))
     ax.plot(range(len(survived_lineages)), survived_lineages, linewidth=1, alpha=0.5)
     ax.set_xlabel("Snapshot", fontsize=12)
@@ -22,6 +23,7 @@ def _plot_particle_survival(survived_lineages: list[float], log_image_fn: Callab
 def _plot_weights_and_ess(
     trajectory: list[Any], ess_list: list[float], t_list: list[float], log_image_fn: Callable[[Any, str], None]
 ) -> None:
+    """Plot per-particle log-weight trajectories and ESS over annealing time."""
     fig, axs = plt.subplots(1, 2, figsize=(15, 5))
 
     # Plot logw trajectories from snapshots if available
@@ -45,6 +47,7 @@ def _plot_weights_and_ess(
 
 
 def _plot_sigma(sigma_list: list[float], t_list: list[float], log_image_fn: Callable[[Any, str], None]) -> None:
+    """Plot the diffusion step size (sigma/eps) over annealing time."""
     fig, ax = plt.subplots(1, 1, figsize=(7.5, 5))
     ax.plot(t_list, sigma_list, linewidth=1, alpha=0.5)
     ax.set_xlabel("Time", fontsize=12)
@@ -57,6 +60,7 @@ def _plot_sigma(sigma_list: list[float], t_list: list[float], log_image_fn: Call
 def _plot_acceptance_rate(
     acceptance_rate_list: list[float], t_list: list[float], log_image_fn: Callable[[Any, str], None]
 ) -> None:
+    """Plot MALA acceptance rate over annealing time."""
     fig, ax = plt.subplots(1, 1, figsize=(7.5, 5))
     ax.plot(t_list, acceptance_rate_list, linewidth=1, alpha=0.5)
     ax.set_xlabel("Time", fontsize=12)
@@ -72,6 +76,7 @@ def _plot_stepwise_energy(
     t_list: list[float],
     log_image_fn: Callable[[Any, str], None],
 ) -> None:
+    """Plot per-particle target and interpolation energies over annealing time."""
     stepwise_target_energy_np = np.stack(target_energy_list)
     stepwise_interpolation_energy_np = np.stack(interpolation_energy_list)
 
@@ -96,6 +101,7 @@ def _plot_stepwise_energy_hist(
     t_list: list[float],
     log_image_fn: Callable[[Any, str], None],
 ) -> None:
+    """Plot 2D energy histograms (time vs energy) for target and interpolation energies."""
     stepwise_target_energy_np = np.stack(target_energy_list)
     stepwise_interpolation_energy_np = np.stack(interpolation_energy_list)
     t_np = np.array(t_list)
