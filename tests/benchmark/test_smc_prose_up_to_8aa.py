@@ -1,0 +1,41 @@
+"""Benchmark: SMC evaluation for transferable Prose on up_to_8aa with MALA."""
+
+from pathlib import Path
+
+import pytest
+from hydra.core.global_hydra import GlobalHydra
+from omegaconf import open_dict
+
+# pyrefly: ignore [missing-import]
+from tests.helpers.utils import compose_config, extract_test_sequence
+from transferable_samplers.eval import eval
+
+
+@pytest.mark.forked
+@pytest.mark.benchmark
+def test_smc_prose_up_to_8aa(trainer_name_param: str, tmp_path: Path) -> None:
+    GlobalHydra.instance().clear()
+    cfg = compose_config(
+        config_name="eval",
+        overrides=["experiment=transferable/eval/prose_up_to_8aa_mala.yaml", f"trainer={trainer_name_param}"],
+    )
+    with open_dict(cfg):
+        cfg.paths.output_dir = str(tmp_path)
+        cfg.paths.log_dir = str(tmp_path)
+        cfg.paths.work_dir = str(Path.cwd())
+        cfg.data.test_sequences = "ARIP"
+        cfg.model.source_energy_config.sample_batch_size = 1_024
+        cfg.model.source_energy_config.energy_batch_size = 128
+        cfg.model.source_energy_config.grad_batch_size = 64
+        cfg.tags = ["pytest", "benchmark_smc"]
+
+    # pyrefly: ignore [bad-argument-type]
+    metrics, _ = eval(cfg)
+    GlobalHydra.instance().clear()
+
+    test_sequence = extract_test_sequence(cfg)
+    assert f"test/{test_sequence}/smc/median_energy" in metrics
+
+    print("\n--- Benchmark metrics ---")
+    for key in sorted(metrics):
+        print(f"  {key}: {metrics[key]}")
