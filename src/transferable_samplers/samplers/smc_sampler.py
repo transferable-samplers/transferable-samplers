@@ -54,6 +54,19 @@ class SMCSampler(BaseSampler):
     Generates proposals, then refines with SMC using MCMC kernels.
     DDP-aware: particles are sharded across ranks for MCMC,
     gathered globally for ESS checks and resampling.
+
+    Args:
+        num_samples: Total number of proposal samples to generate.
+        init_eps: Initial diffusion step size (h = eps * dt per annealing step).
+        use_metropolis: If True, apply Metropolis-Hastings correction (MALA).
+        num_annealing_steps: Number of discrete annealing steps from t=0 to t=1.
+        adaptive_step_size: If True, adapt eps based on acceptance rate.
+        ess_threshold: Resample when normalized ESS drops below this threshold.
+            Set negative to disable intermediate resampling.
+        resampling_method: Resampling strategy (``"multinomial"`` or ``"systematic"``).
+        energy_cutoff_filter: Drop proposals with target energy above this value.
+        logw_quantile_filter: Drop the top fraction of proposals by importance weight.
+        log_traj_freq: Save particle snapshots every this many steps for diagnostics.
     """
 
     def __init__(

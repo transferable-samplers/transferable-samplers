@@ -19,7 +19,13 @@ def langevin_proposal(
     dt: float | torch.Tensor,
     eps: float,
 ) -> SMCParticles:
-    """Langevin proposal + SMC weight update. Returns particles with energies/grads at x'."""
+    """Euler-Maruyama Langevin proposal with SMC weight update.
+
+    Proposes x' = x - h*grad(E_t(x)) + sqrt(2h)*noise where h = eps*dt,
+    and updates log-weights for the annealing schedule increment.
+
+    Returns new SMCParticles with energies and gradients evaluated at x'.
+    """
     h = eps * dt
     E_interp_grad = linear_interpolation(particles.E_source_grad, particles.E_target_grad, t)
     dx = -h * E_interp_grad + torch.sqrt(2 * h) * torch.randn_like(particles.x)
