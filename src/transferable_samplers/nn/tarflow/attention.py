@@ -285,32 +285,3 @@ class AttentionBlock(torch.nn.Module):
         x = x + self.mlp(x)
         return x * mask[..., None]
 
-
-if __name__ == "__main__":
-    torch.use_deterministic_algorithms(True)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    torch.set_printoptions(sci_mode=True, precision=2)
-    torch.manual_seed(1)
-
-    attn = Attention(128, 64, use_qkln=True, use_attn_pair_bias=True)
-
-    x = torch.randn((128, 10, 128))
-    mask = torch.tril(torch.ones((x.shape[1], x.shape[1]), dtype=torch.bool))
-    pair = torch.randn((128, 10, 10, 128))
-    y = attn(x, pair=pair, mask=mask)
-
-    attn.USE_SPDA = False
-    z = attn(x, pair=pair, mask=mask)
-
-    error = (abs(y - z)).mean()
-    print(f"Error between SPDA and proteina: {error}")
-    assert torch.allclose(y, z, atol=1e-6), f"Error: {error}"
-
-    w = attn(x, pair=pair, mask=mask)
-    assert not torch.isnan(w).any()
-    assert not torch.isinf(w).any()
-
-    # pair = torch.randn((128, 10, 10, 128))
-    # w = attn(x, pair=pair, mask=mask)
-    # assert not torch.allclose(w, z)
