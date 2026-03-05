@@ -73,8 +73,7 @@ class OpenMMEnergy:
         self._context = Context(system, integrator, platform, properties)
 
     @property
-    def n_atoms(self) -> int:
-        """Return the number of atoms in the system."""
+    def _num_atoms(self) -> int:
         return self._system.getNumParticles()
 
     def _compute(self, positions: torch.Tensor) -> tuple[np.ndarray, np.ndarray]:
@@ -93,7 +92,7 @@ class OpenMMEnergy:
         pos_np = _to_numpy(positions)
 
         # Reshape to (batch, n_atoms, 3)
-        pos_np = pos_np.reshape(-1, self.n_atoms, 3)
+        pos_np = pos_np.reshape(-1, self._num_atoms, 3)
         batch_size = pos_np.shape[0]
 
         energies = np.zeros(batch_size, dtype=np.float64)
@@ -135,10 +134,10 @@ class OpenMMEnergy:
         # Flatten leading batch dims
         flat = positions.reshape(-1, orig_shape[-1]) if positions.ndim > 2 else positions
         if positions.ndim > 2:
-            flat = positions.reshape(-1, self.n_atoms, 3)
+            flat = positions.reshape(-1, self._num_atoms, 3)
 
         result = _OpenMMEnergyGrad.apply(flat, self)
 
         # Restore batch dims
-        batch_shape = orig_shape[:-2] if orig_shape[-2:] == (self.n_atoms, 3) else orig_shape[:-1]
+        batch_shape = orig_shape[:-2] if orig_shape[-2:] == (self._num_atoms, 3) else orig_shape[:-1]
         return result.reshape(*batch_shape)
