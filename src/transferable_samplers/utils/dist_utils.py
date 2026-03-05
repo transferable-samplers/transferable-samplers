@@ -1,3 +1,5 @@
+"""Helpers for torch.distributed operations."""
+
 from __future__ import annotations
 
 from typing import TypeVar
@@ -14,10 +16,12 @@ def is_distributed() -> bool:
 
 
 def get_world_size() -> int:
+    """Return the distributed world size, or 1 if not distributed."""
     return dist.get_world_size() if dist.is_initialized() else 1
 
 
 def get_rank() -> int:
+    """Return the current process rank, or 0 if not distributed."""
     return dist.get_rank() if dist.is_initialized() else 0
 
 

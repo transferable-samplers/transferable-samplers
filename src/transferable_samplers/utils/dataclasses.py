@@ -1,3 +1,5 @@
+"""Core dataclasses employed throughout the codebase."""
+
 from __future__ import annotations
 
 import math
@@ -24,9 +26,21 @@ class TargetEnergy:
     normalization_std: torch.Tensor
 
     def energy(self, x: torch.Tensor) -> torch.Tensor:
+        """Compute target energy on normalized samples.
+
+        Destandardizes coordinates internally before evaluating.
+        """
         return self.energy_fn(destandardize_coords(x, self.normalization_std))
 
     def energy_and_grad(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute target energy and its gradient on normalized samples.
+
+        Must be called outside ``torch.enable_grad()`` context. Internally
+        enables gradients to compute the gradient via autograd, then detaches.
+
+        Raises:
+            RuntimeError: If called while gradients are globally enabled.
+        """
         if torch.is_grad_enabled():
             raise RuntimeError(
                 "TargetEnergy.energy_and_grad() is non-differentiable by design."
@@ -176,6 +190,8 @@ class SystemCond:
 
 @dataclass
 class SamplesData:
+    """Container for sampled configurations to be passed to the evaluator."""
+
     samples: torch.Tensor
     E_target: torch.Tensor
     # pyrefly: ignore [bad-assignment]
@@ -200,6 +216,8 @@ class SamplesData:
 
 @dataclass
 class EvalContext:
+    """Evaluation context bundling reference data, energy functions, and metadata."""
+
     true_data: SamplesData
     target_energy: TargetEnergy
     normalization_std: torch.Tensor

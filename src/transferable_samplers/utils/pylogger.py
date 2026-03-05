@@ -1,3 +1,5 @@
+"""Multi-GPU-friendly ranked logger."""
+
 from __future__ import annotations
 
 import logging
@@ -16,13 +18,16 @@ class RankedLogger(logging.LoggerAdapter):
         rank_zero_only: bool = False,
         extra: Mapping[str, object] | None = None,
     ) -> None:
-        """Initializes a multi-GPU-friendly python command line logger.
+        """Initialize a multi-GPU-friendly python command line logger.
 
         Logs on all processes with their rank prefixed in the log message.
 
-        :param name: The name of the logger. Default is ``__name__``.
-        :param rank_zero_only: Whether to force all logs to only occur on the rank zero process. Default is `False`.
-        :param extra: (Optional) A dict-like object which provides contextual information. See `logging.LoggerAdapter`.
+        Args:
+            name: The name of the logger.
+            rank_zero_only: Whether to force all logs to only occur on the rank
+                zero process.
+            extra: A dict-like object which provides contextual information.
+                See ``logging.LoggerAdapter``.
         """
         logger = logging.getLogger(name)
         super().__init__(logger=logger, extra=extra)
@@ -32,14 +37,14 @@ class RankedLogger(logging.LoggerAdapter):
     def log(self, level: int, msg: str, rank: int | None = None, *args: Any, **kwargs: Any) -> None:
         """Delegate a log call to the underlying logger, prefixing with process rank.
 
-        If `'rank'` is provided, then the log will only
-        occur on that rank/process.
+        If ``rank`` is provided, then the log will only occur on that rank/process.
 
-        :param level: The level to log at. Look at `logging.__init__.py` for more information.
-        :param msg: The message to log.
-        :param rank: The rank to log at.
-        :param args: Additional args to pass to the underlying logging function.
-        :param kwargs: Any additional keyword args to pass to the underlying logging function.
+        Args:
+            level: The level to log at. See ``logging`` module for valid levels.
+            msg: The message to log.
+            rank: If provided, only log on this rank/process.
+            *args: Additional args passed to the underlying logging function.
+            **kwargs: Additional keyword args passed to the underlying logging function.
         """
         if self.isEnabledFor(level):
             msg, kwargs = self.process(msg, kwargs)

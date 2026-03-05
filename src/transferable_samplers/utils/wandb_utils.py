@@ -1,3 +1,5 @@
+"""Weights & Biases logging utilities."""
+
 from __future__ import annotations
 
 import statistics as stats
@@ -17,7 +19,15 @@ logger = RankedLogger(__name__, rank_zero_only=False)
 
 
 def compute_mean_metrics(metrics: dict[str, Any], prefix: str = "val") -> dict[str, float]:
-    """Aggregate metrics across all sequences by computing mean."""
+    """Aggregate per-sequence metrics by computing their mean.
+
+    Args:
+        metrics: Dict of metric values keyed by ``{prefix}/{sequence}/{metric_name}``.
+        prefix: Metric key prefix to filter on (e.g. ``"val"``).
+
+    Returns:
+        Dict keyed by ``{prefix}/mean/{metric_name}`` with mean values.
+    """
     mean_dict_list: defaultdict[str, list[float]] = defaultdict(list)
 
     for key, value in metrics.items():
@@ -38,8 +48,13 @@ def compute_mean_metrics(metrics: dict[str, Any], prefix: str = "val") -> dict[s
 def make_log_image_fn(trainer: Trainer) -> Callable[[Any, str | None, str], None]:
     """Return a safe image logger function.
 
-    - Logs only on global rank 0
-    - If no WandbLogger is present, becomes a no-op
+    Logs only on global rank 0. Returns a no-op if no WandbLogger is present.
+
+    Args:
+        trainer: The Lightning trainer whose loggers are inspected.
+
+    Returns:
+        A callable ``(img, title, title_prefix) -> None`` that logs an image.
     """
     if not getattr(trainer, "is_global_zero", False):
         # pyrefly: ignore [bad-return]
@@ -65,15 +80,17 @@ def make_log_image_fn(trainer: Trainer) -> Callable[[Any, str | None, str], None
 
 @rank_zero_only
 def log_hyperparameters(object_dict: dict[str, Any], resolve: bool = True) -> None:
-    """Controls which config parts are saved by Lightning loggers.
+    """Control which config parts are saved by Lightning loggers.
 
-    Additionally saves:
-        - Number of model parameters
+    Additionally saves the number of model parameters (total, trainable,
+    non-trainable).
 
-    :param object_dict: A dictionary containing the following objects:
-        - `"cfg"`: A DictConfig object containing the main config.
-        - `"model"`: The Lightning model.
-        - `"trainer"`: The Lightning trainer.
+    Args:
+        object_dict: A dictionary containing the following objects:
+            - ``"cfg"``: A DictConfig object containing the main config.
+            - ``"model"``: The Lightning model.
+            - ``"trainer"``: The Lightning trainer.
+        resolve: Whether to resolve OmegaConf references when converting the config.
     """
     hparams: dict[str, Any] = {}
     cfg = OmegaConf.to_container(object_dict["cfg"], resolve=resolve)

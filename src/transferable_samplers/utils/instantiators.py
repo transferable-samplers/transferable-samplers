@@ -1,3 +1,5 @@
+"""Hydra-based instantiation of callbacks and loggers."""
+
 import hydra
 from lightning import Callback
 from lightning.pytorch.loggers import Logger
@@ -9,10 +11,13 @@ logger = RankedLogger(__name__, rank_zero_only=False)
 
 
 def instantiate_callbacks(callbacks_cfg: DictConfig) -> list[Callback]:
-    """Instantiates callbacks from config.
+    """Instantiate callbacks from config.
 
-    :param callbacks_cfg: A DictConfig object containing callback configurations.
-    :return: A list of instantiated callbacks.
+    Args:
+        callbacks_cfg: A DictConfig object containing callback configurations.
+
+    Returns:
+        A list of instantiated callbacks.
     """
     callbacks: list[Callback] = []
 
@@ -32,10 +37,13 @@ def instantiate_callbacks(callbacks_cfg: DictConfig) -> list[Callback]:
 
 
 def instantiate_loggers(logger_cfg: DictConfig) -> list[Logger]:
-    """Instantiates loggers from config.
+    """Instantiate loggers from config.
 
-    :param logger_cfg: A DictConfig object containing logger configurations.
-    :return: A list of instantiated loggers.
+    Args:
+        logger_cfg: A DictConfig object containing logger configurations.
+
+    Returns:
+        A list of instantiated loggers.
     """
     loggers: list[Logger] = []
 
