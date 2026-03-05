@@ -80,7 +80,6 @@ def cfg_and_experiment_name(request: pytest.FixtureRequest, tmp_path: Path) -> t
     GlobalHydra.instance().clear()
 
 
-@pytest.mark.forked
 @pytest.mark.essential
 def test_model_loss(cfg_and_experiment_name: tuple[DictConfig, str]) -> None:
     """

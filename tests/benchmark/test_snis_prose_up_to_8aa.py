@@ -42,7 +42,6 @@ def _make_cfg(trainer_name_param: str, tmp_path: Path, seed: int = 42):
     return cfg
 
 
-@pytest.mark.forked
 @pytest.mark.benchmark
 def test_snis_prose_up_to_8aa(trainer_name_param: str, tmp_path: Path) -> None:
     """Check metrics are within 2σ of reference values."""

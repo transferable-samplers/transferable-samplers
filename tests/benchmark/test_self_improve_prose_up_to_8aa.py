@@ -12,7 +12,6 @@ from tests.helpers.utils import compose_config
 from transferable_samplers.train import train
 
 
-@pytest.mark.forked
 @pytest.mark.benchmark
 def test_self_improve_prose_up_to_8aa(trainer_name_param: str, tmp_path: Path) -> None:
     GlobalHydra.instance().clear()

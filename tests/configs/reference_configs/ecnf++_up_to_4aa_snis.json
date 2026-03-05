@@ -34,8 +34,7 @@
     "pin_memory": false,
     "precomputed_std": 0.28,
     "system_cond_ids": [
-      "encodings",
-      "permutations"
+      "encodings"
     ],
     "test_sequences": [
       "AA",
@@ -186,7 +185,7 @@
       "_target_": "transferable_samplers.utils.dataclasses.SourceEnergyConfig",
       "energy_batch_size": 8,
       "grad_batch_size": 8,
-      "sample_batch_size": 4
+      "sample_batch_size": 6
     },
     "train_from_buffer": false
   },

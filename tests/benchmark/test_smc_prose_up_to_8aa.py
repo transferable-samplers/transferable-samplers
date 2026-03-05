@@ -11,7 +11,6 @@ from tests.helpers.utils import compose_config, extract_test_sequence
 from transferable_samplers.eval import eval
 
 
-@pytest.mark.forked
 @pytest.mark.benchmark
 def test_smc_prose_up_to_8aa(trainer_name_param: str, tmp_path: Path) -> None:
     GlobalHydra.instance().clear()

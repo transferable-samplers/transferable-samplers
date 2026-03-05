@@ -9,17 +9,8 @@ class PaddingTransform:
     def __init__(self, max_num_atoms: int) -> None:
         self.max_num_atoms = max_num_atoms
 
-    def create_permutation_mask(
-        self, permutations: dict[str, torch.Tensor], padded_seq_len: int
-    ) -> dict[str, torch.Tensor]:
-        num_tokens = next(iter(permutations.values())).shape[0]
-        assert all(len(v) == num_tokens for v in permutations.values()), "All permutations must have same length"
-        true_mask = torch.ones(num_tokens, dtype=torch.bool)
-        false_mask = torch.zeros(padded_seq_len - num_tokens, dtype=torch.bool)
-        # pyrefly: ignore [bad-return]
-        return torch.cat([true_mask, false_mask])
-
     def pad_data(self, x: torch.Tensor) -> torch.Tensor:
+        """Pad a 2D tensor to max_num_atoms along the first dimension."""
         assert len(x.shape) == 2
         num_atoms = x.shape[0]
         assert num_atoms <= self.max_num_atoms, f"number of particles {num_atoms} exceeds max {self.max_num_atoms}"
@@ -27,6 +18,7 @@ class PaddingTransform:
         return torch.cat([x, pad_tensor])
 
     def pad_encodings(self, encodings: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+        """Pad encoding tensors to max_num_atoms, leaving seq_len unchanged."""
         padded_encodings = {}
         for key, value in encodings.items():
             if not key == "seq_len":  # don't pad seq_len - is single value per sample
@@ -38,6 +30,7 @@ class PaddingTransform:
         return padded_encodings
 
     def pad_permutations(self, permutations: dict[str, torch.Tensor], padded_seq_len: int) -> dict[str, torch.Tensor]:
+        """Pad permutation tensors with sequential indices up to padded_seq_len."""
         num_tokens = next(iter(permutations.values())).shape[0]
         assert all(len(v) == num_tokens for v in permutations.values()), "All permutations must have same length"
         pad_len = padded_seq_len - num_tokens
@@ -53,28 +46,34 @@ class PaddingTransform:
             return padded_permutations
 
     def __call__(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Pad data, encodings, and permutations, and add a boolean mask."""
         assert "mask" not in data, "data already has a mask, cannot pad again"
 
         x = data["x"]
         encodings = data["encodings"]
-        permutations = data["permutations"]
+        permutations = data.get("permutations")
 
         assert x.ndim == 2, f"PaddingTransform only handles single samples, got shape {x.shape}"
 
-        mask = self.create_permutation_mask(permutations, padded_seq_len=self.max_num_atoms)
+        num_atoms = x.shape[0]
+        mask = torch.cat(
+            [
+                torch.ones(num_atoms, dtype=torch.bool),
+                torch.zeros(self.max_num_atoms - num_atoms, dtype=torch.bool),
+            ]
+        )
 
         x = self.pad_data(x)
-
         encodings = self.pad_encodings(encodings)
-
-        permutations = self.pad_permutations(permutations, padded_seq_len=self.max_num_atoms)
 
         padded_batch = {
             **data,
             "x": x,
             "encodings": encodings,
-            "permutations": permutations,
             "mask": mask,
         }
+
+        if permutations is not None:
+            padded_batch["permutations"] = self.pad_permutations(permutations, padded_seq_len=self.max_num_atoms)
 
         return padded_batch

@@ -81,7 +81,6 @@ def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, t
     GlobalHydra.instance().clear()
 
 
-@pytest.mark.forked  # prevents OpenMM issues
 @pytest.mark.essential
 def test_snis_mwe(cfg_test_snis_mwe):
     """

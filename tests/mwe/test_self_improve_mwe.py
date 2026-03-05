@@ -65,7 +65,6 @@ def cfg_test_self_improve_mwe(request: pytest.FixtureRequest, trainer_name_param
     GlobalHydra.instance().clear()
 
 
-@pytest.mark.forked  # prevents OpenMM issues
 @pytest.mark.essential
 def test_self_improve_mwe(cfg_test_self_improve_mwe: DictConfig) -> None:
     """

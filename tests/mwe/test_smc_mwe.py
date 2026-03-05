@@ -72,7 +72,6 @@ def cfg_test_smc_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tm
     GlobalHydra.instance().clear()
 
 
-@pytest.mark.forked  # prevents OpenMM issues
 @pytest.mark.essential
 def test_smc_mwe(cfg_test_smc_mwe: DictConfig) -> None:
     """

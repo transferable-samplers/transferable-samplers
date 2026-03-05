@@ -18,6 +18,10 @@ import torch
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, OmegaConf, open_dict
 
+# pyrefly: ignore [missing-import]
+from tests.helpers.utils import compose_config
+from transferable_samplers.train import train
+
 # PyTorch 2.6+ defaults to weights_only=True. Lightning checkpoints contain
 # OmegaConf objects so we need weights_only=False for resume to work.
 # Patch torch.load so None→False (pre-2.6 behaviour).
@@ -31,10 +35,6 @@ def _patched_torch_load(*args, **kwargs):
 
 
 torch.load = _patched_torch_load  # type: ignore[assignment]
-
-# pyrefly: ignore [missing-import]
-from tests.helpers.utils import compose_config
-from transferable_samplers.train import train
 
 # Use a single lightweight experiment config for all tests.
 EXPERIMENT = "single_system/train/tarflow_AAA.yaml"
@@ -85,7 +85,6 @@ def _train_and_get_ckpt(trainer_name: str, out_dir: Path, **extra) -> Path:
 # ---------------------------------------------------------------------------
 # 1. Train + Resume
 # ---------------------------------------------------------------------------
-@pytest.mark.forked
 @pytest.mark.essential
 def test_train_and_resume(trainer_name_param: str, tmp_path: Path) -> None:
     """Train 1 epoch, then resume from last.ckpt for 1 more epoch."""
@@ -110,7 +109,6 @@ def test_train_and_resume(trainer_name_param: str, tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # 2a. Train from init: ckpt_path
 # ---------------------------------------------------------------------------
-@pytest.mark.forked
 @pytest.mark.essential
 def test_train_from_init_ckpt(trainer_name_param: str, tmp_path: Path) -> None:
     """Train to create a checkpoint, then init a fresh run from that ckpt."""
@@ -131,7 +129,6 @@ def test_train_from_init_ckpt(trainer_name_param: str, tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # 2b. Train from init: ckpt_path + resume
 # ---------------------------------------------------------------------------
-@pytest.mark.forked
 @pytest.mark.essential
 def test_train_from_init_ckpt_then_resume(trainer_name_param: str, tmp_path: Path) -> None:
     """Init from ckpt, train 1 epoch, then resume for 1 more epoch."""
@@ -164,7 +161,6 @@ def test_train_from_init_ckpt_then_resume(trainer_name_param: str, tmp_path: Pat
 # ---------------------------------------------------------------------------
 # 2c. Train from init: hf_state_dict (finetune from pretrained HF weights)
 # ---------------------------------------------------------------------------
-@pytest.mark.forked
 @pytest.mark.essential
 def test_train_from_init_hf_state_dict(trainer_name_param: str, tmp_path: Path) -> None:
     """Init from pretrained HF weights and finetune for 1 epoch."""
@@ -182,7 +178,6 @@ def test_train_from_init_hf_state_dict(trainer_name_param: str, tmp_path: Path) 
 # ---------------------------------------------------------------------------
 # 2d. Train from init: hf_state_dict + resume
 # ---------------------------------------------------------------------------
-@pytest.mark.forked
 @pytest.mark.essential
 def test_train_from_init_hf_state_dict_then_resume(trainer_name_param: str, tmp_path: Path) -> None:
     """Init from pretrained HF weights, train 1 epoch, then resume for 1 more."""
@@ -210,7 +205,6 @@ def test_train_from_init_hf_state_dict_then_resume(trainer_name_param: str, tmp_
 # ---------------------------------------------------------------------------
 # 3. Train + Eval
 # ---------------------------------------------------------------------------
-@pytest.mark.forked
 @pytest.mark.essential
 def test_train_and_eval(trainer_name_param: str, tmp_path: Path) -> None:
     """Train 1 epoch, then run eval (test stage) loading from last.ckpt."""

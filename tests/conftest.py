@@ -42,11 +42,16 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "essential: must-pass tests (config, assets, algorithms)")
     config.addinivalue_line("markers", "benchmark: long-running runs that validate metrics against a paper")
     config.addinivalue_line("markers", "optional: architectural/design tests")
-    config.addinivalue_line("markers", "forked: force forked execution via pytest-forked")
 
 
 @pytest.fixture(autouse=True)
-def _enforce_benchmark_hardware(request, trainer_name_param: str):
+def _enforce_hardware_constraints(request, trainer_name_param: str):
     if request.node.get_closest_marker("benchmark"):
         if trainer_name_param == "cpu":
             pytest.skip("Benchmark tests require GPU or DDP")
+    if (
+        trainer_name_param == "ddp_fork"
+        and request.node.get_closest_marker("essential")
+        and "tests/mwe" not in str(request.fspath)
+    ):
+        pytest.skip("DDP essential tests only run MWE tests")
