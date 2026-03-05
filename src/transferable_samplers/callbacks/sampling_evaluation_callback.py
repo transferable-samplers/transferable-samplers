@@ -1,3 +1,5 @@
+"""Callback that runs sampling and evaluation at validation/test time."""
+
 from __future__ import annotations
 
 from functools import partial
@@ -19,15 +21,20 @@ logger = RankedLogger(__name__, rank_zero_only=False)
 
 
 class SamplingEvaluationCallback(Callback):
-    """Lightning callback that orchestrates sample generation + evaluation.
+    """Generate conformations and evaluate them at validation/test epoch end.
 
-    On validation/test epoch end:
-    1. Loops over sequences, generating samples via self.sampler (all ranks)
-    2. Global zero only: evaluates samples, plots, logs per-sequence metrics
-    3. Global zero only: saves samples and diagnostics to disk
-    4. Global zero only: aggregates and logs mean metrics across sequences
+    All ranks participate in sampling (due to all_gather inside the sampler).
+    Evaluation, plotting, saving, and metric logging happen on global rank zero
+    only. EMA weight swapping is handled separately by ``EMAWeightAveraging``.
 
-    EMA weight swapping is handled by the EMAWeightAveraging callback.
+    Args:
+        evaluator: Evaluator that computes metrics from generated conformations.
+        sampler: Sampler used to generate conformations. If None, evaluation is
+            skipped entirely.
+        run_diagnostics_kwargs: Extra kwargs forwarded to
+            ``pl_module.run_model_diagnostics`` (if the model implements it).
+        output_dir: Directory to save ``samples_dict.pt`` and ``diagnostics.pt``.
+            Empty string disables saving.
     """
 
     def __init__(
@@ -44,14 +51,24 @@ class SamplingEvaluationCallback(Callback):
         self.output_dir = output_dir
 
     def on_validation_epoch_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
+        """Run evaluation on validation sequences."""
         self.evaluate(trainer, pl_module, "val")
         logger.info("Validation evaluation complete")
 
     def on_test_epoch_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
+        """Run evaluation on test sequences."""
         self.evaluate(trainer, pl_module, "test")
         logger.info("Test evaluation complete")
 
     def evaluate(self, trainer: Trainer, pl_module: LightningModule, prefix: str) -> None:
+        """Sample conformations for each sequence and evaluate on rank zero.
+
+        Args:
+            trainer: Lightning Trainer instance.
+            pl_module: The LightningModule being trained/evaluated.
+            prefix: Either ``"val"`` or ``"test"``, used for metric naming and
+                to select which sequences to evaluate.
+        """
         if self.sampler is None:
             return
 

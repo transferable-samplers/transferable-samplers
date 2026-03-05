@@ -1,3 +1,5 @@
+"""Callback that populates the replay buffer for self-improvement training."""
+
 from __future__ import annotations
 
 from functools import partial
@@ -18,14 +20,18 @@ logger = RankedLogger(__name__, rank_zero_only=False)
 
 
 class PopulateBufferCallback(Callback):
-    """Lightning callback that owns a sampler and populates the model's buffer for self-improvement training.
+    """Populate the model's replay buffer at the start of each training epoch.
 
-    On each training epoch start:
-    1. Gets eval context from the datamodule
-    2. Builds source energy from the model
-    3. Runs the sampler to generate samples
-    4. Optionally evaluates the samples
-    5. Stores the resampled samples in the model's buffer
+    Uses a sampler to generate conformations from the current model, optionally
+    evaluates them, then stores the resampled conformations in the model's buffer
+    for self-improvement training.
+
+    Requires ``model.train_from_buffer=True``. Incompatible with
+    ``EMAWeightAveraging`` (asserts at runtime).
+
+    Args:
+        sampler: Sampler used to generate conformations from the model.
+        evaluator: Optional evaluator to log sample quality metrics each epoch.
     """
 
     def __init__(self, sampler: BaseSampler, evaluator: PeptideEnsembleEvaluator | None = None) -> None:
@@ -34,6 +40,12 @@ class PopulateBufferCallback(Callback):
         self.evaluator = evaluator
 
     def on_train_epoch_start(self, trainer: Trainer, pl_module: LightningModule) -> None:
+        """Generate samples and populate the model's buffer.
+
+        All ranks participate in sampling (the sampler uses all_gather internally),
+        but only rank zero evaluates. Every rank populates its own buffer with
+        the same samples since all_gather ensures identical results across ranks.
+        """
         assert pl_module.train_from_buffer, "PopulateBufferCallback requires model.train_from_buffer=True."
         assert not self._has_ema_callback(trainer), (
             "EMAWeightAveraging callback should not be used with self-improvement."
