@@ -41,6 +41,12 @@ def pytest_addoption(parser):
 def pytest_configure(config):
     config.addinivalue_line("markers", "essential: must-pass tests (config, assets, algorithms)")
     config.addinivalue_line("markers", "benchmark: long-running runs that validate metrics against a paper")
-    config.addinivalue_line("markers", "benchmark_ddp: benchmark runs under DDP to verify parity with single-GPU")
     config.addinivalue_line("markers", "optional: architectural/design tests")
     config.addinivalue_line("markers", "forked: force forked execution via pytest-forked")
+
+
+@pytest.fixture(autouse=True)
+def _enforce_benchmark_hardware(request, trainer_name_param: str):
+    if request.node.get_closest_marker("benchmark"):
+        if trainer_name_param == "cpu":
+            pytest.skip("Benchmark tests require GPU or DDP")

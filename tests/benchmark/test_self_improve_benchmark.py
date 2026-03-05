@@ -57,10 +57,3 @@ def _run_self_improve_benchmark(cfg: DictConfig) -> None:
 def test_self_improve_benchmark(cfg_self_improve_benchmark: DictConfig) -> None:
     """Run full self-improvement experiment on GPU and collate all metrics."""
     _run_self_improve_benchmark(cfg_self_improve_benchmark)
-
-
-@pytest.mark.forked
-@pytest.mark.benchmark_ddp
-def test_self_improve_benchmark_ddp(cfg_self_improve_benchmark: DictConfig) -> None:
-    """Run full self-improvement experiment on DDP and collate all metrics."""
-    _run_self_improve_benchmark(cfg_self_improve_benchmark)

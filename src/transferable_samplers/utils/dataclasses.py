@@ -8,6 +8,7 @@ from typing import Any
 import scipy.special
 import torch
 import torch.utils._pytree as pytree
+from tqdm import tqdm
 
 from transferable_samplers.utils.standardization import destandardize_coords
 
@@ -93,12 +94,15 @@ class SourceEnergy:
         """
         all_samples, all_E = [], []
         remaining = num_samples
+        pbar = tqdm(total=num_samples, desc="Sampling proposals", unit="sample")
         while remaining > 0:
             n = min(self.sample_batch_size, remaining)
             s, e = self.sample_fn(n, **kwargs)
             all_samples.append(s)
             all_E.append(e)
             remaining -= n
+            pbar.update(n)
+        pbar.close()
         samples = torch.cat(all_samples, dim=0)
         E_source = torch.cat(all_E, dim=0)
 

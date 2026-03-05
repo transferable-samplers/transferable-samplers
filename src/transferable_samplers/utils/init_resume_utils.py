@@ -29,7 +29,7 @@ def load_state_dict_from_ckpt(path: str) -> dict[str, torch.Tensor]:
     will be in the checkpoint's ``state_dict`` field.
     """
     assert path.endswith(".ckpt"), f"Expected a .ckpt file, got: {path}"
-    ckpt = torch.load(path, map_location="cpu")
+    ckpt = torch.load(path, map_location="cpu", weights_only=False)
     if "state_dict" not in ckpt:
         raise KeyError(f"Checkpoint at {path} missing 'state_dict' key.")
     return ckpt["state_dict"]
@@ -45,7 +45,7 @@ def load_state_dict_from_file(path: str) -> dict[str, torch.Tensor]:
         The loaded state dict.
     """
     assert path.endswith(".pth"), f"Expected a .pth file, got: {path}"
-    return torch.load(path, map_location="cpu")
+    return torch.load(path, map_location="cpu", weights_only=False)
 
 
 def load_state_dict_from_hf(hf_filepath: str, scratch_dir: str) -> dict[str, torch.Tensor]:
@@ -162,7 +162,7 @@ def resolve_init_or_resume(
     # 1. Try to resume from an existing checkpoint
     if resume_ckpt_path and Path(resume_ckpt_path).exists():
         try:
-            _ = torch.load(resume_ckpt_path, map_location="cpu")
+            _ = torch.load(resume_ckpt_path, map_location="cpu", weights_only=False)
             logger.info(f"Found resume checkpoint at {resume_ckpt_path}. Resuming training; ignoring init_*.")
             return resume_ckpt_path, None
         except Exception:

@@ -61,10 +61,3 @@ def _run_smc_benchmark(cfg: DictConfig) -> None:
 def test_smc_benchmark(cfg_smc_benchmark: DictConfig) -> None:
     """Run full SMC evaluation experiment on GPU and collate all metrics."""
     _run_smc_benchmark(cfg_smc_benchmark)
-
-
-@pytest.mark.forked
-@pytest.mark.benchmark_ddp
-def test_smc_benchmark_ddp(cfg_smc_benchmark: DictConfig) -> None:
-    """Run full SMC evaluation experiment on DDP and collate all metrics."""
-    _run_smc_benchmark(cfg_smc_benchmark)

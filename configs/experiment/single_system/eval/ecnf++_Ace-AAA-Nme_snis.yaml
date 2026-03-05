@@ -23,7 +23,7 @@ model:
     channels: 256
     num_layers: 5
   source_energy_config:
-    sample_batch_size: 8
+    sample_batch_size: 32
 callbacks:
   sampling_evaluation:
     sampler:

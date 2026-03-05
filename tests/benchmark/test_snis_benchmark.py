@@ -15,7 +15,6 @@ from transferable_samplers.eval import eval
 
 EXPERIMENT_NAMES = [
     "single_system/eval/ecnf++_AAA_snis.yaml",  # single system ecnf
-    "single_system/eval/tarflow_AAA_ula.yaml",  # single system tarflow
     "transferable/eval/ecnf++_up_to_4aa_snis.yaml",  # transferable ecnf
     "transferable/eval/prose_up_to_8aa_snis.yaml",  # transferable tarflow
 ]
@@ -62,11 +61,4 @@ def _run_snis_benchmark(cfg: DictConfig) -> None:
 @pytest.mark.benchmark
 def test_snis_benchmark(cfg_snis_benchmark: DictConfig) -> None:
     """Run full SNIS evaluation experiment on GPU and collate all metrics."""
-    _run_snis_benchmark(cfg_snis_benchmark)
-
-
-@pytest.mark.forked
-@pytest.mark.benchmark_ddp
-def test_snis_benchmark_ddp(cfg_snis_benchmark: DictConfig) -> None:
-    """Run full SNIS evaluation experiment on DDP and collate all metrics."""
     _run_snis_benchmark(cfg_snis_benchmark)

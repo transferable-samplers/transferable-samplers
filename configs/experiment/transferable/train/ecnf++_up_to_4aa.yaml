@@ -33,6 +33,7 @@ model:
     div_factor: 5e2
     final_div_factor: 1.0
 data:
+  system_cond_ids: [encodings]
   batch_size: 512
   com_augmentation: false
 callbacks:
