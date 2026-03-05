@@ -1,1 +1,1 @@
-"""Transferable Samplers: transferable molecular dynamics samplers."""
+"""Transferable Samplers: transferable sampling of molecular systems."""
