@@ -37,6 +37,27 @@ from transferable_samplers.utils.huggingface import download_and_extract_pdb_tar
 
 
 class ManyPeptidesDataModule(BaseDataModule):
+    """Datamodule for transferable training / evaluation on ManyPeptidesMD dataset.
+
+    Training data is streamed from WebDataset tar archives (cached locally or
+    fetched from HuggingFace Hub). Evaluation data uses pre-subsampled
+    trajectories with precomputed TICA projections.
+
+    System conditioning (encodings and/or permutations) is controlled by
+    ``system_cond_ids`` and cached as pickle files during ``prepare_data``.
+
+    Args:
+        precomputed_std: Precomputed standardization std across all sequences.
+        val_sequences: Sequence(s) to evaluate during validation.
+        test_sequences: Sequence(s) to evaluate during testing.
+        num_aa_min: Minimum amino acid count for WebDataset filtering.
+        num_aa_max: Maximum amino acid count for WebDataset filtering.
+        system_cond_ids: Which conditioning to compute (``"encodings"``,
+            ``"permutations"``, or both).
+
+    See ``BaseDataModule`` for remaining args.
+    """
+
     HF_REPO_ID = "transferable-samplers/many-peptides-md"
     WDS_REPO_PATH = "webdatasets/single_frames"
     NUM_TARFILES = 5000
@@ -118,14 +139,13 @@ class ManyPeptidesDataModule(BaseDataModule):
         self.std = torch.tensor(self.precomputed_std)
 
     def prepare_data(self) -> None:
-        """Download + preprocessing data.
+        """Download PDBs and evaluation data, then cache preprocessing dicts.
 
-        Lightning ensures that `self.prepare_data()` is called only
-        within a single process on CPU, so you can safely add your downloading logic within. In
-        case of multi-node training, the execution of this hook depends upon
-        `self.prepare_data_per_node()`.
+        Lightning ensures this is called only within a single process on CPU,
+        so downloading logic is safe here. In multi-node training, execution
+        depends on ``self.prepare_data_per_node()``.
 
-        Do not use it to assign state (self.x = y).
+        Do not use it to assign state (``self.x = y``).
         """
         self.wds_cache_dir.mkdir(parents=True, exist_ok=True)
         self.preproc_cache_dir.mkdir(parents=True, exist_ok=True)
@@ -148,14 +168,14 @@ class ManyPeptidesDataModule(BaseDataModule):
             prepare_and_cache_permutations_dict(topology_dict, self.permutations_dict_pkl_path)
 
     def setup(self, stage: str | None = None) -> None:
-        """Load data. Set variables: `self.data_train`, `self.data_val`, `self.data_test`.
+        """Load cached preprocessing dicts and build the training dataset.
 
-        This method is called by Lightning before `trainer.fit()`, `trainer.validate()`, `trainer.test()`, and
-        `trainer.predict()`, so be careful not to execute things like random split twice! Also, it is called after
-        `self.prepare_data()` and there is a barrier in between which ensures that all the processes proceed to
-        `self.setup()` once the data is prepared and available for use.
+        Called by Lightning before ``trainer.fit()``, ``trainer.validate()``,
+        ``trainer.test()``, and ``trainer.predict()``. A barrier after
+        ``prepare_data`` ensures all processes wait until data is ready.
 
-        :param stage: The stage to setup. Either `"fit"`, `"validate"`, `"test"`, or `"predict"`. Defaults to ``None``.
+        Args:
+            stage: One of ``"fit"``, ``"validate"``, ``"test"``, or ``"predict"``.
         """
         self._validate_and_set_batch_size()
 

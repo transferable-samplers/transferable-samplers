@@ -15,7 +15,8 @@ matplotlib.rcParams["font.family"] = "STIXGeneral"
 COLORS = ["r", "b", "orange", "purple", "brown", "pink"]
 
 
-def interatomic_dist(x: torch.Tensor, flatten: bool = True) -> torch.Tensor:
+def _interatomic_dist(x: torch.Tensor, flatten: bool = True) -> torch.Tensor:
+    """Compute upper-triangular pairwise interatomic distances."""
     assert len(x.shape) == 3, f"Expected 3D array, got {x.shape}"
 
     num_atoms = x.shape[1]
@@ -51,13 +52,13 @@ def plot_atom_distances(
         prefix: Metric key prefix.
     """
     logging.info(f"Plotting interatomic distances for {prefix}")
-    true_samples_dist = interatomic_dist(true_samples).cpu()
+    true_samples_dist = _interatomic_dist(true_samples).cpu()
     min_dist = true_samples_dist.min()
     max_dist = true_samples_dist.max()
 
     named_dists = {}
     for name, samples in samples_dict.items():
-        dist = interatomic_dist(samples).cpu()
+        dist = _interatomic_dist(samples).cpu()
         named_dists[name] = dist
         min_dist = min(min_dist, dist.min())
         max_dist = max(max_dist, dist.max())

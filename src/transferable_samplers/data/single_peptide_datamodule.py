@@ -23,6 +23,19 @@ from transferable_samplers.utils.dataclasses import EvalContext, SamplesData, Ta
 
 
 class SinglePeptideDataModule(BaseDataModule):
+    """Datamodule for a single fixed peptide sequence.
+
+    Downloads trajectory data from HuggingFace Hub, computes standardization
+    statistics from the training split, and builds an OpenMM energy function
+    for evaluation.
+
+    Args:
+        sequence: Amino acid sequence string (e.g. ``"Ace-AAA-Nme"``).
+        temperature: Simulation temperature in Kelvin.
+
+    See ``BaseDataModule`` for remaining args.
+    """
+
     HF_REPO_ID = "transferable-samplers/sequential-boltzmann-generators-data"
 
     def __init__(
@@ -70,14 +83,13 @@ class SinglePeptideDataModule(BaseDataModule):
         self.test_sequences = [self.sequence]
 
     def prepare_data(self) -> None:
-        """Download + preprocessing data.
+        """Download trajectory data from HuggingFace Hub if not already present.
 
-        Lightning ensures that `self.prepare_data()` is called only
-        within a single process on CPU, so you can safely add your downloading logic within. In
-        case of multi-node training, the execution of this hook depends upon
-        `self.prepare_data_per_node()`.
+        Lightning ensures this is called only within a single process on CPU,
+        so downloading logic is safe here. In multi-node training, execution
+        depends on ``self.prepare_data_per_node()``.
 
-        Do not use it to assign state (self.x = y).
+        Do not use it to assign state (``self.x = y``).
         """
         required_files = [self.train_data_path, self.val_data_path, self.test_data_path, self.pdb_path]
         if all(Path(f).exists() for f in required_files):
@@ -96,14 +108,14 @@ class SinglePeptideDataModule(BaseDataModule):
         logging.info(f"Downloaded dataset to {local_dir}")
 
     def setup(self, stage: str | None = None) -> None:
-        """Load data. Set variables: `self.data_train`, `self.data_val`, `self.data_test`.
+        """Load trajectory data and compute standardization statistics.
 
-        This method is called by Lightning before `trainer.fit()`, `trainer.validate()`, `trainer.test()`, and
-        `trainer.predict()`, so be careful not to execute things like random split twice! Also, it is called after
-        `self.prepare_data()` and there is a barrier in between which ensures that all the processes proceed to
-        `self.setup()` once the data is prepared and available for use.
+        Called by Lightning before ``trainer.fit()``, ``trainer.validate()``,
+        ``trainer.test()``, and ``trainer.predict()``. A barrier after
+        ``prepare_data`` ensures all processes wait until data is ready.
 
-        :param stage: The stage to setup. Either `"fit"`, `"validate"`, `"test"`, or `"predict"`. Defaults to ``None``.
+        Args:
+            stage: One of ``"fit"``, ``"validate"``, ``"test"``, or ``"predict"``.
         """
         self._validate_and_set_batch_size()
 

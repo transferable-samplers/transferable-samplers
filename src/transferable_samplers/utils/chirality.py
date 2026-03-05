@@ -32,7 +32,7 @@ def _find_chirality_centers(adj_list: torch.Tensor, atom_types: torch.Tensor, nu
     Args:
         adj_list: List of bonds
         atom_types: List of atom types
-        num_h_atoms: If num_h_atoms or more hydrogen atoms connected to the center, it is not reportet.
+        num_h_atoms: If num_h_atoms or more hydrogen atoms connected to the center, it is not reported.
             Default is 2, because in this case the mirroring is a simple permutation.
 
     Returns:
@@ -77,15 +77,18 @@ def _check_symmetry_change(
     adj_list: torch.Tensor,
     atom_types: torch.Tensor,
 ) -> torch.Tensor:
-    """Check for a batch if the chirality changed wrt to some reference reference_signs.
+    """Check if the chirality changed wrt to some reference reference_signs.
 
     If the signs for two configurations are different for the same center, the chirality changed.
 
     Args:
-        true_coords: Tensor of atom coordinates
-        pred_coords: Tensor of atom coordinates
+        true_coords: Tensor of atom coordinates.
+        pred_coords: Tensor of atom coordinates.
+        adj_list: Bond adjacency list.
+        atom_types: Atom type indices.
+
     Returns:
-        Mask, where changes are True
+        Mask, where ``True`` indicates a chirality change.
     """
     chirality_centers = _find_chirality_centers(adj_list, atom_types)
 
@@ -94,7 +97,17 @@ def _check_symmetry_change(
     return (perm_sign != reference_signs.to(pred_coords)).any(dim=-1)
 
 
-def get_symmetry_change(true_samples: torch.Tensor, pred_samples: torch.Tensor, topology: Any) -> torch.Tensor:
+def get_symmetry_change(true_samples: torch.Tensor, pred_samples: torch.Tensor, topology: md.Topology) -> torch.Tensor:
+    """Check whether predicted samples have inconsistent global chirality relative to true samples.
+
+    Args:
+        true_samples: Reference atom coordinates, shape ``(N, num_atoms, 3)``.
+        pred_samples: Predicted atom coordinates, shape ``(M, num_atoms, 3)``.
+        topology: Molecular topology (e.g. from MDTraj) providing atoms and bonds.
+
+    Returns:
+        Boolean mask of shape ``(M,)`` where ``True`` indicates a chirality flip.
+    """
     true_samples = true_samples[: len(pred_samples)]
 
     adj_list = _get_adj_list(topology)

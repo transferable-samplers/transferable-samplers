@@ -16,11 +16,15 @@ logger = RankedLogger(__name__, rank_zero_only=False)
 class LossEvaluationCallback(Callback):
     """Evaluate model loss on held-out true samples during validation/test.
 
-    Uses the model's native loss (MSE for flow matching, NLL for normalizing flows)
-    without system-size normalization.
+    Uses the model's ``compute_primary_loss`` (MSE for flow matching, NLL for
+    normalizing flows) without system-size normalization.
 
     DDP-safe: all ranks compute loss on a shard of the data, then all_reduce to
     get the global mean. Only rank 0 logs metrics.
+
+    Args:
+        batch_size: Number of samples per forward pass.
+        max_samples: Cap on the number of true samples to evaluate. None = use all.
     """
 
     def __init__(self, batch_size: int = 256, max_samples: int | None = None) -> None:

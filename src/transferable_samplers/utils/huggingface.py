@@ -139,11 +139,11 @@ TICA_MEAN_SHAPES = {
 
 
 def safe_extract_tar(tar_path: str, extraction_path: str) -> None:
-    """Safely extracts a tar archive to the given path.
+    """Safely extract a tar archive to the given path.
 
     Args:
-        tar_path (str): Path to the tar archive.
-        extraction_path (str): Directory to extract files into.
+        tar_path: Path to the tar archive.
+        extraction_path: Directory to extract files into.
     """
     abs_path = Path(extraction_path).resolve()
 
@@ -157,11 +157,14 @@ def safe_extract_tar(tar_path: str, extraction_path: str) -> None:
 
 # pyrefly: ignore [bad-return]
 def download_weights(destination_dir: str, hf_filepath: str) -> str:
-    """Downloads the model weights from Hugging Face Hub.
+    """Download model weights from Hugging Face Hub.
 
     Args:
-        destination_dir (str): The destination dir where the model weights will be saved.
-        hf_filepath (str): The filepath in the Hugging Face repo
+        destination_dir: The destination dir where the model weights will be saved.
+        hf_filepath: The filepath in the Hugging Face repo.
+
+    Returns:
+        Local path to the downloaded weights file.
     """
     try:
         Path(destination_dir).mkdir(parents=True, exist_ok=True)
@@ -173,10 +176,10 @@ def download_weights(destination_dir: str, hf_filepath: str) -> str:
 
 
 def download_and_extract_pdb_tarfiles(data_dir: str) -> None:
-    """Downloads and extracts the PDB tarfiles from Hugging Face Hub.
+    """Download and extract the PDB tarfiles from Hugging Face Hub.
 
     Args:
-        data_dir (str): The top-level data dir in which to build the pdb file subdirectories
+        data_dir: The top-level data dir in which to build the pdb file subdirectories.
     """
     if not (Path(data_dir) / "pdb_tarfiles").exists():
         logging.info(f"Downloading PDB tarfiles to {data_dir}")
@@ -197,10 +200,10 @@ def download_and_extract_pdb_tarfiles(data_dir: str) -> None:
 
 
 def download_evaluation_data(data_dir: str) -> None:
-    """Downloads and extracts the evaluation trajectories_subsampled from Hugging Face Hub.
+    """Download and extract the evaluation trajectories_subsampled from Hugging Face Hub.
 
     Args:
-        data_dir (str): The top-level data dir in which to build the evaluation data subdirectories
+        data_dir: The top-level data dir in which to build the evaluation data subdirectories.
     """
     logging.warning(
         "Critical Update\n"
@@ -230,27 +233,24 @@ def download_evaluation_data(data_dir: str) -> None:
     # Check TICA shapes for all downloaded files
     logging.info("Checking TICA model shapes...")
 
-    # TODO
-    logging.warning("You have not uncommented the TICA checks")
+    for subset_key in TICA_MEAN_SHAPES.keys():
+        for sequence in TICA_MEAN_SHAPES[subset_key].keys():
+            # Construct file path from dict keys
+            file_path = os.path.join(
+                data_dir, "trajectories_subsampled", subset_key, f"{len(sequence)}AA", f"{sequence}_subsampled.npz"
+            )
+            data = np.load(file_path)
+            tica_mean = data["tica_mean"]
+            tica_mean_shape = tica_mean.shape[0]
+            expected_shape = TICA_MEAN_SHAPES[subset_key][sequence]
 
-    # for subset_key in TICA_MEAN_SHAPES.keys():
-    #     for sequence in TICA_MEAN_SHAPES[subset_key].keys():
-    #         # Construct file path from dict keys
-    #         file_path = os.path.join(
-    #             data_dir, "trajectories_subsampled", subset_key, f"{len(sequence)}AA", f"{sequence}_subsampled.npz"
-    #         )
-    #         data = np.load(file_path)
-    #         tica_mean = data["tica_mean"]
-    #         tica_mean_shape = tica_mean.shape[0]
-    #         expected_shape = TICA_MEAN_SHAPES[subset_key][sequence]
+            error_message = (
+                f"TICA mean shape for {sequence} is {tica_mean_shape}, but expected {expected_shape}\n"
+                f"File: {file_path}\n"
+                "This is likely due to the change in the TICA model implementation.\n"
+                "See https://huggingface.co/datasets/transferable-samplers/many-peptides-md for further details."
+            )
 
-    #         error_message = (
-    #             f"TICA mean shape for {sequence} is {tica_mean_shape}, but expected {expected_shape}\n"
-    #             f"File: {file_path}\n"
-    #             "This is likely due to the change in the TICA model implementation.\n"
-    #             "See https://huggingface.co/datasets/transferable-samplers/many-peptides-md for further details."
-    #         )
+            assert tica_mean_shape == expected_shape, error_message
 
-    #         assert tica_mean_shape == expected_shape, error_message
-
-    # logging.info("TICA model shape checks completed successfully.")
+    logging.info("TICA model shape checks completed successfully.")

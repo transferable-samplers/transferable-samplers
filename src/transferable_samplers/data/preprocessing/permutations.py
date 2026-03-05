@@ -18,6 +18,7 @@ def load_yaml_as_dict(path: str | Path) -> dict:
 
 
 def standardize_atom_name(atom_name: str, aa_name: str) -> str:
+    """Collapse indistinguishable atom names (e.g. HB1/HB2/HB3 → HB) for equivalent encodings."""
     if atom_name[0] == "H" and atom_name[-1] in ("1", "2", "3"):
         # For these AA the H-X-N atoms are not interchangeable
         if aa_name in ("HIS", "HIE", "PHE", "TRP", "TYR") and atom_name[:2] in (
@@ -45,6 +46,21 @@ def get_permutation(
     sidechain_variant: str,
     residue_cache: dict[str, Any] | None = None,
 ) -> torch.Tensor:
+    """Build a single atom permutation for a given topology and strategy.
+
+    Args:
+        permutations_definition_dict: YAML-loaded dict defining backbone and
+            sidechain atom orderings.
+        topology: mdtraj Topology for the peptide.
+        sequence_ordering: ``"n2c"`` (N-terminus to C-terminus) or ``"c2n"``.
+        global_type: ``"residue-by-residue"`` or ``"backbone-first"``.
+        sidechain_variant: ``"standard"`` or ``"variant"`` (reversed rings/branches).
+        residue_cache: Optional dict for caching per-residue permutations across
+            sequences with shared residue types.
+
+    Returns:
+        A permutation tensor of length ``topology.n_atoms``.
+    """
     # Validate input strategy options
     if sequence_ordering not in ["n2c", "c2n"]:
         raise ValueError(f"Unknown sequence ordering: {sequence_ordering}")
@@ -230,6 +246,11 @@ def get_permutation(
 
 
 def get_permutations_dict(topology_dict: dict[str, Any]) -> dict[str, dict[str, torch.Tensor]]:
+    """Generate all permutation variants for every sequence in a topology dict.
+
+    Produces permutations for all combinations of sequence ordering, global
+    type, and sidechain variant, plus flipped versions of each.
+    """
     # Load the permutations definition from YAML file
     permutations_definition_dict = load_yaml_as_dict(Path(__file__).parent / "permutations.yaml")
 

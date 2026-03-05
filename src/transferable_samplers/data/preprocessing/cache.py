@@ -13,6 +13,16 @@ from transferable_samplers.data.preprocessing.permutations import get_permutatio
 def prepare_and_cache_pdb_dict(
     pdb_paths: list[str], cache_path: str, delimiter: str = "-"
 ) -> dict[str, openmm.app.PDBFile]:
+    """Load PDB files into a sequence-keyed dict, caching to disk.
+
+    Args:
+        pdb_paths: Paths to PDB files.
+        cache_path: Path to the pickle cache file.
+        delimiter: Character to split the filename on to extract the sequence.
+
+    Returns:
+        Dict mapping sequence strings to ``openmm.app.PDBFile`` objects.
+    """
     if Path(cache_path).is_file():
         logging.info(f"Loading cached PDB dict from {cache_path}")
         with Path(cache_path).open("rb") as f:
@@ -33,6 +43,7 @@ def prepare_and_cache_pdb_dict(
 
 
 def prepare_and_cache_topology_dict(pdb_dict: dict[str, openmm.app.PDBFile], cache_path: str) -> dict[str, md.Topology]:
+    """Extract mdtraj topologies from PDB dict, caching to disk."""
     if Path(cache_path).is_file():
         logging.info(f"Loading cached topology dict from {cache_path}")
         with Path(cache_path).open("rb") as f:
@@ -51,6 +62,7 @@ def prepare_and_cache_topology_dict(pdb_dict: dict[str, openmm.app.PDBFile], cac
 
 
 def prepare_and_cache_encodings_dict(topology_dict: dict[str, md.Topology], cache_path: str) -> dict[str, dict]:
+    """Compute atom/residue encodings from topologies, caching to disk."""
     if Path(cache_path).is_file():
         logging.info(f"Loading cached encodings dict from {cache_path}")
         with Path(cache_path).open("rb") as f:
@@ -65,6 +77,7 @@ def prepare_and_cache_encodings_dict(topology_dict: dict[str, md.Topology], cach
 
 
 def prepare_and_cache_permutations_dict(topology_dict: dict[str, md.Topology], cache_path: str) -> dict[str, dict]:
+    """Compute atom permutations from topologies, caching to disk."""
     if Path(cache_path).is_file():
         logging.info(f"Loading cached permutations dict from {cache_path}")
         with Path(cache_path).open("rb") as f:

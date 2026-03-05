@@ -7,11 +7,17 @@ from transferable_samplers.utils.dataclasses import SamplesData, SourceEnergy, T
 
 
 class BaseSampler(ABC):
-    """Base class for sampling strategies.
+    """Abstract base class for sampling strategies.
 
-    Samplers are decoupled from the LightningModule. They receive:
-    - source_energy: SourceEnergy with sample() and energy() callables.
-    - target_energy: TargetEnergy with energy() callable.
+    Samplers are decoupled from the LightningModule. They receive
+    ``SourceEnergy`` and ``TargetEnergy`` callables and return named
+    sample sets with optional diagnostics.
+
+    Subclasses must implement:
+        - ``sample``: Run the full sampling pipeline.
+
+    Args:
+        num_samples: Total number of samples to generate.
     """
 
     def __init__(self, num_samples: int) -> None:

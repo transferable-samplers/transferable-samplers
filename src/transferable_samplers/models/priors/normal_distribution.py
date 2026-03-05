@@ -7,6 +7,19 @@ from transferable_samplers.models.priors.prior import Prior
 
 
 class NormalDistribution(Prior):
+    """Isotropic Gaussian prior with optional zero center-of-mass constraint.
+
+    When ``mean_free=True``, sampled conformations are projected to have zero
+    center of mass, and log-probabilities are computed after the same projection.
+
+    Args:
+        num_dimensions: Spatial dimensions per atom (typically 3).
+        mean: Mean of the Gaussian.
+        std: Standard deviation of the Gaussian.
+        mean_free: If True, subtract center of mass from samples and before
+            computing log-probabilities.
+    """
+
     def __init__(self, num_dimensions: int = 3, mean: float = 0.0, std: float = 1.0, mean_free: bool = False) -> None:
         self.num_dimensions = num_dimensions
         self.mean = mean

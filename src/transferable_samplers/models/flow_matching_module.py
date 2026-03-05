@@ -17,7 +17,22 @@ logger = RankedLogger(__name__, rank_zero_only=False)
 
 
 class FlowMatchingModule(BaseLightningModule):
-    """Flow matching model."""
+    """Flow matching generative model using continuous normalizing flows.
+
+    Trains a velocity field ``v(t, x)`` to transport samples from the prior to
+    the target distribution along a linear interpolation path. Generation
+    integrates the learned ODE from t=0 (prior) to t=1 (target) using an
+    adaptive Dormand-Prince solver. Proposal energy is computed via the
+    reverse ODE with change-of-variables (Jacobian trace).
+
+    See ``BaseLightningModule`` for inherited args.
+
+    Args:
+        sigma: Noise scale for stochastic interpolation (0 = deterministic OT path).
+        dlogp_tol_scale: Scaling factor for the log-determinant tolerance in the ODE.
+        atol: Absolute tolerance for the ODE solver.
+        rtol: Relative tolerance for the ODE solver.
+    """
 
     def __init__(
         self,
@@ -150,6 +165,18 @@ class FlowMatchingModule(BaseLightningModule):
         reverse: bool = False,
         compute_dlogp: bool = True,
     ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Integrate the ODE forward (prior -> target) or reverse (target -> prior).
+
+        Args:
+            net: Velocity field network.
+            x: Input tensor ``(batch, atoms, 3)``.
+            encodings: Optional conditioning encodings.
+            reverse: If True, integrate from t=1 to t=0.
+            compute_dlogp: If True, compute log-determinant via Hutchinson trace.
+
+        Returns:
+            Tuple of (transformed samples, dlogp).
+        """
         batch_size = x.shape[0]
         num_atoms = x.shape[1]
 
@@ -193,6 +220,7 @@ class FlowMatchingModule(BaseLightningModule):
     def _get_xt(
         self, x0: torch.Tensor, x1: torch.Tensor, t: torch.Tensor, mask: torch.Tensor | None = None
     ) -> torch.Tensor:
+        """Compute interpolated sample ``x_t = (1-t)*x0 + t*x1 + sigma*noise``."""
         mu_t = (1.0 - t) * x0 + t * x1
 
         if not self.sigma == 0.0:
@@ -210,5 +238,6 @@ class FlowMatchingModule(BaseLightningModule):
         return xt
 
     def _get_flow_targets(self, x0: torch.Tensor, x1: torch.Tensor) -> torch.Tensor:
+        """Compute the conditional flow target ``v_t = x1 - x0``."""
         vt_flow = x1 - x0
         return vt_flow

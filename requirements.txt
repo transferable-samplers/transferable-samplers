@@ -18,7 +18,6 @@ wandb==0.23.1
 # aim>=3.16.2  # no lower than 3.16.2, see https://github.com/aimhubio/aim/issues/2550
 
 # --------- others --------- #
-rootutils==1.0.7        # standardizing the project root setup
 pre-commit==4.5.1       # hooks for applying linters on commit
 rich==14.2.0            # beautiful text formatting in terminal
 pytest==9.0.2           # tests

@@ -16,7 +16,11 @@ class SNISSampler(BaseSampler):
     """Self-Normalized Importance Sampling.
 
     Generates proposal samples, computes importance weights, and resamples.
-    Optionally applies logit clipping.
+    DDP-aware: samples are generated per-rank and gathered globally.
+
+    Args:
+        num_samples: Total number of proposal samples to generate.
+        logw_quantile_filter: Drop the top fraction of proposals by importance weight.
     """
 
     def __init__(

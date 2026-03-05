@@ -26,9 +26,18 @@ logger = RankedLogger(__name__, rank_zero_only=False)
 
 
 class PeptideEnsembleEvaluator:
-    """Evaluates generated samples against reference data.
+    """Evaluates generated conformations against reference data.
 
-    Handles chirality fixing, metric computation, and plot generation.
+    Handles chirality detection and fixing, metric computation (Wasserstein
+    distances, KMeans JSD, ESS), and plot generation (Ramachandran, TICA,
+    energies, interatomic distances, center-of-mass norms).
+
+    Args:
+        fix_symmetry: If True, flip samples with incorrect chirality.
+        drop_unfixable_symmetry: If True, drop samples whose chirality
+            cannot be fixed by flipping (only applies if fix_symmetry is True).
+        num_eval_samples: Maximum number of conformations used per metric.
+        do_plots: Whether to generate evaluation plots.
     """
 
     def __init__(
@@ -162,7 +171,22 @@ class PeptideEnsembleEvaluator:
         tica_model: Any,
         prefix: str = "",
     ) -> dict[str, float]:
-        """Computes all metrics between true and predicted data."""
+        """Compute all metrics between true and predicted conformation data.
+
+        Metrics include: ESS (if importance weights present), mean/median energy,
+        energy Wasserstein, torus Wasserstein (phi/psi), TICA Wasserstein, and
+        KMeans JSD (both TICA and torus).
+
+        Args:
+            true_data: Reference trajectory conformations.
+            pred_data: Generated conformations.
+            topology: mdtraj topology for dihedral computation.
+            tica_model: Fitted TICA model for dimensionality reduction.
+            prefix: String prefix for metric keys.
+
+        Returns:
+            Dict mapping metric names to computed values.
+        """
         metrics = {}
         num_eval_samples = self.num_eval_samples
 

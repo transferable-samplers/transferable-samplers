@@ -1,37 +1,14 @@
-# ruff: noqa: E402, I001
-
-from typing import Any
 import logging
-
-
-import time
 import random
+import time
+from typing import Any
+
 import hydra
 import lightning
-import rootutils
 import torch
 from lightning import Callback, LightningDataModule, LightningModule, Trainer
 from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
-from dotenv import load_dotenv
-
-rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
-load_dotenv(override=True)
-
-# the setup_root above is equivalent to:
-# - adding project root dir to PYTHONPATH
-#       (so you don't need to force user to install project as a package)
-#       (necessary before importing any local modules e.g. `from transferable_samplers import utils`)
-# - setting up PROJECT_ROOT environment variable
-#       (which is used as a base for paths in "configs/paths/default.yaml")
-#       (this way all filepaths are the same no matter where you run the code)
-# - loading environment variables from ".env" in root dir
-#
-# you can remove it if you:
-# 1. either install project as a package or move entry files to project root dir
-# 2. set `root_dir` to "." in "configs/paths/default.yaml"
-#
-# more info: https://github.com/ashleve/rootutils
 
 from transferable_samplers.utils.init_resume_utils import resolve_init
 from transferable_samplers.utils.instantiators import instantiate_callbacks, instantiate_loggers
@@ -55,16 +32,24 @@ logger = RankedLogger(__name__, rank_zero_only=False)
 
 @task_wrapper
 def eval(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Trains the model.
+    """Evaluate a model on validation and/or test set.
 
-    Can additionally evaluate on a testset, using best weights obtained during
-    training.
+    Wrapped in @task_wrapper for failure handling during multiruns.
 
-    This method is wrapped in optional @task_wrapper decorator, that controls the behavior during
-    failure. Useful for multiruns, saving info about the crash, etc.
+    Model weights are loaded via ``cfg.ckpt_path`` (Lightning checkpoint) or
+    ``cfg.hf_state_dict_path`` (Hugging Face Hub). At least one of ``cfg.val``
+    or ``cfg.test`` must be enabled.
 
-    :param cfg: A DictConfig configuration composed by Hydra.
-    :return: A tuple with metrics and dict with all instantiated objects.
+    Args:
+        cfg: Hydra DictConfig. Key fields used here:
+            - ``cfg.ckpt_path``: Path to a checkpoint for weight initialisation.
+            - ``cfg.hf_state_dict_path``: HF Hub path for weight initialisation.
+            - ``cfg.seed``: Random seed for reproducibility.
+            - ``cfg.val``: Whether to run validation.
+            - ``cfg.test``: Whether to run testing.
+
+    Returns:
+        A tuple of (merged val/test metrics dict, object dict with all instantiated objects).
     """
     # set seed for random number generators in pytorch, numpy and python.random
     if cfg.get("seed"):
@@ -136,10 +121,13 @@ def eval(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
 
 @hydra.main(version_base="1.3", config_path="../../configs", config_name="eval.yaml")
 def main(cfg: DictConfig) -> float | None:
-    """Main entry point for training.
+    """Main entry point for evaluation.
 
-    :param cfg: DictConfig configuration composed by Hydra.
-    :return: Optional[float] with optimized metric value.
+    Args:
+        cfg: DictConfig configuration composed by Hydra.
+
+    Returns:
+        Optimized metric value, if configured.
     """
     # apply extra utilities
     # (e.g. ask for tags if none are provided in cfg, print cfg tree, etc.)

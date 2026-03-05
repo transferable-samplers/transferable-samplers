@@ -38,18 +38,14 @@ class OpenMMEnergy:
     """Wrapper around an OpenMM system that computes energies and gradients.
 
     Input positions are in nm, returned energies are dimensionless (units of kT).
-    Forces from OpenMM are used as the backward gradient via a custom autograd function.
+    Forces from OpenMM are used as the backward gradient via a custom autograd
+    function (``_OpenMMEnergyGrad``).
 
-    Parameters
-    ----------
-    system : openmm.System
-        The OpenMM system object containing all force objects.
-    integrator : openmm.Integrator
-        A thermostated OpenMM integrator (must have a `getTemperature()` method).
-    platform_name : str
-        An OpenMM platform name ('CPU' or 'CUDA').
-    device_index : int or None
-        GPU device index for CUDA platform. Ignored for CPU.
+    Args:
+        system: The OpenMM system object containing all force objects.
+        integrator: A thermostated OpenMM integrator (must have ``getTemperature()``).
+        platform_name: OpenMM platform name (``"CPU"`` or ``"CUDA"``).
+        device_index: GPU device index for CUDA platform. Ignored for CPU.
     """
 
     def __init__(
@@ -83,17 +79,12 @@ class OpenMMEnergy:
     def _compute(self, positions: torch.Tensor) -> tuple[np.ndarray, np.ndarray]:
         """Compute energies and forces for a batch of positions.
 
-        Parameters
-        ----------
-        positions : torch.Tensor
-            Positions with shape (batch, n_atoms * 3) or (batch, n_atoms, 3).
+        Args:
+            positions: Positions with shape ``(batch, n_atoms * 3)`` or
+                ``(batch, n_atoms, 3)``.
 
         Returns:
-        -------
-        energies : np.ndarray
-            Energies in kT units, shape (batch,).
-        forces : np.ndarray
-            Forces in kT/nm units, shape matching input positions.
+            A tuple of ``(energies, forces)`` as numpy arrays in kT units.
         """
         from openmm import unit
 
@@ -132,15 +123,12 @@ class OpenMMEnergy:
     def __call__(self, positions: torch.Tensor) -> torch.Tensor:
         """Compute energies for a batch of positions.
 
-        Parameters
-        ----------
-        positions : torch.Tensor
-            Positions with shape (..., n_atoms, 3) or (..., n_atoms * 3).
+        Args:
+            positions: Positions with shape ``(..., n_atoms, 3)`` or
+                ``(..., n_atoms * 3)``.
 
         Returns:
-        -------
-        energies : torch.Tensor
-            Energies in kT units, shape (batch,).
+            Energies in kT units, shape ``(batch,)``.
         """
         orig_shape = positions.shape
         # Flatten leading batch dims

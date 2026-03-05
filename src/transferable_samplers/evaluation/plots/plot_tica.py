@@ -19,6 +19,7 @@ matplotlib.rcParams["font.family"] = "STIXGeneral"
 
 
 def plot_tic01(ax: Axes, tics: np.ndarray, tics_lims: np.ndarray, cmap: str = "viridis") -> Axes:
+    """Plot TIC0 vs TIC1 as a 2D histogram on the given axes."""
     _ = ax.hist2d(tics[:, 0], tics[:, 1], bins=100, norm=LogNorm(), cmap=cmap, rasterized=True)
     ax.set_xlabel("TIC0", fontsize=45)
     ax.set_ylabel("TIC1", fontsize=45)
@@ -32,6 +33,15 @@ def plot_tic01(ax: Axes, tics: np.ndarray, tics_lims: np.ndarray, cmap: str = "v
 def plot_tica(
     log_image_fn: Callable[[Any, str], None], samples: torch.Tensor, topology: Any, tica_model: Any, prefix: str = ""
 ) -> None:
+    """Plot TICA projection (TIC0 vs TIC1) for a set of conformations.
+
+    Args:
+        log_image_fn: Callable to log the figure.
+        samples: Conformation tensor ``(batch, num_atoms, 3)``.
+        topology: mdtraj topology for feature computation.
+        tica_model: Fitted TICA model for projection.
+        prefix: Metric key prefix.
+    """
     logging.info(f"Plotting TICA for {prefix}")
 
     pred_traj_samples = md.Trajectory(samples.cpu().numpy(), topology=topology)

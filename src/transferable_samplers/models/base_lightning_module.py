@@ -21,6 +21,32 @@ logger = RankedLogger(__name__, rank_zero_only=False)
 
 
 class BaseLightningModule(LightningModule):
+    """Abstract base class for generative model Lightning modules.
+
+    Subclasses must implement:
+        - ``training_step``: Compute training loss from a batch.
+        - ``compute_primary_loss``: Compute per-sample primary loss (used by both
+          training and ``LossEvaluationCallback``).
+        - ``generate_proposal``: Draw samples from the learned proposal distribution.
+        - ``proposal_energy``: Compute proposal energy (-log q) for given conformations.
+
+    Provides shared infrastructure: prior sampling, optimizer/scheduler configuration,
+    EMA weight access, source energy construction, sample buffer management, and
+    gradient norm logging.
+
+    Args:
+        net: The neural network (flow or velocity field).
+        optimizer: Partial optimizer constructor (receives ``params``).
+        scheduler: Partial LR scheduler constructor (receives ``optimizer``).
+        prior: Prior distribution for sampling latent space.
+        compile_net: If True, ``torch.compile`` the network at setup.
+        source_energy_config: Config for building a ``SourceEnergy`` (batched
+            sample/energy callables used by SMC and other samplers).
+        train_from_buffer: If True, draw training batches from the replay buffer
+            instead of the dataloader.
+        mean_free_prior: If True, use a mean-free (zero center-of-mass) prior.
+    """
+
     def __init__(
         self,
         net: torch.nn.Module,
@@ -50,7 +76,9 @@ class BaseLightningModule(LightningModule):
 
     @abstractmethod
     # pyrefly: ignore [bad-override]
-    def training_step(self, batch: dict[str, Any], batch_idx: int) -> torch.Tensor: ...
+    def training_step(self, batch: dict[str, Any], batch_idx: int) -> torch.Tensor:
+        """Compute training loss for one batch. Called by Lightning's training loop."""
+        ...
 
     @abstractmethod
     def compute_primary_loss(self, batch: dict[str, Any]) -> torch.Tensor:
@@ -104,6 +132,10 @@ class BaseLightningModule(LightningModule):
         ...
 
     def setup(self, stage: str) -> None:
+        """Called by Lightning at the beginning of fit/validate/test/predict.
+
+        Optionally compiles the network and validates trainer batch limits.
+        """
         if self.compile_net and stage == "fit":
             # pyrefly: ignore [bad-assignment]
             self.net = torch.compile(self.net)
@@ -120,6 +152,7 @@ class BaseLightningModule(LightningModule):
 
     # pyrefly: ignore [bad-override]
     def configure_optimizers(self) -> dict[str, Any]:
+        """Build optimizer and optional LR scheduler from the stored partials."""
         # Only parameters with requires_grad=True are passed to optimizer
         # pyrefly: ignore [not-callable]
         optimizer = self.optimizer_fn(params=[p for p in self.parameters() if p.requires_grad])

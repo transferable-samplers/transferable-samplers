@@ -111,6 +111,11 @@ AA_CODE_CONVERSION = {
 
 
 def get_encodings(topology: Any) -> dict[str, torch.Tensor]:
+    """Compute per-atom integer encodings from an mdtraj topology.
+
+    Returns a dict with keys ``"atom_type"``, ``"aa_pos"``, ``"aa_type"``,
+    and ``"seq_len"``, each as an int64 tensor.
+    """
     aa_pos_encodings = []
     aa_type_encodings = []
     atom_type_encodings = []
@@ -157,6 +162,7 @@ def get_encodings(topology: Any) -> dict[str, torch.Tensor]:
 
 
 def get_encodings_dict(topology_dict: dict[str, Any]) -> dict[str, dict[str, torch.Tensor]]:
+    """Compute encodings for all sequences in a topology dict."""
     encodings_dict = {}
 
     for _i, (sequence, topology) in tqdm(
