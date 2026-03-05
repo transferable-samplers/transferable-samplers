@@ -16,6 +16,24 @@ def build_webdataset(
     num_aa_max: int | None = None,
     transform: Any | None = None,
 ) -> wds.WebDataset:
+    """Build a WebDataset pipeline for streaming conformation data.
+
+    Each tar sample contains a binary coordinate array and a key encoding
+    the peptide sequence. Samples are filtered by amino acid count and
+    optionally transformed.
+
+    Args:
+        tar_urls: URLs or local paths to tar archives.
+        cache_dir: Local directory for caching downloaded tars.
+        num_dimensions: Spatial dimensions per atom (used for reshaping).
+        shuffle_buffer: Buffer size for in-stream shuffling.
+        num_aa_min: Minimum amino acid count (inclusive filter).
+        num_aa_max: Maximum amino acid count (inclusive filter).
+        transform: Optional transform applied to each sample dict.
+
+    Returns:
+        A configured WebDataset pipeline.
+    """
     def make_sample(sample: tuple[str, bytes]) -> dict[str, Any]:
         key, x = sample
         sequence = key.split("_")[0]

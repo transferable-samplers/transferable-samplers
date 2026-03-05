@@ -1,5 +1,3 @@
-"""SMC diagnostic plots from trajectory snapshots and per-step diagnostics."""
-
 from __future__ import annotations
 
 from collections.abc import Callable

@@ -9,6 +9,31 @@ from transferable_samplers.utils.dataclasses import EvalContext
 
 
 class BaseDataModule(LightningDataModule, ABC):
+    """Abstract base class for peptide conformation datamodules.
+
+    Subclasses must implement:
+        - ``prepare_data``: Download / preprocess data (single process, no state).
+        - ``setup``: Load data and set ``self.data_train``, ``self.data_val``,
+          ``self.data_test``.
+        - ``prepare_eval``: Build an ``EvalContext`` for a given peptide sequence.
+
+    Val/test dataloaders are placeholders — actual evaluation is handled by
+    ``SamplingEvaluationCallback`` via ``prepare_eval``.
+
+    Args:
+        data_dir: Root data directory.
+        num_dimensions: Spatial dimensions per atom (typically 3).
+        num_atoms: Maximum number of atoms per molecule (used for padding).
+        batch_size: Global batch size (split across devices).
+        num_workers: DataLoader worker count.
+        persistent_workers: Keep workers alive between epochs.
+        pin_memory: Pin DataLoader memory for faster GPU transfer.
+        com_augmentation: Apply Gaussian center-of-mass augmentation.
+        num_eval_samples: Number of conformations subsampled for evaluation.
+        train_from_buffer: If True, training data comes from a replay buffer
+            populated by ``PopulateBufferCallback`` instead of a dataset.
+    """
+
     def __init__(
         self,
         data_dir: str,
@@ -22,19 +47,6 @@ class BaseDataModule(LightningDataModule, ABC):
         num_eval_samples: int = 10_000,
         train_from_buffer: bool = False,
     ) -> None:
-        """Initialize a `BaseDataModule`.
-
-        :param data_dir: The data directory.
-        :param num_dimensions: Number of spatial dimensions (e.g. 3).
-        :param num_atoms: Number of atoms per molecule.
-        :param batch_size: The batch size. Defaults to `64`.
-        :param num_workers: The number of workers. Defaults to `0`.
-        :param persistent_workers: Whether to keep workers alive between epochs. Defaults to `False`.
-        :param pin_memory: Whether to pin memory. Defaults to `False`.
-        :param com_augmentation: Whether to apply center-of-mass augmentation. Defaults to `False`.
-        :param num_eval_samples: Number of samples for evaluation. Defaults to `10_000`.
-        :param train_from_buffer: Whether to train from a replay buffer. Defaults to `False`.
-        """
         super().__init__()
 
         self.save_hyperparameters(logger=False)
@@ -52,40 +64,40 @@ class BaseDataModule(LightningDataModule, ABC):
 
     @abstractmethod
     def prepare_data(self) -> None:
-        """Download data if needed.
+        """Download and preprocess data if needed.
 
-        Lightning ensures that `self.prepare_data()` is called only
-        within a single process on CPU, so you can safely add your downloading logic within. In
-        case of multi-node training, the execution of this hook depends upon
-        `self.prepare_data_per_node()`.
+        Lightning ensures this is called only within a single process on CPU,
+        so downloading logic is safe here. In multi-node training, execution
+        depends on ``self.prepare_data_per_node()``.
 
-        Do not use it to assign state (self.x = y).
+        Do not use it to assign state (``self.x = y``).
         """
         ...
 
     @abstractmethod
     def setup(self, stage: str | None = None) -> None:
-        """Load data. Set variables: `self.data_train`, `self.data_val`, `self.data_test`.
+        """Load data and set ``self.data_train``, ``self.data_val``, ``self.data_test``.
 
-        This method is called by Lightning before `trainer.fit()`, `trainer.validate()`, `trainer.test()`, and
-        `trainer.predict()`, so be careful not to execute things like random split twice! Also, it is called after
-        `self.prepare_data()` and there is a barrier in between which ensures that all the processes proceed to
-        `self.setup()` once the data is prepared and available for use.
+        Called by Lightning before ``trainer.fit()``, ``trainer.validate()``,
+        ``trainer.test()``, and ``trainer.predict()``. A barrier after
+        ``prepare_data`` ensures all processes wait until data is ready.
 
-        :param stage: The stage to setup. Either `"fit"`, `"validate"`, `"test"`, or `"predict"`. Defaults to ``None``.
+        Args:
+            stage: One of ``"fit"``, ``"validate"``, ``"test"``, or ``"predict"``.
         """
         ...
 
     @abstractmethod
     def prepare_eval(self, sequence: str, stage: str) -> EvalContext:
-        """Prepare evaluation data and energy function for a given peptide sequence.
+        """Build an EvalContext for a given peptide sequence.
 
         Args:
-            sequence: Peptide sequence identifier to prepare evaluation data for.
-            stage: Dataset split ("val" or "test"). Used to select data path.
+            sequence: Peptide sequence identifier.
+            stage: Dataset split (``"val"`` or ``"test"``).
 
         Returns:
-            EvalContext with all components required for evaluation.
+            EvalContext containing true conformations, target energy, topology,
+            TICA model, and system conditioning (if applicable).
         """
         ...
 
@@ -101,10 +113,7 @@ class BaseDataModule(LightningDataModule, ABC):
         self.batch_size_per_device = self.batch_size // self.trainer.world_size
 
     def train_dataloader(self) -> DataLoader[Any]:
-        """Create and return the train dataloader.
-
-        :return: The train dataloader.
-        """
+        """Create and return the train dataloader."""
         # pyrefly: ignore [missing-attribute]
         is_iterable = isinstance(self.data_train, IterableDataset)
 
@@ -134,19 +143,13 @@ class BaseDataModule(LightningDataModule, ABC):
             )
 
     def val_dataloader(self) -> DataLoader[Any]:
-        """Create and return the validation dataloader.
-
-        NOTE: these only exist for Lightning compatibility. All evaluation is handled by custom callbacks.
-        """
+        """Return a placeholder validation dataloader (evaluation handled by callbacks)."""
         world_size = self.trainer.world_size if self.trainer is not None else 1
         # pyrefly: ignore [missing-attribute]
         return DataLoader(dataset=self.data_val, batch_size=world_size)
 
     def test_dataloader(self) -> DataLoader[Any]:
-        """Create and return the test dataloader.
-
-        NOTE: these only exist for Lightning compatibility. All evaluation is handled by custom callbacks.
-        """
+        """Return a placeholder test dataloader (evaluation handled by callbacks)."""
         world_size = self.trainer.world_size if self.trainer is not None else 1
         # pyrefly: ignore [missing-attribute]
         return DataLoader(dataset=self.data_test, batch_size=world_size)

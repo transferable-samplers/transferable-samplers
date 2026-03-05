@@ -1,5 +1,3 @@
-"""Handling of chirality checks for peptides."""
-
 from __future__ import annotations
 
 from typing import Any

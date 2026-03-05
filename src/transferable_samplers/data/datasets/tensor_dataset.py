@@ -6,6 +6,14 @@ import torch
 
 
 class TensorDataset(torch.utils.data.Dataset):
+    """Map-style dataset backed by a single tensor.
+
+    Args:
+        data: Tensor of conformations, shape ``(N, num_atoms, 3)``.
+        transform: Optional transform applied to each sample dict.
+        inject_metadata: Optional static metadata merged into every sample.
+    """
+
     def __init__(
         self, data: torch.Tensor, transform: Any | None = None, inject_metadata: dict[str, Any] | None = None
     ) -> None:

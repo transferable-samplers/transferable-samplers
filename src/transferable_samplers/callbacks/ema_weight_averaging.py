@@ -1,5 +1,3 @@
-"""Exponential moving average (EMA) weight averaging callback."""
-
 from __future__ import annotations
 
 from lightning.pytorch.callbacks import WeightAveraging

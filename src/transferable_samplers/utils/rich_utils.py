@@ -1,5 +1,3 @@
-"""Rich-based config printing and tag enforcement."""
-
 from collections.abc import Sequence
 from pathlib import Path
 

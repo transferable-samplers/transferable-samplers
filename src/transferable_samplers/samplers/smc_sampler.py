@@ -1,30 +1,28 @@
-"""Consider the Euler-Maruyama discretization of the overdamped Langevin SDE.
-
-    X_{k+1} = X_k - h grad_E_t(X_k) + sqrt(2h) ξ,
-    ξ ~ N(0, I),
-
-Where E_t is a time-varying energy interpolation between E_source and E_target.
-
-For continuous-time AIS / SMC, the proposal Langevin step size is coupled with
-the annealing-time increment dt as follows:
-
-    h = eps * dt,
-
-where dt is the annealing-time increment and eps controls the diffusion
-strength per unit annealing time; this ensures convergence to the underlying
-SDE and preservation of intermediate marginals as dt → 0.
-
-In discrete-time MALA, the Metropolis–Hastings correction enforces
-detailed balance, so the proposal scale need not depend on dt.
-However, for consistency across samplers we still use h = eps * dt.
-Consequently, changing num_annealing_steps (and therefore dt) changes
-the effective MALA step size h.
-
-For further details on continuous-time AIS see:
-Proposition 1 of https://arxiv.org/pdf/2410.02711
-Appendix D.2 of https://arxiv.org/pdf/2508.18175
-"""
-
+# Consider the Euler-Maruyama discretization of the overdamped Langevin SDE:
+#
+#     X_{k+1} = X_k - h grad_E_t(X_k) + sqrt(2h) ξ,
+#     ξ ~ N(0, I),
+#
+# Where E_t is a time-varying energy interpolation between E_source and E_target.
+#
+# For continuous-time AIS / SMC, the proposal Langevin step size is coupled with
+# the annealing-time increment dt as follows:
+#
+#     h = eps * dt,
+#
+# where dt is the annealing-time increment and eps controls the diffusion
+# strength per unit annealing time; this ensures convergence to the underlying
+# SDE and preservation of intermediate marginals as dt → 0.
+#
+# In discrete-time MALA, the Metropolis–Hastings correction enforces
+# detailed balance, so the proposal scale need not depend on dt.
+# However, for consistency across samplers we still use h = eps * dt.
+# Consequently, changing num_annealing_steps (and therefore dt) changes
+# the effective MALA step size h.
+#
+# For further details on continuous-time AIS see:
+# Proposition 1 of https://arxiv.org/pdf/2410.02711
+# Appendix D.2 of https://arxiv.org/pdf/2508.18175
 from __future__ import annotations
 
 from typing import Any

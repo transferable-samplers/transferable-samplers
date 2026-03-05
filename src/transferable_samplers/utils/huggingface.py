@@ -1,5 +1,3 @@
-"""Hugging Face Hub download and extraction utilities."""
-
 from __future__ import annotations
 
 import logging

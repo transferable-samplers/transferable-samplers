@@ -1,5 +1,3 @@
-"""Coordinate standardization and destandardization."""
-
 import torch
 
 

@@ -1,5 +1,3 @@
-"""Callback that runs sampling and evaluation at validation/test time."""
-
 from __future__ import annotations
 
 from functools import partial

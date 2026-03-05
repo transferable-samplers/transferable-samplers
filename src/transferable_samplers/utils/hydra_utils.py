@@ -1,5 +1,3 @@
-"""Hydra task utilities: extras, task wrapper, and metric retrieval."""
-
 import warnings
 from collections.abc import Callable
 from importlib.util import find_spec

@@ -1,5 +1,3 @@
-"""Callback that populates the replay buffer for self-improvement training."""
-
 from __future__ import annotations
 
 from functools import partial

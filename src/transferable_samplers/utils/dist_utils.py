@@ -1,5 +1,3 @@
-"""Helpers for torch.distributed operations."""
-
 from __future__ import annotations
 
 from typing import TypeVar

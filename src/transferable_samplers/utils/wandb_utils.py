@@ -1,5 +1,3 @@
-"""Weights & Biases logging utilities."""
-
 from __future__ import annotations
 
 import statistics as stats

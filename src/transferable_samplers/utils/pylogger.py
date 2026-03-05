@@ -1,5 +1,3 @@
-"""Multi-GPU-friendly ranked logger."""
-
 from __future__ import annotations
 
 import logging

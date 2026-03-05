@@ -91,6 +91,8 @@ ignore = [
     "ANN401", # dynamically typed expressions (Any) are disallowed - too strict for this codebase
 
     # Docstrings: typically too noisy / not worth enforcing
+    "D100",   # missing docstring in public module
+    "D104",   # missing docstring in public package (__init__.py)
     "D105",   # missing docstring in magic method
     "D107",   # missing docstring in __init__
 ]

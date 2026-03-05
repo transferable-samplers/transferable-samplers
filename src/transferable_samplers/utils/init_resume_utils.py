@@ -1,5 +1,3 @@
-"""Utilities for resolving checkpoint / init-weight loading at training time."""
-
 from __future__ import annotations
 
 from copy import deepcopy

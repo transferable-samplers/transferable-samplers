@@ -1,5 +1,3 @@
-"""Core dataclasses employed throughout the codebase."""
-
 from __future__ import annotations
 
 import math
