@@ -33,9 +33,11 @@ class LossEvaluationCallback(Callback):
         self.max_samples = max_samples
 
     def on_validation_epoch_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
+        """Evaluate loss on validation data."""
         self._evaluate(trainer, pl_module, "val")
 
     def on_test_epoch_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
+        """Evaluate loss on test data."""
         self._evaluate(trainer, pl_module, "test")
 
     def _evaluate(self, trainer: Trainer, pl_module: LightningModule, prefix: str) -> None:

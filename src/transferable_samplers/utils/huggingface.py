@@ -4,6 +4,7 @@ import logging
 import tarfile
 from pathlib import Path
 
+import numpy as np
 from huggingface_hub import hf_hub_download, snapshot_download
 
 # TODO repos currently hardcoded - slightly hard to remove hardcode from data as assumes repo structure
@@ -236,8 +237,12 @@ def download_evaluation_data(data_dir: str) -> None:
     for subset_key in TICA_MEAN_SHAPES.keys():
         for sequence in TICA_MEAN_SHAPES[subset_key].keys():
             # Construct file path from dict keys
-            file_path = os.path.join(
-                data_dir, "trajectories_subsampled", subset_key, f"{len(sequence)}AA", f"{sequence}_subsampled.npz"
+            file_path = (
+                Path(data_dir)
+                / "trajectories_subsampled"
+                / subset_key
+                / f"{len(sequence)}AA"
+                / f"{sequence}_subsampled.npz"
             )
             data = np.load(file_path)
             tica_mean = data["tica_mean"]

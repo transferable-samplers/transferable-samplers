@@ -31,6 +31,7 @@ class NormalDistribution(Prior):
     def sample(
         self, num_samples: int, num_atoms: int, mask: torch.Tensor | None = None, device: str | torch.device = "cpu"
     ) -> torch.Tensor:
+        """Draw samples from the Gaussian prior."""
         x = self.distribution.sample((num_samples, num_atoms, self.num_dimensions)).to(device)
         if self.mean_free:
             if mask is None:
@@ -42,6 +43,7 @@ class NormalDistribution(Prior):
         return x.reshape(num_samples, num_atoms, self.num_dimensions)
 
     def logp(self, x: torch.Tensor, mask: torch.Tensor | None = None) -> torch.Tensor:
+        """Compute log-probability under the Gaussian prior."""
         assert x.dim() == 3
         num_samples = x.shape[0]
         num_atoms = x.shape[1]

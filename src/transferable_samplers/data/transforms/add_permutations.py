@@ -8,6 +8,7 @@ class AddPermutationsTransform:
         self.permutations_dict = permutations_dict
 
     def __call__(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Add sequence-specific permutations to the data dict."""
         assert "mask" not in data, "data should be unpadded (so without a mask)"
         assert data["x"].ndim == 2, f"AddPermutationsTransform only handles single samples, got shape {data['x'].shape}"
 

@@ -74,6 +74,7 @@ class OpenMMEnergy:
 
     @property
     def n_atoms(self) -> int:
+        """Return the number of atoms in the system."""
         return self._system.getNumParticles()
 
     def _compute(self, positions: torch.Tensor) -> tuple[np.ndarray, np.ndarray]:

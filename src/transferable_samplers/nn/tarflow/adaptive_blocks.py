@@ -343,4 +343,3 @@ class AdaptiveAttnAndTransition(torch.nn.Module):
             x = self._apply_transition(x, cond, mask)
 
         return x * mask[..., None]
-

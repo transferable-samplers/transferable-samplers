@@ -8,7 +8,7 @@ import torch
 from scipy.spatial.distance import jensenshannon
 from sklearn.cluster import KMeans
 
-from transferable_samplers.data.preprocessing.tica import tica_features, _wrap
+from transferable_samplers.data.preprocessing.tica import tica_features, wrap
 
 
 def _kmeans_jsd(
@@ -33,7 +33,7 @@ def _compute_dihedrals(trajectory: md.Trajectory) -> np.ndarray:
     _, phi = md.compute_phi(trajectory)
     _, psi = md.compute_psi(trajectory)
     _, omega = md.compute_omega(trajectory)
-    return np.concatenate([*_wrap(phi), *_wrap(psi), *_wrap(omega)], axis=-1)
+    return np.concatenate([*wrap(phi), *wrap(psi), *wrap(omega)], axis=-1)
 
 
 def tica_kmeans_jsd(

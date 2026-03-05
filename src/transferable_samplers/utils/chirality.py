@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from typing import Any
-
+import mdtraj as md
 import numpy as np
 import torch
 
 
-def _get_atom_types(topology: Any) -> torch.Tensor:
+def _get_atom_types(topology: md.Topology) -> torch.Tensor:
     atom_dict = {"C": 0, "H": 1, "N": 2, "O": 3, "S": 4}
     atom_types = []
     for atom_name in topology.atoms:
@@ -16,7 +15,7 @@ def _get_atom_types(topology: Any) -> torch.Tensor:
     return atom_types
 
 
-def _get_adj_list(topology: Any) -> torch.Tensor:
+def _get_adj_list(topology: md.Topology) -> torch.Tensor:
     adj_list = torch.from_numpy(
         np.array(
             [(b.atom1.index, b.atom2.index) for b in topology.bonds],

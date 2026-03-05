@@ -12,6 +12,7 @@ class Random3DRotationTransform:
     """
 
     def __call__(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Apply a random 3D rotation to the coordinates."""
         assert "mask" not in data, "data should be unpadded (so without a mask)"
 
         x: torch.Tensor = data["x"]

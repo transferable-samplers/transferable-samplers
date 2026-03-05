@@ -66,6 +66,7 @@ class NormalizingFlowModule(BaseLightningModule):
             self.teacher.eval()
 
     def compute_primary_loss(self, batch: dict[str, Any]) -> torch.Tensor:
+        """Compute per-sample negative log-likelihood loss."""
         x = batch["x"]
         assert len(x.shape) == 3, "molecules must be a pointcloud (batch_size, num_atoms, 3)"
 
@@ -79,6 +80,7 @@ class NormalizingFlowModule(BaseLightningModule):
         return -logq
 
     def training_step(self, batch: dict[str, Any], batch_idx: int) -> torch.Tensor:
+        """Compute training loss with optional teacher regularization."""
         if self.train_from_buffer:
             assert self._buffer is not None, "Buffer must be set for training from buffer"
             batch = self._buffer.sample(batch["x"].shape[0], device=self.device)
@@ -115,6 +117,7 @@ class NormalizingFlowModule(BaseLightningModule):
         num_samples: int,
         system_cond: SystemCond | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Generate samples using the reverse pass of the invertible network."""
         encodings = system_cond.encodings if system_cond else None
 
         if encodings is None:
@@ -144,6 +147,7 @@ class NormalizingFlowModule(BaseLightningModule):
         x: torch.Tensor,
         system_cond: SystemCond | None = None,
     ) -> torch.Tensor:
+        """Compute proposal energy (-log q) via the forward pass."""
         batched_cond = system_cond.for_batch(x.shape[0], x.device) if system_cond else None
         _encodings = batched_cond.encodings if batched_cond else None
         _permutations = batched_cond.permutations if batched_cond else None
@@ -156,6 +160,7 @@ class NormalizingFlowModule(BaseLightningModule):
         return -logq  # energy is negative log probability
 
     def on_train_epoch_start(self) -> None:
+        """Reset metrics and validate teacher regularization config."""
         super().on_train_epoch_start()
         if self.teacher_regularize_weight > 0:
             assert not self._has_ema_callback(), (

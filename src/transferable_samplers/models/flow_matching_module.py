@@ -71,6 +71,7 @@ class FlowMatchingModule(BaseLightningModule):
         self.num_integrations = 0
 
     def compute_primary_loss(self, batch: dict[str, Any]) -> torch.Tensor:
+        """Compute per-sample flow matching MSE loss."""
         x = batch["x"]
         assert len(x.shape) == 3, "molecules must be a pointcloud (batch_size, num_atoms, 3)"
 
@@ -89,7 +90,7 @@ class FlowMatchingModule(BaseLightningModule):
         xt = self._get_xt(z, x, t, mask)
         vt_flow = self._get_flow_targets(z, x)
 
-        vt_pred = self.forward(t, xt, encodings=encodings, mask=mask)
+        vt_pred = self.net(t, xt, encodings=encodings, node_mask=mask)
 
         assert len(vt_pred.shape) == 2
         assert len(vt_flow.shape) == 2
@@ -97,6 +98,7 @@ class FlowMatchingModule(BaseLightningModule):
         return torch.sum((vt_pred - vt_flow) ** 2, dim=-1)
 
     def training_step(self, batch: dict[str, Any], batch_idx: int) -> torch.Tensor:
+        """Compute training loss with system-size normalization."""
         if self.train_from_buffer:
             # pyrefly: ignore [missing-attribute]
             batch = self._buffer.sample(batch["x"].shape[0], device=self.device)
@@ -114,6 +116,7 @@ class FlowMatchingModule(BaseLightningModule):
         num_samples: int,
         system_cond: SystemCond | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Generate samples by integrating the learned ODE forward."""
         encodings = system_cond.encodings if system_cond else None
 
         if encodings is None:
@@ -140,6 +143,7 @@ class FlowMatchingModule(BaseLightningModule):
         x: torch.Tensor,
         system_cond: SystemCond | None = None,
     ) -> torch.Tensor:
+        """Compute proposal energy (-log q) via reverse ODE with change-of-variables."""
         if torch.is_grad_enabled() and x.requires_grad:
             logger.warning(
                 "We have not tested differentiation of FlowMatchingModule.proposal_energy()."
@@ -150,12 +154,6 @@ class FlowMatchingModule(BaseLightningModule):
         # dlogp_rev is log|det(dx/dz)| = -log|det(dz/dx)|, so logq = logp_z - dlogp_rev
         logq = self.prior.logp(z_pred) - dlogp_rev
         return -logq  # energy is negative log probability
-
-    # pyrefly: ignore [bad-override]
-    def forward(
-        self, t: torch.Tensor, x: torch.Tensor, encodings: dict[str, torch.Tensor] | None, mask: torch.Tensor | None
-    ) -> torch.Tensor:
-        return self.net(t, x, encodings=encodings, node_mask=mask)
 
     def _integrate(
         self,

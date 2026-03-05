@@ -1,4 +1,3 @@
----
 defaults:
   - default
 # simulate DDP on CPU, useful for debugging

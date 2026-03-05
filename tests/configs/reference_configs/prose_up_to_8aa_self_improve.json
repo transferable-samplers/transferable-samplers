@@ -321,7 +321,6 @@
     "data_dir": "${paths.scratch_dir}/many-peptides-md",
     "log_dir": "${paths.scratch_dir}/logs",
     "output_dir": "${hydra:runtime.output_dir}",
-    "root_dir": "${oc.env:PROJECT_ROOT}",
     "scratch_dir": "${oc.env:SCRATCH_DIR}/transferable-samplers",
     "work_dir": "${hydra:runtime.cwd}"
   },

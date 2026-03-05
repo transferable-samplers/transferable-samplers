@@ -8,6 +8,7 @@ class AddEncodingsTransform:
         self.encodings_dict = encodings_dict
 
     def __call__(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Add sequence-specific encodings to the data dict."""
         assert "mask" not in data, "data should be unpadded (so without a mask)"
         assert data["x"].ndim == 2, f"AddEncodingsTransform only handles single samples, got shape {data['x'].shape}"
 

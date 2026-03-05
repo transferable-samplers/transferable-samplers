@@ -104,6 +104,7 @@ class SMCSampler(BaseSampler):
         source_energy: SourceEnergy,
         target_energy: TargetEnergy,
     ) -> tuple[dict[str, SamplesData], dict[str, Any]]:
+        """Run SMC sampling sampling."""
         # Generate proposal
         world_size = get_world_size()
         loc_num_samples = self.num_samples // world_size

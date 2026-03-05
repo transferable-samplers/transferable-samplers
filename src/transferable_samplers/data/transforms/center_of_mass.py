@@ -12,6 +12,7 @@ class CenterOfMassTransform:
     """
 
     def __call__(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Apply Gaussian noise to the center of mass."""
         assert "mask" not in data, "data should be unpadded (so without a mask)"
 
         x = data["x"]

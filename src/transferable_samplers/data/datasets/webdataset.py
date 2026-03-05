@@ -34,6 +34,7 @@ def build_webdataset(
     Returns:
         A configured WebDataset pipeline.
     """
+
     def make_sample(sample: tuple[str, bytes]) -> dict[str, Any]:
         key, x = sample
         sequence = key.split("_")[0]

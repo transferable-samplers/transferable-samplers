@@ -12,6 +12,7 @@ class StandardizeTransform:
         self.std = std
 
     def __call__(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Zero center of mass and normalize coordinates."""
         assert "mask" not in data, "data should be unpadded (so without a mask)"
 
         x = data["x"]

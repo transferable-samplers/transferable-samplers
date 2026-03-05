@@ -11,11 +11,11 @@ from lightning import Callback, LightningDataModule, LightningModule, Trainer
 from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
 
-from transferable_samplers.utils.init_resume_utils import resolve_init_or_resume, augment_state_dict_for_teacher
-from transferable_samplers.utils.instantiators import instantiate_callbacks, instantiate_loggers
-from transferable_samplers.utils.wandb_utils import log_hyperparameters
-from transferable_samplers.utils.pylogger import RankedLogger
 from transferable_samplers.utils.hydra_utils import extras, get_metric_value, task_wrapper
+from transferable_samplers.utils.init_resume_utils import augment_state_dict_for_teacher, resolve_init_or_resume
+from transferable_samplers.utils.instantiators import instantiate_callbacks, instantiate_loggers
+from transferable_samplers.utils.pylogger import RankedLogger
+from transferable_samplers.utils.wandb_utils import log_hyperparameters
 
 # We had issues with invertbility of TarFlow without the following settings.
 # Didn't notice any walltime difference for TarFlow or ECNF, but is worth

@@ -30,7 +30,8 @@ def _compute_distances(xyz: np.ndarray) -> np.ndarray:
     return distances_ca
 
 
-def _wrap(array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def wrap(array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Wrap angles into (sin, cos) pairs."""
     return (np.sin(array), np.cos(array))
 
 
@@ -45,7 +46,7 @@ def tica_features(
         _, phi = md.compute_phi(trajectory)
         _, psi = md.compute_psi(trajectory)
         _, omega = md.compute_omega(trajectory)
-        dihedrals = np.concatenate([*_wrap(phi), *_wrap(psi), *_wrap(omega)], axis=-1)
+        dihedrals = np.concatenate([*wrap(phi), *wrap(psi), *wrap(omega)], axis=-1)
     if use_distances:
         distances = _compute_distances(trajectory.xyz)
     if use_distances and use_dihedrals:
@@ -81,6 +82,7 @@ class TicaModel:
         self.dim = dim
 
     def forward(self, x: np.ndarray) -> np.ndarray:
+        """Project data onto the TICA components."""
         x_centered = x - self.mean
         return x_centered @ self.projection[:, : self.dim]
 

@@ -82,10 +82,10 @@ class BaseLightningModule(LightningModule):
 
     @abstractmethod
     def compute_primary_loss(self, batch: dict[str, Any]) -> torch.Tensor:
-        """Compute per-sample primary loss (the quantity to minimize), without
-        system-size normalization or auxiliary losses (e.g. teacher regularization).
+        """Compute per-sample primary loss (the quantity to minimize).
 
-        Called by both ``training_step`` (which adds system-size normalization and
+        Without system-size normalization or auxiliary losses (e.g. teacher
+        regularization). Called by both ``training_step`` (which adds system-size normalization and
         auxiliary losses) and ``LossEvaluationCallback`` (which averages directly
         to monitor model fit on held-out true samples).
 
@@ -226,10 +226,12 @@ class BaseLightningModule(LightningModule):
         self._buffer = buffer
 
     def on_train_epoch_start(self) -> None:
+        """Reset metrics and log epoch start."""
         logger.info("Train epoch start")
         self.train_metrics.reset()
 
     def on_train_epoch_end(self) -> None:
+        """Reset metrics and log epoch end."""
         self.train_metrics.reset()
         logger.info("Train epoch end")
 
@@ -247,6 +249,7 @@ class BaseLightningModule(LightningModule):
         return (per_sample_loss / system_dim).mean()
 
     def on_before_optimizer_step(self, optimizer: torch.optim.Optimizer, *args: Any, **kwargs: Any) -> None:
+        """Log gradient norm before optimizer step."""
         total_norm = 0.0
         for param in self.trainer.lightning_module.parameters():
             if param.grad is not None:
@@ -256,9 +259,11 @@ class BaseLightningModule(LightningModule):
         self.log_dict({"train/grad_norm": total_norm}, prog_bar=True)
 
     def on_validation_epoch_start(self) -> None:
+        """Log validation epoch start."""
         logger.info("Validation epoch start")
 
     def on_validation_epoch_end(self) -> None:
+        """Log validation epoch end."""
         logger.info("Validation epoch end")
 
     # pyrefly: ignore [bad-override]
@@ -267,9 +272,11 @@ class BaseLightningModule(LightningModule):
         return None
 
     def on_test_epoch_start(self) -> None:
+        """Log test epoch start."""
         logger.info("Test epoch start")
 
     def on_test_epoch_end(self) -> None:
+        """Log test epoch end."""
         logger.info("Test epoch end")
 
     # pyrefly: ignore [bad-override]

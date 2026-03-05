@@ -284,4 +284,3 @@ class AttentionBlock(torch.nn.Module):
         x = x + self.attention(x, pair=pair, mask=attn_mask, temp=attn_temp, which_cache=which_cache)
         x = x + self.mlp(x)
         return x * mask[..., None]
-

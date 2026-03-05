@@ -1,4 +1,3 @@
----
 # @package _global_
 #
 defaults:
@@ -10,7 +9,7 @@ hydra:
     mem_gb: 32
     gres: gpu:l40s:1
     timeout_min: 2880
-    array_parallelism: 1  # max num of tasks to run in parallel (via job array)
+    array_parallelism: 1 # max num of tasks to run in parallel (via job array)
     setup:
       - module purge
       - module load miniconda/3
