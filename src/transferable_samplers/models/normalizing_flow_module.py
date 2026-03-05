@@ -14,6 +14,23 @@ logger = RankedLogger(__name__, rank_zero_only=False)
 
 
 class NormalizingFlowModule(BaseLightningModule):
+    """Normalizing flow generative model trained via maximum likelihood.
+
+    Maps target conformations to a simple prior via an invertible network,
+    trained to maximize log-likelihood. Generation uses the reverse pass of
+    the invertible network.
+
+    Supports optional teacher regularization for fine-tuning: a frozen copy
+    of the initial network penalizes the model's log-density from drifting
+    too far from the teacher's predictions.
+
+    See ``BaseLightningModule`` for inherited args.
+
+    Args:
+        teacher_regularize_weight: Weight for teacher regularization loss.
+            If > 0, a frozen copy of the initial network is used as teacher.
+    """
+
     def __init__(
         self,
         net: torch.nn.Module,

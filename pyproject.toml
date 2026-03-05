@@ -107,6 +107,7 @@ dummy-variable-rgx = "^(_.*|[ijk])$"
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S", "ANN", "D"]
 "scripts/**" = ["S", "ANN", "D"]
+"src/transferable_samplers/nn/**" = ["D"]
 "src/transferable_samplers/samplers/**" = ["N803", "N806"]
 "src/transferable_samplers/utils/dataclasses.py" = ["N806"]
 
