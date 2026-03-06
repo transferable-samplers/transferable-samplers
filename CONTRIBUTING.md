@@ -33,14 +33,14 @@ Hooks will now run automatically on every `git commit`. The pre-commit configura
 **Format + lint (auto-fix):**
 
 ```bash
-uv run ruff format .
-uv run ruff check --fix .
+uv run pre-commit run ruff --all-files
+uv run pre-commit run ruff-format --all-files
 ```
 
 **Type checking (Pyrefly):**
 
 ```bash
-uv run pyrefly check .
+uv run pre-commit run pyrefly-check --all-files --hook-stage manual
 ```
 
 **Run all pre-commit hooks on the entire repo:**
