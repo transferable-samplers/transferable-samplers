@@ -28,7 +28,7 @@ class TorchDynWrapper(torch.nn.Module):
 
         dx = self.model(t, x)
         dlogp = -torch.vmap(self._divergence, in_dims=(None, 0), randomness="different")(
-            torch.tensor([t], device=x.device), x
+            t.to(x.device).reshape(1), x
         )
 
         self.nfe += 1
