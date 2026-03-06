@@ -5,7 +5,7 @@
 #SBATCH --array=0-19
 #SBATCH --gres=gpu:l40s:1
 #SBATCH -c 4
-#SBATCH --mem=32G
+#SBATCH --mem=48G
 #SBATCH -t 24:00:00
 
 # 4 tests x 5 repeats = 20 tasks
@@ -27,4 +27,4 @@ echo "=== Job $SLURM_ARRAY_TASK_ID: test=$TEST_FILE repeat=$REPEAT_IDX ==="
 
 mkdir -p logs/benchmark
 
-PYTEST_TRAINER=gpu pytest -vv -s "$TEST_FILE" 2>&1
+PYTEST_TRAINER=gpu uv run pytest -vv -s "$TEST_FILE" 2>&1

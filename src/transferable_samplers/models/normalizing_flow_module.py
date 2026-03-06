@@ -105,7 +105,7 @@ class NormalizingFlowModule(BaseLightningModule):
             logq = -per_sample_loss  # per_sample_loss is -logq
             teacher_reg = (logq - logq_teacher).pow(2).mean()
             loss = loss + self.teacher_regularize_weight * teacher_reg
-            self.log("finetune/teacher_regularization", teacher_reg.item(), prog_bar=True, sync_dist=True)
+            self.log("fine-tune/teacher_regularization", teacher_reg.item(), prog_bar=True, sync_dist=True)
 
         batch_value = self.train_metrics(loss)
         self.log_dict(batch_value, prog_bar=True)

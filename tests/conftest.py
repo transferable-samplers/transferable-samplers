@@ -9,6 +9,9 @@ from pathlib import Path
 
 import pytest
 import torch
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
 
 # Create report directory if it doesn't exist
 report_dir = os.environ.get("PYTEST_REPORT_DIR", "tests/")

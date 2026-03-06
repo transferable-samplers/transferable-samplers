@@ -22,4 +22,4 @@ echo "=== Job $SLURM_ARRAY_TASK_ID: test=$TEST_FILE (DDP) ==="
 
 mkdir -p logs/benchmark
 
-PYTEST_TRAINER=ddp pytest -vv -s "$TEST_FILE" 2>&1
+PYTEST_TRAINER=ddp uv run pytest -vv -s "$TEST_FILE" 2>&1

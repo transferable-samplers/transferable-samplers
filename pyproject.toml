@@ -111,6 +111,8 @@ unfixable = []
 dummy-variable-rgx = "^(_.*|[ijk])$"
 
 [tool.ruff.lint.per-file-ignores]
+"src/transferable_samplers/train.py" = ["E402"]
+"src/transferable_samplers/eval.py" = ["E402"]
 "tests/**" = ["S", "ANN", "D"]
 "scripts/**" = ["S", "ANN", "D"]
 "src/transferable_samplers/nn/**" = ["D"]

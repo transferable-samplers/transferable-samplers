@@ -3,6 +3,10 @@ import random
 import time
 from typing import Any
 
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
+
 import hydra
 import lightning
 import torch

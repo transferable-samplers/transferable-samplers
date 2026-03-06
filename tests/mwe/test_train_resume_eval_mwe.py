@@ -159,11 +159,11 @@ def test_train_from_init_ckpt_then_resume(trainer_name_param: str, tmp_path: Pat
 
 
 # ---------------------------------------------------------------------------
-# 2c. Train from init: hf_state_dict (finetune from pretrained HF weights)
+# 2c. Train from init: hf_state_dict (fine-tune from pretrained HF weights)
 # ---------------------------------------------------------------------------
 @pytest.mark.essential
 def test_train_from_init_hf_state_dict(trainer_name_param: str, tmp_path: Path) -> None:
-    """Init from pretrained HF weights and finetune for 1 epoch."""
+    """Init from pretrained HF weights and fine-tune for 1 epoch."""
     cfg = _make_train_cfg(
         trainer_name_param,
         tmp_path,
