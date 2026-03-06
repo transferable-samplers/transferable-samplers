@@ -19,14 +19,21 @@ def standardize_coords(x: torch.Tensor, std: torch.Tensor) -> torch.Tensor:
 
 
 def destandardize_coords(x: torch.Tensor, std: torch.Tensor) -> torch.Tensor:
-    """Undo standardization: multiply by std.
+    """Rescale standardized coordinates by multiplying by std.
+
+    This reverses only the scaling applied in :func:`standardize_coords` and does
+    not restore the subtracted center of mass. To fully invert the transformation,
+    the original center of mass must be added back separately.
 
     Args:
-        x: Standardized tensor of shape (num_samples, num_atoms, num_dimensions).
+        x: Standardized tensor of shape (num_samples, num_atoms, num_dimensions),
+            typically output from :func:`standardize_coords` (possibly after other
+            operations).
         std: Scalar standard deviation tensor.
 
     Returns:
-        Destandardized tensor of the same shape.
+        Tensor of the same shape, with original scale restored but still centered
+        (zero-mean per sample).
     """
     assert std.numel() == 1, "Standard deviation should be scalar"
     assert len(x.shape) == 3, "Input should be 3D tensor"
