@@ -121,6 +121,8 @@ class SamplingEvaluationCallback(Callback):
                 pl_module.log_dict(seq_metrics)
                 all_metrics.update(seq_metrics)
 
+            del eval_ctx
+
         if trainer.is_global_zero:
             plt.close("all")
             mean_metrics = compute_mean_metrics(all_metrics, prefix=prefix)

@@ -197,15 +197,15 @@ class PeptideEnsembleEvaluator:
         num_eval_samples = min(num_eval_samples, len(pred_data), len(true_data))
         true_data = true_data[:num_eval_samples]
         pred_data = pred_data[:num_eval_samples]
-        metrics[f"{prefix}/num_eval_samples"] = min(num_eval_samples, len(pred_data))
+        metrics[f"{prefix}/num-eval-samples"] = min(num_eval_samples, len(pred_data))
 
         # Compute effective sample size
         if pred_data.logw is not None:
             ess = normalized_ess(pred_data.logw)
-            metrics[f"{prefix}/effective_sample_size"] = ess
+            metrics[f"{prefix}/effective-sample-size"] = ess
 
-        metrics[f"{prefix}/mean_energy"] = pred_data.E_target.mean().cpu()
-        metrics[f"{prefix}/median_energy"] = pred_data.E_target.median().cpu()
+        metrics[f"{prefix}/mean-energy"] = pred_data.E_target.mean().cpu()
+        metrics[f"{prefix}/median-energy"] = pred_data.E_target.median().cpu()
 
         metrics.update(energy_wasserstein(true_data.E_target, pred_data.E_target, prefix=prefix))
         logger.info("Energy wasserstein computed")
@@ -270,8 +270,8 @@ class PeptideEnsembleEvaluator:
 
         uncorrectable_symmetry_rate = second_symmetry_change.float().mean().item()
 
-        metrics[f"{prefix}proposal/correct_symmetry_rate"] = correct_symmetry_rate
-        metrics[f"{prefix}proposal/uncorrectable_symmetry_rate"] = uncorrectable_symmetry_rate
+        metrics[f"{prefix}proposal/correct-chirality-rate"] = correct_symmetry_rate
+        metrics[f"{prefix}proposal/uncorrectable-chirality-rate"] = uncorrectable_symmetry_rate
 
         if self.fix_symmetry:
             samples[first_symmetry_change] *= -1

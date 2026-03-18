@@ -48,7 +48,7 @@ def test_snis_ecnf_up_to_4aa(trainer_name_param: str, tmp_path: Path) -> None:
     GlobalHydra.instance().clear()
 
     test_sequence = extract_test_sequence(cfg)
-    assert f"test/{test_sequence}/proposal/median_energy" in metrics
+    assert f"test/{test_sequence}/proposal/median-energy" in metrics
 
     print("\n--- Benchmark metrics ---")
     for key in sorted(metrics):

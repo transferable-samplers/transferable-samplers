@@ -93,7 +93,7 @@ def test_model_loss(cfg_and_experiment_name: tuple[DictConfig, str]) -> None:
 
     test_sequence = extract_test_sequence(cfg)
 
-    loss_key = f"test/{test_sequence}/eval_loss"
+    loss_key = f"test/{test_sequence}/eval-loss"
     assert loss_key in metrics, f"{loss_key} missing from metrics"
 
     loss = metrics[loss_key]

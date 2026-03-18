@@ -82,9 +82,11 @@ class LossEvaluationCallback(Callback):
                 torch.distributed.all_reduce(local_mean, op=torch.distributed.ReduceOp.AVG)
 
             if trainer.is_global_zero:
-                key = f"{prefix}/{sequence}/eval_loss"
+                key = f"{prefix}/{sequence}/eval-loss"
                 all_metrics[key] = local_mean.item()
                 logger.info(f"{key}: {local_mean.item():.6f}")
+
+            del eval_ctx
 
         if trainer.is_global_zero:
             pl_module.log_dict(all_metrics)

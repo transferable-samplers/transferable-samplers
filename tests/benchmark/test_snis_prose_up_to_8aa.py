@@ -30,7 +30,7 @@ from tests.helpers.utils import compose_config
 from transferable_samplers.eval import eval
 
 REFERENCE = {
-    "resampled/effective_sample_size": (0.0226, 0.0013),
+    "resampled/effective-sample-size": (0.0226, 0.0013),
     "resampled/energy-w2": (1.413, 0.411),
     "resampled/torus-w2": (0.628, 0.052),
     "resampled/tica-w2": (0.279, 0.082),

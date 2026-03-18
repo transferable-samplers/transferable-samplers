@@ -69,8 +69,16 @@ class OpenMMEnergy:
         elif platform_name == "CUDA":
             if device_index is not None:
                 properties["DeviceIndex"] = str(device_index)
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
 
         self._context = Context(system, integrator, platform, properties)
+
+    def __del__(self) -> None:
+        self._context = None
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
 
     @property
     def _num_atoms(self) -> int:

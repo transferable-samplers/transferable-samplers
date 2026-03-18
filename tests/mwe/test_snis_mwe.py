@@ -30,6 +30,8 @@ EXPERIMENT_NAMES = [
 @pytest.fixture(params=EXPERIMENT_NAMES, ids=get_config_stem)
 # pyrefly: ignore [bad-return]
 def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, tmp_path: Path) -> DictConfig:
+    if trainer_name_param == "cpu" and "ecnf" in request.param:
+        pytest.skip("ecnf SNIS on CPU is too slow")
     """
     Hydra-composed config for the evaluation experiments.
 
@@ -87,15 +89,15 @@ def test_snis_mwe(cfg_test_snis_mwe):
     Run eval() for every experiment config provided by the `cfg_test_snis_mwe` fixture.
 
     Asserts:
-    - 'test/{sequence}/proposal/median_energy' is present and below threshold.
+    - 'test/{sequence}/proposal/median-energy' is present and below threshold.
     """
 
     metrics, _ = eval(cfg_test_snis_mwe)
 
     test_sequence = extract_test_sequence(cfg_test_snis_mwe)
 
-    median_proposal_energy = metrics.get(f"test/{test_sequence}/proposal/median_energy", None)
-    assert median_proposal_energy is not None, f"test/{test_sequence}/proposal/median_energy missing"
+    median_proposal_energy = metrics.get(f"test/{test_sequence}/proposal/median-energy", None)
+    assert median_proposal_energy is not None, f"test/{test_sequence}/proposal/median-energy missing"
     assert median_proposal_energy < MEDIAN_PROPOSAL_ENERGY_THRESHOLDS[test_sequence], (
         f"Median proposal energy {median_proposal_energy} above threshold "
         f"{MEDIAN_PROPOSAL_ENERGY_THRESHOLDS[test_sequence]} for sequence {test_sequence}"

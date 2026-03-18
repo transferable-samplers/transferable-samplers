@@ -99,5 +99,5 @@ def plot_atom_distances(
 
     fig.canvas.draw()
 
-    log_image_fn(fig, f"{prefix}/interatomic_distances")
+    log_image_fn(fig, f"{prefix}/interatomic-distances")
     plt.close()

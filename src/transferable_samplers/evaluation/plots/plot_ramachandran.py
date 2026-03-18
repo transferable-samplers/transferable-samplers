@@ -91,5 +91,5 @@ def plot_ramachandran(
         cbar = fig.colorbar(im)  # , ticks=ticks)
         im.set_clim(vmax=samples.shape[0] // 20)
         cbar.ax.set_ylabel(f"Count, max = {int(h.max())}", fontsize=18)
-        log_image_fn(fig, f"{prefix}/ramachandran_simple/{i}")
+        log_image_fn(fig, f"{prefix}/ramachandran-simple/{i}")
         plt.close()

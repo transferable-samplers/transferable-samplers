@@ -54,5 +54,5 @@ def plot_com_norms(
 
     fig.canvas.draw()
 
-    log_image_fn(fig, f"{prefix}/com_norms")
+    log_image_fn(fig, f"{prefix}/com-norms")
     plt.close()

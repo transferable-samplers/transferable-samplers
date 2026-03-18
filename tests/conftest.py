@@ -58,3 +58,5 @@ def _enforce_hardware_constraints(request, trainer_name_param: str):
         and "tests/mwe" not in str(request.fspath)
     ):
         pytest.skip("DDP essential tests only run MWE tests")
+    if "tests/configs" in str(request.fspath) and trainer_name_param != "cpu":
+        pytest.skip("Config tests only run on CPU")

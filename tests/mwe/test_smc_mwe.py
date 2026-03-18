@@ -78,15 +78,15 @@ def test_smc_mwe(cfg_test_smc_mwe: DictConfig) -> None:
     Run eval() for every experiment config provided by the `cfg_test_smc_mwe` fixture.
 
     Asserts:
-    - 'test/{sequence}/smc/median_energy' is present and below threshold.
+    - 'test/{sequence}/smc/median-energy' is present and below threshold.
     """
     # pyrefly: ignore [bad-argument-type]
     metrics, _ = eval(cfg_test_smc_mwe)
 
     test_sequence = extract_test_sequence(cfg_test_smc_mwe)
 
-    median_smc_energy = metrics.get(f"test/{test_sequence}/smc/median_energy", None)
-    assert median_smc_energy is not None, f"test/{test_sequence}/smc/median_energy missing"
+    median_smc_energy = metrics.get(f"test/{test_sequence}/smc/median-energy", None)
+    assert median_smc_energy is not None, f"test/{test_sequence}/smc/median-energy missing"
     assert median_smc_energy < MEDIAN_SMC_ENERGY_THRESHOLDS[test_sequence], (
         f"Median smc energy {median_smc_energy} above threshold "
         f"{MEDIAN_SMC_ENERGY_THRESHOLDS[test_sequence]} for sequence {test_sequence}"

@@ -213,13 +213,15 @@ class NormalizingFlowModule(BaseLightningModule):
         diff = (z - z_recon).abs()
         metrics = {
             f"{prefix}/diagnostic/invert/mse": torch.mean((z - z_recon) ** 2).item(),
-            f"{prefix}/diagnostic/invert/max_abs": torch.max(diff).item(),
-            f"{prefix}/diagnostic/invert/mean_abs": torch.mean(diff).item(),
-            f"{prefix}/diagnostic/invert/median_abs": torch.median(diff).item(),
+            f"{prefix}/diagnostic/invert/max-abs-error": torch.max(diff).item(),
+            f"{prefix}/diagnostic/invert/mean-abs-error": torch.mean(diff).item(),
+            f"{prefix}/diagnostic/invert/median-abs-error": torch.median(diff).item(),
         }
         for cutoff in (0.01, 0.001):
-            metrics[f"{prefix}/diagnostic/invert/fail_count_{cutoff}"] = torch.sum(diff > cutoff).float().item()
-            metrics[f"{prefix}/diagnostic/invert/fail_count_sample_{cutoff}"] = (
+            metrics[f"{prefix}/diagnostic/invert/fail-count-dimensionwise@{cutoff}"] = (
+                torch.sum(diff > cutoff).float().item()
+            )
+            metrics[f"{prefix}/diagnostic/invert/fail-count-samplewise@{cutoff}"] = (
                 (torch.sum(diff > cutoff, dim=1) > 0).sum().float().item()
             )
 
@@ -241,7 +243,7 @@ class NormalizingFlowModule(BaseLightningModule):
                 fwd_jac = torch.autograd.functional.jacobian(fwd_func, x, vectorize=True)
                 dlogp_true = torch.logdet(fwd_jac.view(data_dim, data_dim))
             dlogp_diffs.append(abs(dlogp[i] - dlogp_true).item())
-        metrics[f"{prefix}/diagnostic/dlogp/mean_diff"] = sum(dlogp_diffs) / len(dlogp_diffs)
-        metrics[f"{prefix}/diagnostic/dlogp/max_diff"] = max(dlogp_diffs)
+        metrics[f"{prefix}/diagnostic/dlogp/mean-abs-error"] = sum(dlogp_diffs) / len(dlogp_diffs)
+        metrics[f"{prefix}/diagnostic/dlogp/max-abs-error"] = max(dlogp_diffs)
 
         return metrics

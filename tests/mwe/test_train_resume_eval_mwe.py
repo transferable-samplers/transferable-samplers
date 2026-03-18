@@ -251,7 +251,7 @@ def test_train_and_eval(trainer_name_param: str, tmp_path: Path) -> None:
     metrics_eval, _ = eval(cfg_eval)
 
     # The eval should produce proposal energy metrics for AAA.
-    key = "test/AAA/proposal/median_energy"
+    key = "test/AAA/proposal/median-energy"
     assert key in metrics_eval, f"{key} missing from eval metrics"
 
     GlobalHydra.instance().clear()

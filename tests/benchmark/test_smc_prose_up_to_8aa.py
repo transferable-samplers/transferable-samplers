@@ -46,7 +46,7 @@ def test_smc_prose_up_to_8aa(trainer_name_param: str, tmp_path: Path) -> None:
     GlobalHydra.instance().clear()
 
     test_sequence = extract_test_sequence(cfg)
-    assert f"test/{test_sequence}/smc/median_energy" in metrics
+    assert f"test/{test_sequence}/smc/median-energy" in metrics
 
     print("\n--- Benchmark metrics ---")
     for key in sorted(metrics):
