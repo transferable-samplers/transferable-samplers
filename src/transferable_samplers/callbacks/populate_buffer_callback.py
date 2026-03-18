@@ -36,6 +36,7 @@ class PopulateBufferCallback(Callback):
         super().__init__()
         self.sampler = sampler
         self.evaluator = evaluator
+        self._eval_ctx = None  # cached after first epoch; eval_ctx is fixed (only source_energy changes)
 
     def on_train_epoch_start(self, trainer: Trainer, pl_module: LightningModule) -> None:
         """Generate samples and populate the model's buffer.
@@ -56,10 +57,11 @@ class PopulateBufferCallback(Callback):
         sequence = datamodule.test_sequences[0]
         logger.info(f"Generating {self.sampler.num_samples} samples for self-consumption")
 
-        eval_ctx = datamodule.prepare_eval(sequence, stage="test")
-        source_energy = pl_module.build_source_energy(eval_ctx.system_cond, use_ema_if_available=True)
+        if self._eval_ctx is None:
+            self._eval_ctx = datamodule.prepare_eval(sequence, stage="test")
+        source_energy = pl_module.build_source_energy(self._eval_ctx.system_cond, use_ema_if_available=True)
 
-        samples_dict, _ = self.sampler.sample(source_energy, eval_ctx.target_energy)
+        samples_dict, _ = self.sampler.sample(source_energy, self._eval_ctx.target_energy)
 
         # Evaluate samples if evaluator is configured
         if self.evaluator is not None and trainer.is_global_zero:
@@ -69,7 +71,7 @@ class PopulateBufferCallback(Callback):
 
             metrics = self.evaluator.evaluate(
                 samples_dict,
-                eval_ctx,
+                self._eval_ctx,
                 log_image_fn=log_image_fn,
                 prefix=prefix,
             )
@@ -88,7 +90,7 @@ class PopulateBufferCallback(Callback):
             Buffer(
                 samples=samples_dict[key].samples,
                 normalization_std=datamodule.std,
-                system_cond=eval_ctx.system_cond,
+                system_cond=self._eval_ctx.system_cond,
                 batch_transform=batch_transform,
             )
         )
