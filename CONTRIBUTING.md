@@ -85,9 +85,7 @@ PYTEST_TRAINER=gpu uv run pytest -m benchmark -v
 PYTEST_TRAINER=ddp uv run pytest -m benchmark -v
 ```
 
-> **SLURM note:** DDP benchmark tests must be run via an interactive `salloc` session, not `sbatch`.
-> Lightning's `ddp_fork` strategy picks a free port at runtime, which races with other processes on shared nodes.
-> Under `sbatch` array jobs this causes near-certain `EADDRINUSE` failures.
+> **SLURM note:** DDP benchmark tests don't seem to work nicely with SLURM array jobs.
 
 ### Optional tests
 

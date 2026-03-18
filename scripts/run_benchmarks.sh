@@ -19,12 +19,15 @@ TESTS=(
 
 NUM_REPEATS=5
 
+SEEDS=(42 123 456 789 1024)
+
 TEST_IDX=$(( SLURM_ARRAY_TASK_ID / NUM_REPEATS ))
 REPEAT_IDX=$(( SLURM_ARRAY_TASK_ID % NUM_REPEATS ))
 TEST_FILE=${TESTS[$TEST_IDX]}
+SEED=${SEEDS[$REPEAT_IDX]}
 
-echo "=== Job $SLURM_ARRAY_TASK_ID: test=$TEST_FILE repeat=$REPEAT_IDX ==="
+echo "=== Job $SLURM_ARRAY_TASK_ID: test=$TEST_FILE repeat=$REPEAT_IDX seed=$SEED ==="
 
 mkdir -p logs/benchmark
 
-PYTEST_TRAINER=gpu uv run pytest -vv -s "$TEST_FILE" 2>&1
+PYTEST_TRAINER=gpu PYTEST_SEED=$SEED uv run pytest -vv -s "$TEST_FILE" 2>&1

@@ -1,5 +1,17 @@
-"""Benchmark: SMC evaluation for transferable Prose on up_to_8aa with MALA."""
+"""Benchmark: SMC evaluation for transferable Prose on up_to_8aa with MALA.
 
+Paper reference values on ARIP.
+    SMC:
+        energy-w2: 3.563
+        tica-w2:   0.459
+        torus-w2:  0.763
+    Proposal:
+        energy-w2: 552396672
+        tica-w2:   0.688
+        torus-w2:  1.986
+"""
+
+import os
 from pathlib import Path
 
 import pytest
@@ -26,6 +38,7 @@ def test_smc_prose_up_to_8aa(trainer_name_param: str, tmp_path: Path) -> None:
         cfg.model.source_energy_config.sample_batch_size = 1_024
         cfg.model.source_energy_config.energy_batch_size = 128
         cfg.model.source_energy_config.grad_batch_size = 64
+        cfg.seed = int(os.environ.get("PYTEST_SEED", 42))
         cfg.tags = ["pytest", "benchmark_smc"]
 
     # pyrefly: ignore [bad-argument-type]

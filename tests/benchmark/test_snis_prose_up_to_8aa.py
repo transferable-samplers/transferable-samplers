@@ -5,8 +5,20 @@ Reference values on ARIP (10k samples, 3 seeds: 42, 123, 456):
     energy-w2: 1.413  ± 0.411
     torus-w2:  0.628  ± 0.052
     tica-w2:   0.279  ± 0.082
+
+Paper reference values on ARIP.
+    Resampled:
+        ESS:       0.0285
+        energy-w2: 2.129
+        tica-w2:   0.317
+        torus-w2:  0.575
+    Proposal:
+        energy-w2: 552396672
+        tica-w2:   0.688
+        torus-w2:  1.986
 """
 
+import os
 from pathlib import Path
 
 import pytest
@@ -45,7 +57,8 @@ def _make_cfg(trainer_name_param: str, tmp_path: Path, seed: int = 42):
 @pytest.mark.benchmark
 def test_snis_prose_up_to_8aa(trainer_name_param: str, tmp_path: Path) -> None:
     """Check metrics are within 2σ of reference values."""
-    cfg = _make_cfg(trainer_name_param, tmp_path, seed=42)
+    seed = int(os.environ.get("PYTEST_SEED", 42))
+    cfg = _make_cfg(trainer_name_param, tmp_path, seed=seed)
     metrics, _ = eval(cfg)
     GlobalHydra.instance().clear()
 

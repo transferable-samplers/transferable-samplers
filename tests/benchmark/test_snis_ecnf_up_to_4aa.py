@@ -1,5 +1,18 @@
-"""Benchmark: SNIS evaluation for transferable ECNF++ on up_to_4aa."""
+"""Benchmark: SNIS evaluation for transferable ECNF++ on up_to_4aa.
 
+Paper reference values on AA.
+    Resampled:
+        ESS:       0.0515
+        energy-w2: 1.396
+        tica-w2:   0.00260
+        torus-w2:  0.204
+    Proposal:
+        energy-w2: 2.957
+        tica-w2:   0.00176
+        torus-w2:  0.0865
+"""
+
+import os
 from pathlib import Path
 
 import pytest
@@ -28,6 +41,7 @@ def test_snis_ecnf_up_to_4aa(trainer_name_param: str, tmp_path: Path) -> None:
         cfg.model.source_energy_config.sample_batch_size = 128
         cfg.model.source_energy_config.energy_batch_size = 128
         cfg.model.source_energy_config.grad_batch_size = 128
+        cfg.seed = int(os.environ.get("PYTEST_SEED", 42))
         cfg.tags = ["pytest", "benchmark_snis"]
 
     metrics, _ = eval(cfg)

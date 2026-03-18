@@ -1,5 +1,14 @@
-"""Benchmark: Self-improvement pipeline for transferable Prose on up_to_8aa."""
+"""Benchmark: Self-improvement pipeline for transferable Prose on up_to_8aa.
 
+Paper reference values on ARIP.
+    Resampled:
+        ESS:       0.0241
+        energy-w2: 1.634
+        tica-w2:   0.254
+        torus-w2:  0.494
+"""
+
+import os
 from math import isnan
 from pathlib import Path
 
@@ -27,6 +36,7 @@ def test_self_improve_prose_up_to_8aa(trainer_name_param: str, tmp_path: Path) -
         cfg.paths.log_dir = str(tmp_path)
         cfg.paths.work_dir = str(Path.cwd())
         cfg.data.test_sequences = "ARIP"
+        cfg.seed = int(os.environ.get("PYTEST_SEED", 42))
         cfg.tags = ["pytest", "benchmark_self_improve"]
 
     metrics, _ = train(cfg)
