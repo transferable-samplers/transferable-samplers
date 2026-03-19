@@ -3,18 +3,18 @@
 This page describes how the major components of the codebase fit together: the data module, Lightning module, samplers, and callbacks. The goal is to make the responsibilities of each component clear and explain the design decisions behind the boundaries between them.
 
 ?> Transferable samplers builds upon [PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/).
-A major benefit of PyTorch Lightning is in standardizing the components of codebases, aiding both readability and reproducibility.
+A major benefit of PyTorch Lightning is in standardising the components of codebases, aiding both readability and reproducibility.
 As such, we have sought to follow Lightning's preferred design principles where possible.
 However, the algorithms implemented by transferable samplers do deviate from the typical workflows for which PyTorch Lightning was developed.
 Care was given to deciding the correct boundaries between components in these non-standard configurations, with the hope that the result can be readily read, understood, hacked, and extended.
 
-> **Note:** Whilst attention has been given to defining a general architecture, changes may be made as required by future methods.
+?> Whilst attention has been given to defining a general architecture, changes may be made as required by future methods.
 
 ## Overview
 
 To the greatest practical extent we have aimed for **each component to own only a single concern**.
 
-Data preparation and normalization are handled by the data module.
+Data preparation and normalisation are handled by the data module.
 The Lightning module defines how to train a generative model, exposing a source / proposal density for samplers to leverage.
 Sampling strategy lives in the sampler, agnostic to the implementations of the source and target densities themselves.
 This separation makes it possible to change any one component — swap a sampler, change a dataset, or try a new proposal model — without touching the others.
@@ -23,7 +23,7 @@ This separation makes it possible to change any one component — swap a sampler
 
 ## Data Module
 
-**Responsibility:** preparing, loading, and normalizing data; providing evaluation contexts.
+**Responsibility:** preparing, loading, and normalising data; providing evaluation contexts.
 
 `BaseDataModule` is an abstract `LightningDataModule` with three required methods:
 
@@ -41,11 +41,11 @@ The two concrete subclasses — `SinglePeptideDataModule` and `ManyPeptidesDataM
 
 - `true_data` — reference conformations (`SamplesData`) for metric computation.
 - `target_energy` — energy function for use by samplers and evaluators, provides `energy()` and `energy_and_grad()` for the forcefield.
-- `normalization_std` — so evaluators can destandardize to physical units.
+- `normalisation_std` — so evaluators can destandardise to physical units.
 - `system_cond` — encoding / permutation tensors for transferable models.
 - `tica_model`, `topology` — optional metadata for TICA-based metrics and chirality detection.
 
-!> The data module handles standardization. The only other component that sees physical-scale coordinates is the evaluator; neither the Lightning module nor the sampler operate on physical-scale data. `TargetEnergy` handles unnormalization internally — callers always pass normalized coordinates.
+!> The data module handles standardisation. The only other component that sees physical-scale coordinates is the evaluator; neither the Lightning module nor the sampler operate on physical-scale data. `TargetEnergy` handles unnormalisation internally — callers always pass normalised coordinates.
 
 ---
 
@@ -57,8 +57,8 @@ The two concrete subclasses — `SinglePeptideDataModule` and `ManyPeptidesDataM
 
 Subclasses implement four abstract methods:
 
-- `compute_primary_loss(batch)` — per-sample primary loss, without system-size normalization or auxiliary terms. Exposed directly so that `LossEvaluationCallback` can evaluate model fit on held-out true samples without training-specific overhead.
-- `training_step(batch, batch_idx)` — calls `compute_primary_loss` and adds system-size normalization and any auxiliary terms to produce the final scalar loss.
+- `compute_primary_loss(batch)` — per-sample primary loss, without system-size normalisation or auxiliary terms. Exposed directly so that `LossEvaluationCallback` can evaluate model fit on held-out true samples without training-specific overhead.
+- `training_step(batch, batch_idx)` — calls `compute_primary_loss` and adds system-size normalisation and any auxiliary terms to produce the final scalar loss.
 - `generate_proposal(net, num_samples, system_cond)` — draw samples from the proposal and return `(samples, E_source)` where `E_source = -log q`.
 - `proposal_energy(net, x, system_cond)` — evaluate `-log q` for given conformations.
 
@@ -70,7 +70,7 @@ Both `NormalizingFlowLitModule` and `FlowMatchLitModule` implement these four me
 
 ### SourceEnergy
 
-`SourceEnergy` is the interface between the Lightning module and the samplers. `build_source_energy()` constructs one by wrapping `generate_proposal` and `proposal_energy` into a self-contained dataclass that handles internal batching, optional center-of-mass energy adjustments, and DDP batch-size scaling. Samplers receive only this dataclass — they never see the model itself. `SourceEnergy` exposes three operations:
+`SourceEnergy` is the interface between the Lightning module and the samplers. `build_source_energy()` constructs one by wrapping `generate_proposal` and `proposal_energy` into a self-contained dataclass that handles internal batching, optional centre-of-mass energy adjustments, and DDP batch-size scaling. Samplers receive only this dataclass — they never see the model itself. `SourceEnergy` exposes three operations:
 
 - `sample(num_samples)` — draw proposals in internal batches.
 - `energy(x)` — evaluate `-log q` in internal batches.
@@ -79,9 +79,9 @@ Both `NormalizingFlowLitModule` and `FlowMatchLitModule` implement these four me
 
 ### Replay buffer
 
-For self-improvement training, the model owns a `Buffer` that stores resampled conformations in normalized space. The model does not populate its own buffer — it only exposes `set_buffer()` and draws from `self._buffer.sample()` in `training_step` when `train_from_buffer=True`. The `PopulateBufferCallback` is responsible for filling it.
+For self-improvement training, the model owns a `Buffer` that stores resampled conformations in normalised space. The model does not populate its own buffer — it only exposes `set_buffer()` and draws from `self._buffer.sample()` in `training_step` when `train_from_buffer=True`. The `PopulateBufferCallback` is responsible for filling it.
 
-!> For consistency with the true data pipeline the buffer samples are destandardized before passing to the datamodule train transforms. This breaks the "rule" of the Lightning module not seeing physical scale coordinates but is accepted as it occurs inside the buffer and enables the exact same transform pipeline to be applied to buffer samples.
+!> For consistency with the true data pipeline the buffer samples are destandardised before passing to the datamodule train transforms. This breaks the "rule" of the Lightning module not seeing physical scale coordinates but is accepted as it occurs inside the buffer and enables the exact same transform pipeline to be applied to buffer samples.
 
 ---
 
@@ -101,7 +101,7 @@ samples_dict, diagnostics = sampler.sample(source_energy, target_energy)
 
 The two concrete samplers:
 
-- **`SNISSampler`** — self-normalized importance sampling. Draws proposals from `source_energy.sample()`, evaluates target and source energies, computes log importance weights `logw = -E_target + E_source`, and resamples proportional to the weights.
+- **`SNISSampler`** — self-normalised importance sampling. Draws proposals from `source_energy.sample()`, evaluates target and source energies, computes log importance weights `logw = -E_target + E_source`, and resamples proportional to the weights.
 - **`SMCSampler`** — sequential Monte Carlo over an annealing path from source to target. Particles are sharded across ranks; MCMC runs locally per rank; resampling coordinates via `all_gather`.
 
 ---

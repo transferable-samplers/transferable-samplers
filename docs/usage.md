@@ -16,7 +16,7 @@ The pretrained model weights used in our works are provided [here](https://huggi
 
 ## Training
 
-The codebase builds on the [Lightning-Hydra-Template](https://github.com/ashleve/lightning-hydra-template). Experiments are organized into configuration files under `configs/experiment/`.
+The codebase builds on the [Lightning-Hydra-Template](https://github.com/ashleve/lightning-hydra-template). Experiments are organised into configuration files under `configs/experiment/`.
 
 Train a TarFlow on the single-system Ace-A-Nme dataset:
 
@@ -30,7 +30,7 @@ Train Prose on the ManyPeptidesMD dataset:
 uv run python -m transferable_samplers.train experiment=transferable/train/prose_up_to_8aa
 ```
 
-> **Note:**  Pass `trainer=ddp` for distributed data parallel training.
+?> Pass `trainer=ddp` for distributed data parallel training.
 
 ### Resuming
 
@@ -90,7 +90,7 @@ uv run python -m transferable_samplers.eval experiment=transferable/eval/prose_u
 
 In practice it is often more convenient to run each evaluation separately and aggregate the per-system metrics afterwards, rather than running sequentially as a single process.
 
-> **Note:**  All samplers support multiple GPUs - pass `trainer=ddp` for distributed sampling.
+?> All samplers support multiple GPUs — pass `trainer=ddp` for distributed sampling.
 
 ### Self-Improving Sampling
 

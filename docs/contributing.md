@@ -83,7 +83,7 @@ PYTEST_TRAINER=gpu uv run pytest -m benchmark -v
 PYTEST_TRAINER=ddp uv run pytest -m benchmark -v
 ```
 
-> **SLURM note:** DDP benchmark tests don't seem to work nicely with SLURM array jobs.
+?> **SLURM:** DDP benchmark tests don't seem to work nicely with SLURM array jobs.
 
 ### Optional tests
 

@@ -23,7 +23,7 @@ uv run python -m transferable_samplers.train experiment=transferable/train/tarfl
 uv run python -m transferable_samplers.train experiment=transferable/train/ecnf++_up_to_4aa
 ```
 
-> **Note:**  These large training experiments benefit from multiple GPUs, pass `trainer=ddp` for distributed data parallel training.
+?> These large training experiments benefit from multiple GPUs — pass `trainer=ddp` for distributed data parallel training.
 
 ### Table 2 — SNIS (10k energy evaluations)
 
