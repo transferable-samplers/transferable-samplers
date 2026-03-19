@@ -2,10 +2,9 @@
 
 A codebase for **sampling the Boltzmann density of molecular systems**, with a focus on transferable methods that generalise to unseen systems at inference time.
 
-?> This is a **research codebase**, not a library. It is designed to be edited and hacked for rapid prototyping of novel approaches.  
-For an overview of how the codebase components fit together, see [Design](design.md)!
+For further documentation, see the docs!
 
-## Quickstart
+## Quickstart
 
 ```bash
 # Clone repo
@@ -30,8 +29,6 @@ uv run python -m transferable_samplers.eval experiment=transferable/eval/prose_u
 
 > You must also populate `.env.example` and save as `.env` (sets `SCRATCH_DIR`).  
 > **Optional:** Flash Attention (for TarFlow methods) must be installed separately, see the note at the bottom of `requirements.txt`.
-
-For full usage including datasets, model weights, training, and fine-tuning, see [Usage](usage.md). For development setup, tooling, and tests, see [Contributing](contributing.md).
 
 ## Implemented Papers
 
