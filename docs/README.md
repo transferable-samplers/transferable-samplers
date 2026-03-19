@@ -1,8 +1,9 @@
 # Transferable Samplers
 
-A research codebase for **sampling the Boltzmann density of molecular systems**, with a focus on transferable methods that generalise to unseen systems at inference time.
-!> This is a research codebase, not a library. It is designed to be edited and hacked for rapid prototyping of novel approaches.
-?> For an overview of how the codebase components fit together, see [Design](design.md)!
+A codebase for **sampling the Boltzmann density of molecular systems**, with a focus on transferable methods that generalise to unseen systems at inference time.
+
+?> This is a **research codebase**, not a library. It is designed to be edited and hacked for rapid prototyping of novel approaches.  
+For an overview of how the codebase components fit together, see [Design](design.md)!
 
 ## Quickstart
 

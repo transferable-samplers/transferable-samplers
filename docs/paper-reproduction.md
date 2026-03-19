@@ -82,7 +82,7 @@ uv run python -m transferable_samplers.train experiment=single_system/train/tarf
 uv run python -m transferable_samplers.eval experiment=single_system/eval/tarflow_AAA_ula
 ```
 
-> To reproduce results averaged over seeds, override `hf_state_dict_path` with `_1` or `_2` (e.g. `hf_state_dict_path=single_system/ecnf++_AAA_1.pth`).
+?> To reproduce results averaged over seeds, override `hf_state_dict_path` with `_1` or `_2` (e.g. `hf_state_dict_path=single_system/ecnf++_AAA_1.pth`).
 
 ### Table 3 — Ace-AAA-Nme, AAAAAA
 
@@ -104,7 +104,7 @@ uv run python -m transferable_samplers.train experiment=single_system/train/tarf
 uv run python -m transferable_samplers.eval experiment=single_system/eval/tarflow_AAAAAA_ula
 ```
 
-> To reproduce results averaged over seeds, override `hf_state_dict_path` with `_1` or `_2` (e.g. `hf_state_dict_path=single_system/ecnf++_AAA_1.pth`).
+?> To reproduce results averaged over seeds, override `hf_state_dict_path` with `_1` or `_2` (e.g. `hf_state_dict_path=single_system/ecnf++_AAA_1.pth`).
 
 ### Figure 8 — Chignolin (GYDPETGTWG)
 

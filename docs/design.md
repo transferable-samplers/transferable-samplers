@@ -8,7 +8,7 @@ As such, we have sought to follow Lightning's preferred design principles where 
 However, the algorithms implemented by transferable samplers do deviate from the typical workflows for which PyTorch Lightning was developed.
 Care was given to deciding the correct boundaries between components in these non-standard configurations, with the hope that the result can be readily read, understood, hacked, and extended.
 
-?> Whilst attention has been given to defining a general architecture, changes may be made as required by future methods.
+> Whilst attention has been given to defining a general architecture, changes may be made as required by future methods.
 
 ## Overview
 
@@ -64,7 +64,7 @@ Subclasses implement four abstract methods:
 
 Both `NormalizingFlowLitModule` and `FlowMatchLitModule` implement these four methods with identical signatures and semantics, so samplers and evaluators treat them interchangeably.
 
-?> `validation_step` and `test_step` exist only for Lightning compatibility. All evaluation is callback-driven.
+> `validation_step` and `test_step` exist only for Lightning compatibility. All evaluation is callback-driven.
 
 ?> Both model types follow the same change-of-variables convention: `logq = logp_prior + dlogp`, where `dlogp` is the log-determinant of the Jacobian (NF) or the trace integral along the ODE trajectory (FM). Energy is uniformly `E = -logq`. For reverse-direction computations, both models consistently subtract the reverse-direction `dlogp`.
 
