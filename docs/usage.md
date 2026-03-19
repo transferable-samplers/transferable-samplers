@@ -8,7 +8,7 @@ Both ManyPeptidesMD and the single-peptide datasets are hosted on Hugging Face.
 - [ManyPeptidesMD](https://huggingface.co/datasets/transferable-samplers/many-peptides-md)
 - [Single systems](https://huggingface.co/datasets/transferable-samplers/sequential-boltzmann-generators-data)
 
-In both cases, the codebase is set up to automatically download the necessary data for training and evaluation. In the case of ManyPeptidesMD the training webdataset will by default be streamed and cached.
+In both cases, the codebase is set up to automatically download the necessary data for training and evaluation. In the case of ManyPeptidesMD, the training webdataset will by default be streamed and cached.
 
 ## Model Weights
 
@@ -88,13 +88,13 @@ uv run python -m transferable_samplers.eval experiment=transferable/eval/prose_u
   data.test_sequences=[AA]
 ```
 
-In practice it is often more convenient to run each evaluation separately and aggregate the per-system metrics afterwards, rather than running sequentially as a single process.
+In practice, it is often more convenient to run each evaluation separately and aggregate the per-system metrics afterwards, rather than running sequentially as a single process.
 
 ?> All samplers support multiple GPUs — pass `trainer=ddp` for distributed sampling.
 
 ### Self-Improving Sampling
 
-Self-improvement finetunes a pretrained model using SNIS-reweighted samples from its own proposal distribution. It uses the same `init_*` arguments as regular finetuning (see above), but with a dedicated experiment config:
+Self-improvement fine-tunes a pretrained model using SNIS-reweighted samples from its own proposal distribution. It uses the same `init_*` arguments as regular finetuning (see above), but with a dedicated experiment config:
 
 ```bash
 # Default: initialises from pretrained weights on HuggingFace

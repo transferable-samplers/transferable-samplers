@@ -12,10 +12,10 @@ Care was given to deciding the correct boundaries between components in these no
 
 ## Overview
 
-To the greatest practical extent we have aimed for **each component to own only a single concern**.
+To the greatest practical extent, we have aimed for **each component to own only a single concern**.
 
 Data preparation and normalisation are handled by the data module.
-The Lightning module defines how to train a generative model, exposing a source / proposal density for samplers to leverage.
+The Lightning module defines how to train a generative model, exposing a source/proposal density for samplers to leverage.
 Sampling strategy lives in the sampler, agnostic to the implementations of the source and target densities themselves.
 This separation makes it possible to change any one component — swap a sampler, change a dataset, or try a new proposal model — without touching the others.
 
@@ -28,7 +28,7 @@ This separation makes it possible to change any one component — swap a sampler
 `BaseDataModule` is an abstract `LightningDataModule` with three required methods:
 
 - `prepare_data()` — download and preprocess (runs in a single process; no state assignment).
-- `setup()` — load datasets and set `self.data_train`; called before any fit/val/test stage. `self.data_val` and `self.data_test` are placeholders - evaluation is handled via callbacks.
+- `setup()` — load datasets and set `self.data_train`; called before any fit/val/test stage. `self.data_val` and `self.data_test` are placeholders — evaluation is handled via callbacks.
 - `prepare_eval(sequence, stage) -> EvalContext` — build a self-contained evaluation context for a given peptide sequence.
 
 The two concrete subclasses — `SinglePeptideDataModule` and `ManyPeptidesDataModule` — only implement these three methods. All dataloader machinery is inherited from the base class.
@@ -42,7 +42,7 @@ The two concrete subclasses — `SinglePeptideDataModule` and `ManyPeptidesDataM
 - `true_data` — reference conformations (`SamplesData`) for metric computation.
 - `target_energy` — energy function for use by samplers and evaluators, provides `energy()` and `energy_and_grad()` for the forcefield.
 - `normalisation_std` — so evaluators can destandardise to physical units.
-- `system_cond` — encoding / permutation tensors for transferable models.
+- `system_cond` — encoding/permutation tensors for transferable models.
 - `tica_model`, `topology` — optional metadata for TICA-based metrics and chirality detection.
 
 !> The data module handles standardisation. The only other component that sees physical-scale coordinates is the evaluator; neither the Lightning module nor the sampler operate on physical-scale data. `TargetEnergy` handles unnormalisation internally — callers always pass normalised coordinates.
@@ -81,7 +81,7 @@ Both `NormalizingFlowLitModule` and `FlowMatchLitModule` implement these four me
 
 For self-improvement training, the model owns a `Buffer` that stores resampled conformations in normalised space. The model does not populate its own buffer — it only exposes `set_buffer()` and draws from `self._buffer.sample()` in `training_step` when `train_from_buffer=True`. The `PopulateBufferCallback` is responsible for filling it.
 
-!> For consistency with the true data pipeline the buffer samples are destandardised before passing to the datamodule train transforms. This breaks the "rule" of the Lightning module not seeing physical scale coordinates but is accepted as it occurs inside the buffer and enables the exact same transform pipeline to be applied to buffer samples.
+!> For consistency with the true data pipeline the buffer samples are destandardised before passing to the datamodule train transforms. This breaks the "rule" of the Lightning module not seeing physical-scale coordinates but is accepted as it occurs inside the buffer and enables the exact same transform pipeline to be applied to buffer samples.
 
 ---
 

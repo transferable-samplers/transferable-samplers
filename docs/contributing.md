@@ -57,7 +57,7 @@ This project uses **pytest** with Hydra integration. Tests are organised into ma
 | `benchmark` | Long-running experiments that validate metrics against published results | `tests/benchmark/` |
 | `optional` | Architectural / design tests (e.g. NF invertibility, dlogp consistency) | `tests/unit/` |
 
-### Essential tests (CPU)
+### Essential tests
 
 Essential tests cover config validation, model asset checks, and minimum working example (MWE) pipelines. Run them on CPU first:
 
@@ -65,25 +65,19 @@ Essential tests cover config validation, model asset checks, and minimum working
 PYTEST_TRAINER=cpu uv run pytest -m essential -v
 ```
 
-To run the MWE pipeline tests on a single GPU or with DDP (requires 2+ GPUs):
+The same tests can be checked on GPU:
 
 ```bash
 PYTEST_TRAINER=gpu uv run pytest -m essential -v
-PYTEST_TRAINER=ddp uv run pytest -m essential -v
 ```
 
-Config and asset tests always run on CPU regardless of `PYTEST_TRAINER`. DDP mode only runs the MWE tests.
+### Benchmark tests
 
-### Benchmark tests (GPU)
-
-Benchmark tests run full experiment configs and validate metrics against published results. They require at least one GPU:
+Benchmark tests run full experiment configs and validate metrics against published results:
 
 ```bash
 PYTEST_TRAINER=gpu uv run pytest -m benchmark -v
-PYTEST_TRAINER=ddp uv run pytest -m benchmark -v
 ```
-
-?> **SLURM:** DDP benchmark tests don't seem to work nicely with SLURM array jobs.
 
 ### Optional tests
 

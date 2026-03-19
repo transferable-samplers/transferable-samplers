@@ -2,7 +2,7 @@
 
 All experiment configs are under `configs/experiment/`. Evaluation configs default to downloading pretrained weights from Hugging Face — see [Usage](usage.md) for how to override with local checkpoints.
 
-By default each evaluation runs over all systems defined in the data config. See [Evaluation](usage.md#sampling) in Usage for details on running only a single system per process - in practice it is often more convenient to run each evaluation separately and aggregate across systems afterwards.
+By default each evaluation runs over all systems defined in the data config. See [Evaluation](usage.md#sampling) in Usage for details on running only a single system per process — in practice it is often more convenient to run each evaluation separately and aggregate across systems afterwards.
 
 ---
 
