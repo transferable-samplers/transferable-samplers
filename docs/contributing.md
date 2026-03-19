@@ -65,11 +65,14 @@ Essential tests cover config validation, model asset checks, and minimum working
 PYTEST_TRAINER=cpu uv run pytest -m essential -v
 ```
 
-The same tests can be checked on GPU:
+A subset of these tests can be checked on GPU or DDP:
 
 ```bash
 PYTEST_TRAINER=gpu uv run pytest -m essential -v
+PYTEST_TRAINER=ddp uv run pytest -m essential -v
 ```
+
+> Only the MWE tests are considered essential on GPU / DDP; config and asset tests are skipped.
 
 ### Benchmark tests
 
@@ -77,6 +80,7 @@ Benchmark tests run full experiment configs and validate metrics against publish
 
 ```bash
 PYTEST_TRAINER=gpu uv run pytest -m benchmark -v
+PYTEST_TRAINER=ddp uv run pytest -m benchmark -v
 ```
 
 ### Optional tests
