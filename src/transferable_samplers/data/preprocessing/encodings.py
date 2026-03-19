@@ -127,7 +127,6 @@ def get_encodings(topology: Any) -> dict[str, torch.Tensor]:
 
             atom_name = atom.name
 
-            # TODO double check this with Leon
             # Standardize side-chain H atom encodings
             if atom_name[0] == "H" and atom_name[-1] in ("1", "2", "3"):
                 # For these AA the H-X-N atoms are not interchangeable

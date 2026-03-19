@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -13,6 +12,9 @@ from matplotlib.axes import Axes
 from matplotlib.colors import LogNorm
 
 from transferable_samplers.data.preprocessing.tica import tica_features
+from transferable_samplers.utils.pylogger import RankedLogger
+
+log = RankedLogger(__name__, rank_zero_only=True)
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
@@ -42,7 +44,7 @@ def plot_tica(
         tica_model: Fitted TICA model for projection.
         prefix: Metric key prefix.
     """
-    logging.info(f"Plotting TICA for {prefix}")
+    log.info(f"Plotting TICA for {prefix}")
 
     pred_traj_samples = md.Trajectory(samples.cpu().numpy(), topology=topology)
 

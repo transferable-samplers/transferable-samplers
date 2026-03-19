@@ -65,7 +65,7 @@ class SNISSampler(BaseSampler):
             samples, E_source, E_target = filter_by_logw_quantile(
                 samples, E_source, E_target, self.logw_quantile_filter
             )
-            logger.info("Clipped proposal logw for SMC initialisation")
+            logger.info("Clipped proposal logw for SNIS")
 
         # Compute importance weights on all ranks
         logw = E_source - E_target

@@ -232,7 +232,6 @@ class MetaBlock(torch.nn.Module):
                 f"First two dimensions of mask {mask.shape[:1]} and x {x.shape[:1]} do not match"
             )
 
-            # WARNING there was a permutation of mask here but i can't see what it would do TODO
             attn_mask = attn_mask.unsqueeze(0)
             attn_mask = attn_mask * mask[..., None]
             attn_mask = attn_mask.unsqueeze(1)
@@ -255,7 +254,7 @@ class MetaBlock(torch.nn.Module):
 
         tokenization_map = permutations.get("tokenization_map", None)
         if tokenization_map is not None:
-            tokenization_mask = (tokenization_map != -1).float().repeat_interleave(3, dim=-1)  # TODO hardcode
+            tokenization_mask = (tokenization_map != -1).float().repeat_interleave(3, dim=-1)  # TODO hardcode dim
             tokenization_mask = self.permutation(tokenization_mask, permutations)
             xb = xb * tokenization_mask
             xa = xa * tokenization_mask

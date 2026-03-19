@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import pickle
 from pathlib import Path
 from typing import Any
@@ -35,6 +34,9 @@ from transferable_samplers.data.transforms.rotation import Random3DRotationTrans
 from transferable_samplers.data.transforms.standardize import StandardizeTransform
 from transferable_samplers.utils.dataclasses import EvalContext, SamplesData, SystemCond, TargetEnergy
 from transferable_samplers.utils.huggingface import download_and_extract_pdb_tarfiles, download_evaluation_data
+from transferable_samplers.utils.pylogger import RankedLogger
+
+log = RankedLogger(__name__, rank_zero_only=True)
 
 
 class ManyPeptidesDataModule(BaseDataModule):
@@ -196,22 +198,22 @@ class ManyPeptidesDataModule(BaseDataModule):
         # Load cached data preprocessing dicts
         with self.pdb_dict_pkl_path.open("rb") as f:
             self.pdb_dict = pickle.load(f)  # noqa: S301
-        logging.info(f"Loaded pdb dict from {self.pdb_dict_pkl_path}")
+        log.info(f"Loaded pdb dict from {self.pdb_dict_pkl_path}")
         with self.topology_dict_pkl_path.open("rb") as f:
             self.topology_dict = pickle.load(f)  # noqa: S301
-        logging.info(f"Loaded topology dict from {self.topology_dict_pkl_path}")
+        log.info(f"Loaded topology dict from {self.topology_dict_pkl_path}")
 
         self.encodings_dict = None
         if "encodings" in self.system_cond_ids:
             with self.encodings_dict_pkl_path.open("rb") as f:
                 self.encodings_dict = pickle.load(f)  # noqa: S301
-            logging.info(f"Loaded encodings dict from {self.encodings_dict_pkl_path}")
+            log.info(f"Loaded encodings dict from {self.encodings_dict_pkl_path}")
 
         self.permutations_dict = None
         if "permutations" in self.system_cond_ids:
             with self.permutations_dict_pkl_path.open("rb") as f:
                 self.permutations_dict = pickle.load(f)  # noqa: S301
-            logging.info(f"Loaded permutations dict from {self.permutations_dict_pkl_path}")
+            log.info(f"Loaded permutations dict from {self.permutations_dict_pkl_path}")
 
         # Build transformations pipeline
         base_transform_list = [
@@ -331,10 +333,10 @@ class ManyPeptidesDataModule(BaseDataModule):
         """
         local_tars = sorted(str(p) for p in self.wds_cache_dir.glob("*.tar"))
         if len(local_tars) >= self.NUM_TARFILES:
-            logging.info(f"Found {len(local_tars)} cached tar files in {self.wds_cache_dir}, skipping HuggingFace.")
+            log.info(f"Found {len(local_tars)} cached tar files in {self.wds_cache_dir}, skipping HuggingFace.")
             return local_tars
         if local_tars:
-            logging.info(
+            log.info(
                 f"Found {len(local_tars)} cached tar files but expected {self.NUM_TARFILES}. "
                 "Falling back to HuggingFace."
             )
@@ -350,7 +352,7 @@ class ManyPeptidesDataModule(BaseDataModule):
         if local_tars is not None:
             return local_tars
         urls = self._resolve_hf_tar_urls()
-        logging.info(f"Using WebDataset cache dir: {self.wds_cache_dir}")
+        log.info(f"Using WebDataset cache dir: {self.wds_cache_dir}")
         return urls
 
     def _load_pdb(self, sequence: str, stage: str) -> Any:

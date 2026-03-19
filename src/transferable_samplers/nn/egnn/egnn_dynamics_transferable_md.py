@@ -15,7 +15,6 @@ import torch.nn as nn
 
 from transferable_samplers.nn.egnn.egnn import EGNN
 
-# TODO remove hardcode
 NUM_ATOM_TYPE = 54
 NUM_AA_TYPE = 20
 

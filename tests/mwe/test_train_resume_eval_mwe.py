@@ -237,7 +237,7 @@ def test_train_and_eval(trainer_name_param: str, tmp_path: Path) -> None:
         cfg_eval.callbacks.sampling_evaluation.sampler = OmegaConf.create(
             {
                 "_target_": "transferable_samplers.samplers.snis_sampler.SNISSampler",
-                "num_samples": 25,
+                "num_samples": 32,
             }
         )
         if trainer_name_param == "cpu":

@@ -32,10 +32,17 @@ class PopulateBufferCallback(Callback):
         evaluator: Optional evaluator to log sample quality metrics each epoch.
     """
 
-    def __init__(self, sampler: BaseSampler, evaluator: PeptideEnsembleEvaluator | None = None) -> None:
+    def __init__(
+        self,
+        sampler: BaseSampler,
+        evaluator: PeptideEnsembleEvaluator | None = None,
+        stage: str = "test",
+    ) -> None:
         super().__init__()
+        assert stage in ("val", "test"), f"stage must be 'val' or 'test', got '{stage}'"
         self.sampler = sampler
         self.evaluator = evaluator
+        self.stage = stage
 
     def on_train_epoch_start(self, trainer: Trainer, pl_module: LightningModule) -> None:
         """Generate samples and populate the model's buffer.
@@ -50,20 +57,21 @@ class PopulateBufferCallback(Callback):
         )
 
         datamodule = trainer.datamodule
-        assert datamodule.test_sequences is not None, "Eval sequence name should be set"
-        assert len(datamodule.test_sequences) == 1, "Can only self-refine on 1 test sequence at a time."
+        sequences = datamodule.test_sequences if self.stage == "test" else datamodule.val_sequences
+        assert sequences is not None, f"datamodule.{self.stage}_sequences must be set."
+        assert len(sequences) == 1, "Can only self-refine on 1 sequence at a time."
 
-        sequence = datamodule.test_sequences[0]
+        sequence = sequences[0]
         logger.info(f"Generating {self.sampler.num_samples} samples for self-consumption")
 
-        eval_ctx = datamodule.prepare_eval(sequence, stage="test")
+        eval_ctx = datamodule.prepare_eval(sequence, stage=self.stage)
         source_energy = pl_module.build_source_energy(eval_ctx.system_cond, use_ema_if_available=True)
 
         samples_dict, _ = self.sampler.sample(source_energy, eval_ctx.target_energy)
 
         # Evaluate samples if evaluator is configured
         if self.evaluator is not None and trainer.is_global_zero:
-            prefix = f"self_improve/{sequence}"
+            prefix = f"self-improve/{sequence}"
             base_log_image_fn = make_log_image_fn(trainer)
             log_image_fn = partial(base_log_image_fn, title_prefix=prefix)
 

@@ -72,6 +72,8 @@ class SamplingEvaluationCallback(Callback):
 
         datamodule = trainer.datamodule
         eval_sequences = datamodule.val_sequences if prefix == "val" else datamodule.test_sequences
+        if trainer.sanity_checking:
+            eval_sequences = eval_sequences[:1]
 
         base_log_image_fn = make_log_image_fn(trainer)
 

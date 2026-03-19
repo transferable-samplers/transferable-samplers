@@ -69,12 +69,25 @@ class OpenMMEnergy:
         elif platform_name == "CUDA":
             if device_index is not None:
                 properties["DeviceIndex"] = str(device_index)
+            # Synchronize and clear the CUDA cache before creating the OpenMM
+            # context. Without this, creating a new context after GPU training
+            # (e.g. in PopulateBufferCallback) could fail with:
+            #   openmm.OpenMMException: The requested CUDA device could not be loaded
+            # The root cause is stale CUDA state from PyTorch occupying resources
+            # that OpenMM needs to initialise its own CUDA context.
             torch.cuda.synchronize()
             torch.cuda.empty_cache()
 
         self._context = Context(system, integrator, platform, properties)
 
     def __del__(self) -> None:
+        # Explicitly release the OpenMM context and flush the CUDA cache so
+        # that the GPU memory is returned promptly. Multiple callbacks
+        # (PopulateBufferCallback, SamplingEvaluationCallback,
+        # LossEvaluationCallback) each call prepare_eval() every epoch,
+        # creating a new OpenMM CUDA context each time. Without explicit
+        # cleanup the contexts accumulate and eventually trigger:
+        #   openmm.OpenMMException: The requested CUDA device could not be loaded
         self._context = None
         if torch.cuda.is_available():
             torch.cuda.synchronize()

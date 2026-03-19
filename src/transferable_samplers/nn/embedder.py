@@ -16,7 +16,6 @@ class SinusoidalEmbedding(nn.Module):
         assert self.embed_size % 2 == 0, "embed_size must be even."
 
     def forward(self, data: torch.Tensor) -> torch.Tensor:
-        # TODO fix docstring
         position = data.float().unsqueeze(-1)  # Shape: [..., 1]
         div_term = torch.exp(
             torch.arange(0, self.embed_size, 2, device=data.device) * -(math.log(self.div_value) / self.embed_size)

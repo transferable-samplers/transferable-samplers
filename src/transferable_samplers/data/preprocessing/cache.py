@@ -1,4 +1,3 @@
-import logging
 import pickle
 from pathlib import Path
 
@@ -8,6 +7,9 @@ from tqdm import tqdm
 
 from transferable_samplers.data.preprocessing.encodings import get_encodings_dict
 from transferable_samplers.data.preprocessing.permutations import get_permutations_dict
+from transferable_samplers.utils.pylogger import RankedLogger
+
+log = RankedLogger(__name__, rank_zero_only=True)
 
 
 def prepare_and_cache_pdb_dict(
@@ -24,12 +26,12 @@ def prepare_and_cache_pdb_dict(
         Dict mapping sequence strings to ``openmm.app.PDBFile`` objects.
     """
     if Path(cache_path).is_file():
-        logging.info(f"Loading cached PDB dict from {cache_path}")
+        log.info(f"Loading cached PDB dict from {cache_path}")
         with Path(cache_path).open("rb") as f:
             pdb_dict = pickle.load(f)  # noqa:S301
     else:
         pdb_dict = {}
-        logging.info(f"Creating pdb dict and caching to {cache_path}")
+        log.info(f"Creating pdb dict and caching to {cache_path}")
         for path in tqdm(pdb_paths, desc="Loading PDBs", total=len(pdb_paths)):
             pdb = openmm.app.PDBFile(path)
             assert len(list(pdb.topology.chains())) == 1, "Only single chain PDBs are supported"
@@ -45,11 +47,11 @@ def prepare_and_cache_pdb_dict(
 def prepare_and_cache_topology_dict(pdb_dict: dict[str, openmm.app.PDBFile], cache_path: str) -> dict[str, md.Topology]:
     """Extract mdtraj topologies from PDB dict, caching to disk."""
     if Path(cache_path).is_file():
-        logging.info(f"Loading cached topology dict from {cache_path}")
+        log.info(f"Loading cached topology dict from {cache_path}")
         with Path(cache_path).open("rb") as f:
             topology_dict = pickle.load(f)  # noqa:S301
     else:
-        logging.info(f"Creating topology dict and caching to {cache_path}")
+        log.info(f"Creating topology dict and caching to {cache_path}")
         topology_dict = {}
         for sequence, pdb in tqdm(pdb_dict.items(), desc="Extracting topologies"):
             topology = md.Topology.from_openmm(pdb.topology)
@@ -64,11 +66,11 @@ def prepare_and_cache_topology_dict(pdb_dict: dict[str, openmm.app.PDBFile], cac
 def prepare_and_cache_encodings_dict(topology_dict: dict[str, md.Topology], cache_path: str) -> dict[str, dict]:
     """Compute atom/residue encodings from topologies, caching to disk."""
     if Path(cache_path).is_file():
-        logging.info(f"Loading cached encodings dict from {cache_path}")
+        log.info(f"Loading cached encodings dict from {cache_path}")
         with Path(cache_path).open("rb") as f:
             encodings_dict = pickle.load(f)  # noqa:S301
     else:
-        logging.info(f"Creating encodings dict and caching to {cache_path}")
+        log.info(f"Creating encodings dict and caching to {cache_path}")
         encodings_dict = get_encodings_dict(topology_dict)
         with Path(cache_path).open("wb") as f:
             pickle.dump(encodings_dict, f)
@@ -79,11 +81,11 @@ def prepare_and_cache_encodings_dict(topology_dict: dict[str, md.Topology], cach
 def prepare_and_cache_permutations_dict(topology_dict: dict[str, md.Topology], cache_path: str) -> dict[str, dict]:
     """Compute atom permutations from topologies, caching to disk."""
     if Path(cache_path).is_file():
-        logging.info(f"Loading cached permutations dict from {cache_path}")
+        log.info(f"Loading cached permutations dict from {cache_path}")
         with Path(cache_path).open("rb") as f:
             permutations_dict = pickle.load(f)  # noqa:S301
     else:
-        logging.info(f"Creating permutations dict and caching to {cache_path}")
+        log.info(f"Creating permutations dict and caching to {cache_path}")
         permutations_dict = get_permutations_dict(topology_dict)
         with Path(cache_path).open("wb") as f:
             pickle.dump(permutations_dict, f)

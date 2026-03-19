@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -8,6 +7,10 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+
+from transferable_samplers.utils.pylogger import RankedLogger
+
+log = RankedLogger(__name__, rank_zero_only=True)
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
@@ -51,7 +54,7 @@ def plot_atom_distances(
         ylim: Optional y-axis limits.
         prefix: Metric key prefix.
     """
-    logging.info(f"Plotting interatomic distances for {prefix}")
+    log.info(f"Plotting interatomic distances for {prefix}")
     true_samples_dist = _interatomic_dist(true_samples).cpu()
     min_dist = true_samples_dist.min()
     max_dist = true_samples_dist.max()

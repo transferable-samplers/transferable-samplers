@@ -57,7 +57,7 @@ def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, t
         cfg.paths.output_dir = str(tmp_path)
         cfg.paths.log_dir = str(tmp_path)
         cfg.paths.work_dir = str(Path.cwd())
-        cfg.callbacks.sampling_evaluation.sampler.num_samples = 25
+        cfg.callbacks.sampling_evaluation.sampler.num_samples = 32
         if trainer_name_param == "cpu":
             cfg.callbacks.sampling_evaluation.run_diagnostics_kwargs = {
                 "num_samples_invert": 8,
@@ -68,7 +68,7 @@ def cfg_test_snis_mwe(request: pytest.FixtureRequest, trainer_name_param: str, t
             cfg.callbacks.sampling_evaluation.sampler = OmegaConf.create(
                 {
                     "_target_": "transferable_samplers.samplers.snis_sampler.SNISSampler",
-                    "num_samples": 25,
+                    "num_samples": 32,
                 }
             )
         if "transferable" in experiment_name:

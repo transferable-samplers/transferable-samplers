@@ -49,6 +49,8 @@ callbacks:
       _target_: transferable_samplers.samplers.snis_sampler.SNISSampler
       num_samples: 200_000
       logw_quantile_filter: 0.002
+    evaluator:
+      _target_: transferable_samplers.evaluation.evaluator.PeptideEnsembleEvaluator
   sampling_evaluation:
     sampler:
       _target_: transferable_samplers.samplers.snis_sampler.SNISSampler

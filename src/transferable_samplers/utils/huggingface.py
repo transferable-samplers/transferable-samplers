@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-import logging
 import tarfile
 from pathlib import Path
 
 import numpy as np
 from huggingface_hub import hf_hub_download, snapshot_download
+
+from transferable_samplers.utils.pylogger import RankedLogger
+
+log = RankedLogger(__name__, rank_zero_only=True)
 
 # TODO repos currently hardcoded - slightly hard to remove hardcode from data as assumes repo structure
 REPO_ID = "transferable-samplers/many-peptides-md"
@@ -185,7 +188,7 @@ def download_and_extract_pdb_tarfiles(data_dir: str) -> None:
         data_dir: The top-level data dir in which to build the pdb file subdirectories.
     """
     if not (Path(data_dir) / "pdb_tarfiles").exists():
-        logging.info(f"Downloading PDB tarfiles to {data_dir}")
+        log.info(f"Downloading PDB tarfiles to {data_dir}")
         # Snapshot download automatically avoids re-downloading if already present
         local_path = snapshot_download(
             repo_id=REPO_ID,
@@ -194,12 +197,12 @@ def download_and_extract_pdb_tarfiles(data_dir: str) -> None:
             allow_patterns=["pdb_tarfiles/*"],
             token=True,
         )
-        logging.info(f"Extracting PDB tarfiles to {data_dir}")
+        log.info(f"Extracting PDB tarfiles to {data_dir}")
         for subset in ["train", "val", "test"]:
             tar_filepath = local_path + f"/pdb_tarfiles/{subset}.tar"
             safe_extract_tar(tar_filepath, str(Path(data_dir) / "pdbs"))
     else:
-        logging.info(f"PDB tarfiles already present in {data_dir}")
+        log.info(f"PDB tarfiles already present in {data_dir}")
 
 
 def download_evaluation_data(data_dir: str) -> None:
@@ -208,7 +211,7 @@ def download_evaluation_data(data_dir: str) -> None:
     Args:
         data_dir: The top-level data dir in which to build the evaluation data subdirectories.
     """
-    logging.warning(
+    log.warning(
         "Critical Update\n"
         "The original 8AA TICA models within `subsampled_trajectories/*/8AA/*.npz` employed a CA-only atom selection.\n"
         "These models are not valid for comparison to results in our paper.\n"
@@ -221,7 +224,7 @@ def download_evaluation_data(data_dir: str) -> None:
         "We sincerely apologize for any inconvenience this may have caused."
     )
     if not (Path(data_dir) / "trajectories_subsampled").exists():
-        logging.info(f"Downloading evaluation data to {data_dir}")
+        log.info(f"Downloading evaluation data to {data_dir}")
         # Snapshot download automatically avoids re-downloading if already present
         snapshot_download(
             repo_id=REPO_ID,
@@ -231,10 +234,10 @@ def download_evaluation_data(data_dir: str) -> None:
             token=True,
         )
     else:
-        logging.info(f"Evaluation data already present in {data_dir}")
+        log.info(f"Evaluation data already present in {data_dir}")
 
     # Check TICA shapes for all downloaded files
-    logging.info("Checking TICA model shapes...")
+    log.info("Checking TICA model shapes...")
 
     for subset_key in TICA_MEAN_SHAPES.keys():
         for sequence in TICA_MEAN_SHAPES[subset_key].keys():
@@ -260,4 +263,4 @@ def download_evaluation_data(data_dir: str) -> None:
 
             assert tica_mean_shape == expected_shape, error_message
 
-    logging.info("TICA model shape checks completed successfully.")
+    log.info("TICA model shape checks completed successfully.")

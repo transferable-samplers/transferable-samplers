@@ -1,4 +1,3 @@
-import logging
 import random
 import time
 from typing import Any
@@ -26,12 +25,11 @@ from transferable_samplers.utils.wandb_utils import log_hyperparameters
 torch.set_float32_matmul_precision("highest")  # must be at least high
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
-logging.info(
+logger = RankedLogger(__name__, rank_zero_only=False)
+logger.info(
     "Some numerical settings applied for TarFlow invertibility. No slowdown was "
     "observed for ECNF but other neural networks may be slower than expected."
 )
-# TODO consolidate codebase logging into single library.
-logger = RankedLogger(__name__, rank_zero_only=False)
 
 
 @task_wrapper
@@ -76,7 +74,7 @@ def eval(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
 
     logger.info(f"Instantiating trainer <{cfg.trainer._target_}>")
     trainer: Trainer = hydra.utils.instantiate(
-        cfg.trainer, callbacks=callbacks, logger=loggers, enable_progress_bar=False
+        cfg.trainer, callbacks=callbacks, logger=loggers, enable_progress_bar=True
     )
 
     object_dict = {
