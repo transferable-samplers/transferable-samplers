@@ -1,6 +1,6 @@
 # Design
 
-This page describes how the major components of the codebase fit together: the data module, Lightning module, callbacks, and samplers. The goal is to make the responsibilities of each component clear and explain the design decisions behind the boundaries between them.
+This page describes how the major components of the codebase fit together: the data module, Lightning module, samplers, and callbacks. The goal is to make the responsibilities of each component clear and explain the design decisions behind the boundaries between them.
 
 ?> Transferable samplers builds upon [PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/).
 A major benefit of PyTorch Lightning is in standardizing the components of codebases, aiding both readability and reproducibility.
@@ -8,7 +8,7 @@ As such, we have sought to follow Lightning's preferred design principles where 
 However, the algorithms implemented by transferable samplers do deviate from the typical workflows for which PyTorch Lightning was developed.
 Care was given to deciding the correct boundaries between components in these non-standard configurations, with the hope that the result can be readily read, understood, hacked, and extended.
 
-> **Note:** The architecture is subject to changes as required by new methods.
+> **Note:** Whilst attention has been given to defining a general architecture, changes may be made as required by future methods.
 
 ## Overview
 
@@ -28,10 +28,10 @@ This separation makes it possible to change any one component — swap a sampler
 `BaseDataModule` is an abstract `LightningDataModule` with three required methods:
 
 - `prepare_data()` — download and preprocess (runs in a single process; no state assignment).
-- `setup()` — load datasets and set `self.data_train`, `self.data_val`, `self.data_test`; called before any fit/val/test stage.
+- `setup()` — load datasets and set `self.data_train`; called before any fit/val/test stage. `self.data_val` and `self.data_test` are placeholders - evaluation is handled via callbacks.
 - `prepare_eval(sequence, stage) -> EvalContext` — build a self-contained evaluation context for a given peptide sequence.
 
-The two concrete subclasses — `SinglePeptideDataModule` and `ManyPeptidesDataModule` — only implement these three methods. All dataloader machinery (batch size validation, DDP sharding, WebDataset epoch length) is inherited from the base class.
+The two concrete subclasses — `SinglePeptideDataModule` and `ManyPeptidesDataModule` — only implement these three methods. All dataloader machinery is inherited from the base class.
 
 ?> The placeholder val and test dataloaders exist only to satisfy Lightning's requirements. Real evaluation does not happen through the dataloader loop — it happens through callbacks that call `prepare_eval()` directly. This is intentional, and allows metrics to be recorded for individual systems before aggregation.
 
@@ -64,6 +64,8 @@ Subclasses implement four abstract methods:
 
 Both `NormalizingFlowLitModule` and `FlowMatchLitModule` implement these four methods with identical signatures and semantics, so samplers and evaluators treat them interchangeably.
 
+?> `validation_step` and `test_step` exist only for Lightning compatibility. All evaluation is callback-driven.
+
 ?> Both model types follow the same change-of-variables convention: `logq = logp_prior + dlogp`, where `dlogp` is the log-determinant of the Jacobian (NF) or the trace integral along the ODE trajectory (FM). Energy is uniformly `E = -logq`. For reverse-direction computations, both models consistently subtract the reverse-direction `dlogp`.
 
 ### SourceEnergy
@@ -72,9 +74,8 @@ Both `NormalizingFlowLitModule` and `FlowMatchLitModule` implement these four me
 
 - `sample(num_samples)` — draw proposals in internal batches.
 - `energy(x)` — evaluate `-log q` in internal batches.
-- `energy_and_grad(x)` — evaluate `-log q` and its gradient in internal batches (used by SMC's MCMC kernel).
+- `energy_and_grad(x)` — evaluate `-log q` and its gradient in internal batches.
 
-?> `validation_step` and `test_step` exist only for Lightning compatibility. All evaluation is callback-driven.
 
 ### Replay buffer
 
@@ -86,7 +87,7 @@ For self-improvement training, the model owns a `Buffer` that stores resampled c
 
 ## Samplers
 
-**Responsibility:** generating conformations from a proposal distribution and reweighting them toward a target energy.
+**Responsibility:** generating conformations from a proposal distribution and reweighting / annealing them toward a target energy.
 
 Samplers receive `SourceEnergy` and `TargetEnergy` and return `(samples_dict, diagnostics)`:
 
@@ -94,9 +95,9 @@ Samplers receive `SourceEnergy` and `TargetEnergy` and return `(samples_dict, di
 samples_dict, diagnostics = sampler.sample(source_energy, target_energy)
 ```
 
-`samples_dict` maps names (e.g. `"resampled"`, `"smc"`) to `SamplesData` instances. `diagnostics` is sampler-specific output (e.g. SMC particle trajectory) or `None`.
+`samples_dict` maps names (e.g. `"resampled"`, `"smc"`) to `SamplesData` instances (as expected by the evaluator). `diagnostics` is sampler-specific output (e.g. SMC particle trajectory) or `None`.
 
-?> Samplers own DDP coordination. Particles must be gathered between devices for resampling, and resharded to devices in the case of SMC.
+?> Samplers own DDP coordination, as particles must be gathered between devices for resampling, and resharded to devices in the case of SMC.
 
 The two concrete samplers:
 
@@ -109,7 +110,7 @@ The two concrete samplers:
 
 **Responsibility:** orchestrating sampling, evaluation, and buffer population.
 
-Callbacks are the connective tissue between the otherwise-decoupled components. Because Lightning passes both `trainer` and `pl_module` to every callback hook, callbacks have access to the data module, the model, and the trainer state simultaneously — which is exactly what orchestration requires.
+Callbacks connect the otherwise-decoupled components. Because Lightning passes both `trainer` and `pl_module` to every callback hook, callbacks have access to the data module, the model, and the trainer state simultaneously.
 
 ### LossEvaluationCallback
 
@@ -126,12 +127,10 @@ Runs on `on_validation_epoch_end` and `on_test_epoch_end`. For each sequence in 
 
 ### PopulateBufferCallback
 
-Runs on `on_train_epoch_start` for self-improvement training. Uses the same sampling pattern as `SamplingEvaluationCallback`, but instead of logging metrics it creates a `Buffer` and calls `pl_module.set_buffer()`.
-
-Buffer ownership was a design challenge: populating the buffer requires the current model weights, but the data module has no access to the model. The callback resolves this naturally — it has access to both through Lightning's hook signature. The model simply stores the buffer and draws from it; it does not know or care how the buffer was populated.
+Runs on `on_train_epoch_start` for self-improvement training. Uses the same sampling pattern as `SamplingEvaluationCallback`, but additionally creates a `Buffer` and calls `pl_module.set_buffer()`.
 
 ### EMAWeightAveraging
 
-Maintains an exponential moving average of model weights. When present, `build_source_energy(use_ema_if_available=True)` uses the EMA weights for sampling — this is used in `SamplingEvaluationCallback` so that evaluation uses a more stable model than the instantaneous checkpoint.
+Maintains an exponential moving average of model weights. When present, `build_source_energy(use_ema_if_available=True)` uses the EMA weights in the `SourceEnergy` passed to the sampler.
 
-!> `EMAWeightAveraging` is incompatible with `PopulateBufferCallback`. Self-improvement training does not use EMA.
+!> `EMAWeightAveraging` is incompatible with `PopulateBufferCallback`.

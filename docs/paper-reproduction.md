@@ -23,6 +23,8 @@ uv run python -m transferable_samplers.train experiment=transferable/train/tarfl
 uv run python -m transferable_samplers.train experiment=transferable/train/ecnf++_up_to_4aa
 ```
 
+> **Note:**  These large training experiments benefit from multiple GPUs, pass `trainer=ddp` for distributed data parallel training.
+
 ### Table 2 — SNIS (10k energy evaluations)
 
 
@@ -60,7 +62,7 @@ uv run python -m transferable_samplers.train experiment=transferable/fine-tune/p
 [![arXiv](https://img.shields.io/badge/arXiv-2502.18462-b31b1b)](https://arxiv.org/abs/2502.18462)
 
 
-### Table 2 — (Ace-A-Nme, AAA)
+### Table 2 — Ace-A-Nme, AAA
 
 ```bash
 # ECNF++ — Ace-A-Nme
@@ -82,7 +84,7 @@ uv run python -m transferable_samplers.eval experiment=single_system/eval/tarflo
 
 > To reproduce results averaged over seeds, override `hf_state_dict_path` with `_1` or `_2` (e.g. `hf_state_dict_path=single_system/ecnf++_AAA_1.pth`).
 
-### Table 3 — Tetrapeptides (Ace-AAA-Nme, AAAAAA)
+### Table 3 — Ace-AAA-Nme, AAAAAA
 
 ```bash
 # ECNF++ — Ace-AAA-Nme

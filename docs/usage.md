@@ -1,6 +1,6 @@
 # Usage
 
-> If you haven't already, follow the [Quickstart](/) to install the codebase.
+> If you haven't already, follow the [Quickstart](README.md#quickstart) to install the codebase.
 
 ## Datasets
 
@@ -29,6 +29,8 @@ Train Prose on the ManyPeptidesMD dataset:
 ```bash
 uv run python -m transferable_samplers.train experiment=transferable/train/prose_up_to_8aa
 ```
+
+> **Note:**  Pass `trainer=ddp` for distributed data parallel training.
 
 ### Resuming
 
@@ -87,6 +89,8 @@ uv run python -m transferable_samplers.eval experiment=transferable/eval/prose_u
 ```
 
 In practice it is often more convenient to run each evaluation separately and aggregate the per-system metrics afterwards, rather than running sequentially as a single process.
+
+> **Note:**  All samplers support multiple GPUs - pass `trainer=ddp` for distributed sampling.
 
 ### Self-Improving Sampling
 
