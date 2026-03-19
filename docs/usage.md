@@ -94,14 +94,14 @@ In practice, it is often more convenient to run each evaluation separately and a
 
 ### Self-Improving Sampling
 
-Self-improvement fine-tunes a pretrained model using SNIS-reweighted samples from its own proposal distribution. It uses the same `init_*` arguments as regular finetuning (see above), but with a dedicated experiment config:
+Self-improvement finetunes a pretrained model using SNIS-reweighted samples from its own proposal distribution. It uses the same `init_*` arguments as regular finetuning (see above), but with a dedicated experiment config:
 
 ```bash
 # Default: initialises from pretrained weights on HuggingFace
-uv run python -m transferable_samplers.train experiment=transferable/fine-tune/prose_up_to_8aa_self_improve
+uv run python -m transferable_samplers.train experiment=transferable/finetune/prose_up_to_8aa_self_improve
 
 # Override with a local checkpoint (.ckpt)
-uv run python -m transferable_samplers.train experiment=transferable/fine-tune/prose_up_to_8aa_self_improve init_ckpt_path=/path/to/checkpoint.ckpt
+uv run python -m transferable_samplers.train experiment=transferable/finetune/prose_up_to_8aa_self_improve init_ckpt_path=/path/to/checkpoint.ckpt
 ```
 
 To resume a self-improvement run, pass `resume_ckpt_path` as with regular training.

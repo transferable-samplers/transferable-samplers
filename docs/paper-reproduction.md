@@ -54,7 +54,7 @@ uv run python -m transferable_samplers.eval experiment=transferable/eval/prose_u
 uv run python -m transferable_samplers.eval experiment=transferable/eval/prose_up_to_8aa_mala
 
 # Self-improving SNIS
-uv run python -m transferable_samplers.train experiment=transferable/fine-tune/prose_up_to_8aa_self_improve
+uv run python -m transferable_samplers.train experiment=transferable/finetune/prose_up_to_8aa_self_improve
 ```
 
 ## Scalable Equilibrium Sampling with Sequential Boltzmann Generators

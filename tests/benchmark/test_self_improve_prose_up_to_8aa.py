@@ -27,7 +27,7 @@ def test_self_improve_prose_up_to_8aa(trainer_name_param: str, tmp_path: Path) -
     cfg = compose_config(
         config_name="train",
         overrides=[
-            "experiment=transferable/fine-tune/prose_up_to_8aa_self_improve.yaml",
+            "experiment=transferable/finetune/prose_up_to_8aa_self_improve.yaml",
             f"trainer={trainer_name_param}",
         ],
     )
