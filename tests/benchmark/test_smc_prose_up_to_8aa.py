@@ -1,14 +1,18 @@
 """Benchmark: SMC evaluation for transferable Prose on up_to_8aa with MALA.
 
-Paper reference values on ARIP.
-    SMC:
-        energy-w2: 3.563
-        tica-w2:   0.459
-        torus-w2:  0.763
-    Proposal:
-        energy-w2: 552396672
-        tica-w2:   0.688
-        torus-w2:  1.986
+SMC metrics on ARIP. Refactor values: 5 seeds (42, 123, 456, 789, 1024), 20th March 2026.
+
+Metric     | Paper* | Refactor (mean ± std)
+---------- | ------ | ----------------------
+energy-w2  | 3.563  | 1.282  ± 0.252
+torus-w2   | 0.763  | 0.619  ± 0.082
+tica-w2    | 0.459  | 0.308  ± 0.091
+
+*Paper values are those used in the 4AA mean values in
+Table 4 of Amortized Sampling with Transferable Normalizing Flows
+https://arxiv.org/abs/2508.18175
+
+Comments: I am investigating the increase in performance, it may be due to differing model weights employed.
 """
 
 import os
@@ -21,6 +25,12 @@ from omegaconf import open_dict
 # pyrefly: ignore [missing-import]
 from tests.helpers.utils import compose_config, extract_test_sequence
 from transferable_samplers.eval import eval
+
+REFERENCE = {
+    "smc/energy-w2": (1.282, 0.252),
+    "smc/torus-w2": (0.619, 0.082),
+    "smc/tica-w2": (0.308, 0.091),
+}
 
 
 @pytest.mark.benchmark
@@ -47,6 +57,15 @@ def test_smc_prose_up_to_8aa(trainer_name_param: str, tmp_path: Path) -> None:
 
     test_sequence = extract_test_sequence(cfg)
     assert f"test/{test_sequence}/smc/median-energy" in metrics
+
+    for suffix, (ref_mean, ref_std) in REFERENCE.items():
+        key = f"test/{test_sequence}/{suffix}"
+        assert key in metrics, f"{key} missing from metrics"
+        val = float(metrics[key])
+        lo, hi = ref_mean - 2.5 * ref_std, ref_mean + 2.5 * ref_std
+        assert lo <= val <= hi, (
+            f"{key}={val:.4f} outside 2.5σ range [{lo:.4f}, {hi:.4f}] (ref {ref_mean:.4f}±{ref_std:.4f})"
+        )
 
     print("\n--- Benchmark metrics ---")
     for key in sorted(metrics):
