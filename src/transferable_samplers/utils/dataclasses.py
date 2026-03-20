@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import math
+import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import scipy.special
 import torch
 import torch.utils._pytree as pytree
-from tqdm import tqdm
 
 from transferable_samplers.utils.standardization import destandardize_coords
 
@@ -55,7 +55,11 @@ class TargetEnergy:
 
 @dataclass(frozen=True)
 class SourceEnergyConfig:
-    """Configuration for SourceEnergy batch sizes. Passed via Hydra configs."""
+    """Configuration for SourceEnergy batch sizes. Passed via Hydra configs.
+
+    All batch sizes are global (across all devices), following Lightning convention.
+    SourceEnergy.__post_init__ divides by world_size to get per-device batch sizes.
+    """
 
     sample_batch_size: int
     energy_batch_size: int
@@ -68,7 +72,8 @@ class SourceEnergy:
     """Source (proposal) energy and sampling, provided by the lightning module.
 
     Created via BaseLightningModule.build_source_energy(). Handles batching
-    internally for sample, energy, and energy_and_grad.
+    internally for sample, energy, and energy_and_grad. Batch sizes are global
+    (following Lightning convention) and divided by world_size in __post_init__.
     """
 
     sample_fn: Callable  # (num_samples) -> (samples, E_source)
@@ -77,6 +82,24 @@ class SourceEnergy:
     energy_batch_size: int
     grad_batch_size: int
     use_com_adjustment: bool = False
+    world_size: int = field(init=False, default=1)
+
+    def __post_init__(self) -> None:
+        from transferable_samplers.utils.dist_utils import get_world_size
+
+        self.world_size = get_world_size()
+        assert self.sample_batch_size % self.world_size == 0, (
+            f"sample_batch_size ({self.sample_batch_size}) must be divisible by world_size ({self.world_size})"
+        )
+        assert self.energy_batch_size % self.world_size == 0, (
+            f"energy_batch_size ({self.energy_batch_size}) must be divisible by world_size ({self.world_size})"
+        )
+        assert self.grad_batch_size % self.world_size == 0, (
+            f"grad_batch_size ({self.grad_batch_size}) must be divisible by world_size ({self.world_size})"
+        )
+        self.sample_batch_size = self.sample_batch_size // self.world_size
+        self.energy_batch_size = self.energy_batch_size // self.world_size
+        self.grad_batch_size = self.grad_batch_size // self.world_size
 
     @staticmethod
     def com_energy_adjustment(x: torch.Tensor) -> torch.Tensor:
@@ -99,22 +122,35 @@ class SourceEnergy:
         )
 
     def sample(self, num_samples: int, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
-        """Generate num_samples proposals in batches.
+        """Generate num_samples proposals in batches on this device.
+
+        num_samples is per-device: each device independently generates num_samples,
+        and the caller is responsible for all_gather if a global view is needed.
 
         If use_com_adjustment is True, applies a CoM energy adjustment
         using std = 1/sqrt(num_atoms), as per Prop. 1 of https://arxiv.org/pdf/2502.18462.
         """
+        num_batches = math.ceil(num_samples / self.sample_batch_size)
+        print(
+            f"sampling {num_batches} batches of {self.sample_batch_size} samples per device, "
+            f"total {num_samples} samples per device {num_samples * self.world_size} samples."
+        )
+
         all_samples, all_E = [], []
         remaining = num_samples
-        pbar = tqdm(total=num_samples, desc="Sampling proposals", unit="sample")
+        batch_idx = 0
         while remaining > 0:
             n = min(self.sample_batch_size, remaining)
+            t0 = time.perf_counter()
             s, e = self.sample_fn(n, **kwargs)
+            elapsed = time.perf_counter() - t0
+            throughput = n / elapsed if elapsed > 0 else float("inf")
+            batch_idx += 1
+            print(f"sample batch {batch_idx}/{num_batches}. {throughput:.1f} samples / s")
             all_samples.append(s)
             all_E.append(e)
             remaining -= n
-            pbar.update(n)
-        pbar.close()
+
         samples = torch.cat(all_samples, dim=0)
         E_source = torch.cat(all_E, dim=0)
 
@@ -124,7 +160,10 @@ class SourceEnergy:
         return samples, E_source
 
     def energy(self, x: torch.Tensor, batch_size: int | None = None) -> torch.Tensor:
-        """Compute energy in batches.
+        """Compute energy in batches on this device.
+
+        x is per-device: each device independently evaluates its local samples.
+        The caller is responsible for all_gather if a global view is needed.
 
         If use_com_adjustment is True, applies a CoM energy adjustment
         using std = 1/sqrt(num_atoms), as per Prop. 1 of https://arxiv.org/pdf/2502.18462.
@@ -140,7 +179,10 @@ class SourceEnergy:
         return out
 
     def energy_and_grad(self, x: torch.Tensor, batch_size: int | None = None) -> tuple[torch.Tensor, torch.Tensor]:
-        """Compute energy and gradient in batches.
+        """Compute energy and gradient in batches on this device.
+
+        x is per-device: each device independently evaluates its local samples.
+        The caller is responsible for all_gather if a global view is needed.
 
         If use_com_adjustment is True, applies a CoM energy adjustment
         using std = 1/sqrt(num_atoms), as per Prop. 1 of https://arxiv.org/pdf/2502.18462.

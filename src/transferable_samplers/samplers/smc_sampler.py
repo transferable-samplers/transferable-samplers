@@ -107,6 +107,11 @@ class SMCSampler(BaseSampler):
         """Run SMC sampling sampling."""
         # Generate proposal
         world_size = get_world_size()
+        if self.num_samples % world_size != 0:
+            raise ValueError(
+                f"SMCSampler.num_samples ({self.num_samples}) must be divisible by "
+                f"world_size ({world_size}) to avoid under-sampling."
+            )
         loc_num_samples = self.num_samples // world_size
         loc_samples, loc_E_source = source_energy.sample(loc_num_samples)
 

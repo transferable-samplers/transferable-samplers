@@ -210,14 +210,12 @@ class BaseLightningModule(LightningModule):
         assert self.source_energy_config is not None, "source_energy_config must be set to build SourceEnergy."
         net = self._build_net_copy(use_ema_if_available=use_ema_if_available)
 
-        world_size = self.trainer.world_size if self.trainer is not None else 1
-
         return SourceEnergy(
             sample_fn=partial(self.generate_proposal, net, system_cond=system_cond),
             energy_fn=partial(self.proposal_energy, net, system_cond=system_cond),
-            sample_batch_size=self.source_energy_config.sample_batch_size // world_size,
-            energy_batch_size=self.source_energy_config.energy_batch_size // world_size,
-            grad_batch_size=self.source_energy_config.grad_batch_size // world_size,
+            sample_batch_size=self.source_energy_config.sample_batch_size,
+            energy_batch_size=self.source_energy_config.energy_batch_size,
+            grad_batch_size=self.source_energy_config.grad_batch_size,
             use_com_adjustment=self.source_energy_config.use_com_adjustment,
         )
 
