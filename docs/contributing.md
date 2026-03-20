@@ -4,6 +4,12 @@ Thank you for your interest in contributing!
 
 We welcome bug reports, pull requests, and improvements of all kinds.
 
+## Contributing a Dataset or Method
+
+Our hope is for this to become a community-driven project, and we'd be excited to hear from anyone interested in contributing a dataset or model/method.
+
+We haven't finalised a process for this yet, but as a rule of thumb: any sampling-related dataset or method with published results (preprints and workshop papers are fine!) is a good candidate. If you have something in mind, please open an issue or reach out, and we'd be happy to discuss.
+
 ## Development Setup
 
 Clone the repository and install in editable mode:
@@ -97,6 +103,20 @@ Architecture and design tests (e.g. NF invertibility, dlogp consistency):
 
 ```bash
 uv run pytest -m optional -v
+```
+
+### Test coverage
+
+Run the essential suite with branch coverage:
+
+```bash
+PYTEST_TRAINER=cpu uv run pytest -m essential --cov --cov-report=html --cov-report=xml -v
+```
+
+Open the HTML report after the run:
+
+```bash
+open htmlcov/index.html
 ```
 
 ### Updating config snapshots

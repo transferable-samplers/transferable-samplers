@@ -19,6 +19,23 @@ markers = [
     "optional: architectural/design tests",
 ]
 
+[tool.coverage.run]
+source = ["transferable_samplers"]
+branch = true
+omit = ["*/tests/*", "*/migrations/*"]
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
+[tool.coverage.json]
+output = "coverage.json"
+
 # ----------------------------------------
 # Ruff configuration (migrated from ruff.toml)
 # ----------------------------------------

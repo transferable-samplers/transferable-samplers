@@ -10,6 +10,18 @@ Care was given to deciding the correct boundaries between components in these no
 
 > Whilst attention has been given to defining a general architecture, changes may be made as required by future methods.
 
+## Motivation
+
+Learned samplers have typically lived in separate per-project repositories, making it challenging to fairly compare approaches, build on prior work, or understand the similarities and differences between methods. By bringing samplers together under a shared architecture, we hope to make those similarities and differences clear, whilst retaining a performant codebase on which to iterate further.
+
+With that in mind, we've strived for the following:
+
+1. **Clarity** — code should be easy to read, understand, and extend; a unified codebase can be a helpful educational resource.
+2. **Performance** — designed to scale: efficiently run experiments across multiple GPUs.
+3. **Reproducibility** — an extensive testing suite, including benchmark tests pinned to values from published papers.
+
+Our hope is that the codebase can serve as a stable foundation for the community to build onwards, whilst preserving correct reference implementations of earlier methods.
+
 ## Overview
 
 To the greatest practical extent, we have aimed for **each component to own only a single concern**.
