@@ -88,6 +88,10 @@ class PopulateBufferCallback(Callback):
             pl_module.log_dict(metrics)
             plt.close("all")
 
+        # Evaluator only runs on rank 0 — barrier before proceeding so all ranks are aligned
+        if torch.distributed.is_initialized():
+            torch.distributed.barrier()
+
         batch_transform = getattr(datamodule, "buffer_transforms", None)
 
         # SMC is much more costly, just assume we want to use it if present.

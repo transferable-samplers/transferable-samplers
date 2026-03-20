@@ -123,6 +123,10 @@ class SamplingEvaluationCallback(Callback):
                 pl_module.log_dict(seq_metrics)
                 all_metrics.update(seq_metrics)
 
+            # Evaluator / diagnostics only run on rank 0 — barrier before next sequence so all ranks are aligned
+            if torch.distributed.is_initialized():
+                torch.distributed.barrier()
+
             del eval_ctx
 
         if trainer.is_global_zero:

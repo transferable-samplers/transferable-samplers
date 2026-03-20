@@ -83,15 +83,24 @@ class LossEvaluationCallback(Callback):
 
             if trainer.is_global_zero:
                 key = f"{prefix}/{sequence}/eval-loss"
-                all_metrics[key] = local_mean.item()
-                logger.info(f"{key}: {local_mean.item():.6f}")
+                value = local_mean.item()
+                all_metrics[key] = value
+                pl_module.log_dict({key: value})
+                logger.info(f"{key}: {value:.6f}")
+
+            # Logging only runs on rank 0 — barrier so all ranks are aligned before next sequence
+            if torch.distributed.is_initialized():
+                torch.distributed.barrier()
 
             del eval_ctx
 
         if trainer.is_global_zero:
-            pl_module.log_dict(all_metrics)
             mean_metrics = compute_mean_metrics(all_metrics, prefix=prefix)
             pl_module.log_dict(mean_metrics)
+
+        # Logging only runs on rank 0 — barrier so all ranks are aligned before returning
+        if torch.distributed.is_initialized():
+            torch.distributed.barrier()
 
     @staticmethod
     def _build_batch(
