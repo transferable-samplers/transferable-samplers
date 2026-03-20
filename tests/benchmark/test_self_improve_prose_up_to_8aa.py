@@ -52,7 +52,7 @@ def test_self_improve_prose_up_to_8aa(trainer_name_param: str, tmp_path: Path) -
         cfg.paths.work_dir = str(Path.cwd())
         cfg.data.test_sequences = "ARIP"
         cfg.seed = int(os.environ.get("PYTEST_SEED", 42))
-        cfg.tags = ["pytest", "benchmark_self_improve"]
+        cfg.tags = ["pytest", "benchmark", "benchmark_self_improve_prose_up_to_8aa"]
 
     metrics, _ = train(cfg)
     GlobalHydra.instance().clear()

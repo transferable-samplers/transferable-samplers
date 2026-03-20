@@ -50,7 +50,7 @@ def test_smc_prose_up_to_8aa(trainer_name_param: str, tmp_path: Path) -> None:
         cfg.model.source_energy_config.energy_batch_size = 128
         cfg.model.source_energy_config.grad_batch_size = 64
         cfg.seed = int(os.environ.get("PYTEST_SEED", 42))
-        cfg.tags = ["pytest", "benchmark_smc"]
+        cfg.tags = ["pytest", "benchmark", "benchmark_smc_prose_up_to_8aa"]
 
     # pyrefly: ignore [bad-argument-type]
     metrics, _ = eval(cfg)

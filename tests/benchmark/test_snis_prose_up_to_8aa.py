@@ -49,7 +49,7 @@ def _make_cfg(trainer_name_param: str, tmp_path: Path, seed: int = 42):
         cfg.callbacks.sampling_evaluation.sampler.num_samples = 10_000
         cfg.data.test_sequences = "ARIP"
         cfg.seed = seed
-        cfg.tags = ["pytest", "benchmark_snis"]
+        cfg.tags = ["pytest", "benchmark", "benchmark_snis_prose_up_to_8aa"]
     return cfg
 
 
