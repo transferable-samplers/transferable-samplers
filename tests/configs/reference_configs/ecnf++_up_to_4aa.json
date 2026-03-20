@@ -264,6 +264,7 @@
     "default_root_dir": "${paths.output_dir}",
     "deterministic": false,
     "devices": 1,
+    "enable_progress_bar": false,
     "gradient_clip_val": 1.0,
     "inference_mode": false,
     "limit_test_batches": 1,
@@ -271,6 +272,7 @@
     "limit_val_batches": 1,
     "max_epochs": 500,
     "min_epochs": 1,
+    "num_sanity_val_steps": 0,
     "plugins": [
       {
         "_target_": "lightning.pytorch.plugins.environments.SLURMEnvironment",

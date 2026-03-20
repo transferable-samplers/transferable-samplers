@@ -4,3 +4,6 @@ pre-commit>=3.6
 # --- JUnit utilities ---
 junit2html>=0.3
 junitparser>=3.2
+
+# --- Coverage ---
+pytest-cov>=7.0
