@@ -93,12 +93,14 @@ class PeptideEnsembleEvaluator:
             if data is not None
         }
 
-        # Fix chirality on proposal samples if present
-        proposal_data = samples_data_dict.get("proposal")
-        if proposal_data is not None:
-            proposal_data, symmetry_metrics = self._fix_chirality(proposal_data, true_data, topology, prefix)
-            metrics.update(symmetry_metrics)
-            samples_data_dict = {**samples_data_dict, "proposal": proposal_data}
+        # Fix chirality on all sample sets; record symmetry metrics from proposal
+        for name, data in samples_data_dict.items():
+            if data is None:
+                continue
+            fixed_data, symmetry_metrics = self._fix_chirality(data, true_data, topology, prefix)
+            if name == "proposal":
+                metrics.update(symmetry_metrics)
+            samples_data_dict = {**samples_data_dict, name: fixed_data}
 
         # Plot true data
         if self.do_plots and log_image_fn is not None:
