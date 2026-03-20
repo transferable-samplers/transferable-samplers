@@ -86,7 +86,7 @@ def prepare_and_cache_permutations_dict(topology_dict: dict[str, md.Topology], c
             permutations_dict = pickle.load(f)  # noqa:S301
     else:
         logger.info(f"Creating permutations dict and caching to {cache_path}")
-        permutations_dict = get_permutations_dict(topology_dict)
+        permutations_dict = get_permutations_dict(topology_dict, show_progress=True)
         with Path(cache_path).open("wb") as f:
             pickle.dump(permutations_dict, f)
 

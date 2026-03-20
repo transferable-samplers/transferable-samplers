@@ -245,7 +245,9 @@ def get_permutation(
     return permutation
 
 
-def get_permutations_dict(topology_dict: dict[str, Any]) -> dict[str, dict[str, torch.Tensor]]:
+def get_permutations_dict(
+    topology_dict: dict[str, Any], show_progress: bool = False
+) -> dict[str, dict[str, torch.Tensor]]:
     """Generate all permutation variants for every sequence in a topology dict.
 
     Produces permutations for all combinations of sequence ordering, global
@@ -264,7 +266,8 @@ def get_permutations_dict(topology_dict: dict[str, Any]) -> dict[str, dict[str, 
     configs = list(product(sequence_orderings, global_types, sidechain_variants))
     total = len(configs) * len(topology_dict)  # total number of permutations to generate
 
-    with tqdm(total=total, desc="Generating permutations") as pbar:  # progress bar for tracking progress
+    # Disable progress bar if show_progress is False, otherwise show it (avoids tqdm in DataModule.prepare_eval() which is called by all devices)
+    with tqdm(total=total, desc="Generating permutations", disable=not show_progress) as pbar:  # progress bar for tracking progress
         for sequence_ordering, global_type, sidechain_variant in configs:
             residue_cache = {}  # New cache for each configuration
             for sequence, topology in topology_dict.items():
