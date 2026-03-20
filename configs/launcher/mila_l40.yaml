@@ -12,6 +12,4 @@ hydra:
     array_parallelism: 100 # max num of tasks to run in parallel (via job array)
     setup:
       - module purge
-      - module load miniconda/3
-      - module load cudatoolkit/12.4
-      - micromamba activate tbg3
+      - source .venv/bin/activate
