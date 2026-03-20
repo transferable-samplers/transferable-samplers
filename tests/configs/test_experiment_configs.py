@@ -25,11 +25,11 @@ REFERENCE_DIR = Path(__file__).resolve().parent / "reference_configs"
 
 # Auto-discover all experiment YAML files
 TRAINING_EXPERIMENTS = sorted(str(p.relative_to(EXPERIMENT_DIR)) for p in EXPERIMENT_DIR.glob("*/train/**/*.yaml"))
-FINETUNE_EXPERIMENTS = sorted(str(p.relative_to(EXPERIMENT_DIR)) for p in EXPERIMENT_DIR.glob("*/fine-tune/**/*.yaml"))
+FINETUNE_EXPERIMENTS = sorted(str(p.relative_to(EXPERIMENT_DIR)) for p in EXPERIMENT_DIR.glob("*/finetune/**/*.yaml"))
 EVALUATION_EXPERIMENTS = sorted(str(p.relative_to(EXPERIMENT_DIR)) for p in EXPERIMENT_DIR.glob("*/eval/**/*.yaml"))
 ALL_EXPERIMENTS = (
     [("train", exp) for exp in TRAINING_EXPERIMENTS]
-    + [("train", exp) for exp in FINETUNE_EXPERIMENTS]  # fine-tune uses the train entrypoint
+    + [("train", exp) for exp in FINETUNE_EXPERIMENTS]  # finetune uses the train entrypoint
     + [("eval", exp) for exp in EVALUATION_EXPERIMENTS]
 )
 ALL_EXPERIMENT_IDS = [Path(exp).stem for _, exp in ALL_EXPERIMENTS]
