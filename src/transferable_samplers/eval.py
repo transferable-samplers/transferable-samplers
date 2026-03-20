@@ -74,7 +74,7 @@ def eval(cfg: DictConfig) -> tuple[dict[str, Any], dict[str, Any]]:
 
     logger.info(f"Instantiating trainer <{cfg.trainer._target_}>")
     trainer: Trainer = hydra.utils.instantiate(
-        cfg.trainer, callbacks=callbacks, logger=loggers, enable_progress_bar=True
+        cfg.trainer, callbacks=callbacks, logger=loggers
     )
 
     object_dict = {
