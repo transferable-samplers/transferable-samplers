@@ -9,7 +9,7 @@ import torch
 
 from transferable_samplers.utils.pylogger import RankedLogger
 
-log = RankedLogger(__name__, rank_zero_only=True)
+logger = RankedLogger(__name__, rank_zero_only=True)
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
@@ -31,7 +31,7 @@ def plot_com_norms(
         ylim: Optional y-axis limits.
         prefix: Metric key prefix.
     """
-    log.info(f"Plotting com norms for {prefix}")
+    logger.info(f"Plotting com norms for {prefix}")
 
     fig, ax = plt.subplots(figsize=(4, 3), dpi=300, constrained_layout=True)
     fig.patch.set_facecolor("white")

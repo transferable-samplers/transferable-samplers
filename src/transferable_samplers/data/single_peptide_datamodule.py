@@ -22,7 +22,7 @@ from transferable_samplers.data.transforms.standardize import StandardizeTransfo
 from transferable_samplers.utils.dataclasses import EvalContext, SamplesData, TargetEnergy
 from transferable_samplers.utils.pylogger import RankedLogger
 
-log = RankedLogger(__name__, rank_zero_only=True)
+logger = RankedLogger(__name__, rank_zero_only=True)
 
 
 class SinglePeptideDataModule(BaseDataModule):
@@ -96,7 +96,7 @@ class SinglePeptideDataModule(BaseDataModule):
         """
         required_files = [self.train_data_path, self.val_data_path, self.test_data_path, self.pdb_path]
         if all(Path(f).exists() for f in required_files):
-            log.info(f"All required files already exist for {self.trajectory_name}, skipping download.")
+            logger.info(f"All required files already exist for {self.trajectory_name}, skipping download.")
             return
 
         Path(f"{self.data_dir}/{self.repo_name}").mkdir(parents=True, exist_ok=True)
@@ -108,7 +108,7 @@ class SinglePeptideDataModule(BaseDataModule):
             allow_patterns=[f"{self.trajectory_name}/*"],
             token=True,
         )
-        log.info(f"Downloaded dataset to {local_dir}")
+        logger.info(f"Downloaded dataset to {local_dir}")
 
     def setup(self, stage: str | None = None) -> None:
         """Load trajectory data and compute standardization statistics.
@@ -178,7 +178,7 @@ class SinglePeptideDataModule(BaseDataModule):
                 transform=train_transforms,
             )
 
-        log.info(f"Train dataset size: {len(self.data_train)}")
+        logger.info(f"Train dataset size: {len(self.data_train)}")
 
     def prepare_eval(self, sequence: str, stage: str) -> EvalContext:
         """Prepare evaluation data and energy function for validation or test trajectories."""

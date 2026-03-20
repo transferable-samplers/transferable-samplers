@@ -20,7 +20,7 @@ import torch
 
 from transferable_samplers.utils.pylogger import RankedLogger
 
-log = RankedLogger(__name__, rank_zero_only=True)
+logger = RankedLogger(__name__, rank_zero_only=True)
 
 SELECTION = "symbol == C or symbol == N or symbol == S"
 
@@ -43,7 +43,7 @@ def tica_features(
 ) -> np.ndarray | list[Any]:
     """Compute TICA input features (distances and/or wrapped dihedrals) from a trajectory."""
     if trajectory.topology.n_residues == 8:
-        log.warning("The 8AA TICA models no longer use the CA-only selection, aligning with the 2AA / 4AA models.")
+        logger.warning("The 8AA TICA models no longer use the CA-only selection, aligning with the 2AA / 4AA models.")
     trajectory = trajectory.atom_slice(trajectory.top.select(selection))
     if use_dihedrals:
         _, phi = md.compute_phi(trajectory)
@@ -109,6 +109,6 @@ def get_tica_model(data: torch.Tensor, topology: md.Topology) -> Any:
     traj_samples = md.Trajectory(data, topology=topology)
 
     tica_model = _run_tica_cns(traj_samples, lagtime=100, dim=2)
-    log.info("Using all C,N,S atoms for TICA")
+    logger.info("Using all C,N,S atoms for TICA")
 
     return tica_model

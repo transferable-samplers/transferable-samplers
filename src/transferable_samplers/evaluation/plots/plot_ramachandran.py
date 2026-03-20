@@ -12,7 +12,7 @@ from matplotlib.colors import LogNorm
 from transferable_samplers.evaluation.metrics.wasserstein_distances import _get_phi_psi_vectors as get_phi_psi_vectors
 from transferable_samplers.utils.pylogger import RankedLogger
 
-log = RankedLogger(__name__, rank_zero_only=True)
+logger = RankedLogger(__name__, rank_zero_only=True)
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
@@ -32,7 +32,7 @@ def plot_ramachandran(
         topology: mdtraj topology for dihedral computation.
         prefix: Metric key prefix.
     """
-    log.info(f"Plotting Ramachandran for {prefix}")
+    logger.info(f"Plotting Ramachandran for {prefix}")
     prefix += "/rama"
 
     phis, psis = get_phi_psi_vectors(samples, topology)
