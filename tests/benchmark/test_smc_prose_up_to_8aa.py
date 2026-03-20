@@ -1,6 +1,7 @@
 """Benchmark: SMC evaluation for transferable Prose on up_to_8aa with MALA.
 
 SMC metrics on ARIP. Refactor values: 5 seeds (42, 123, 456, 789, 1024), 20th March 2026.
+Commit: refactor@d85ecf16d76c97040d03f66c651a8f55b63cf671
 
 Metric     | Paper* | Refactor (mean ± std)
 ---------- | ------ | ----------------------
