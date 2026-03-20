@@ -59,27 +59,35 @@ This project uses **pytest** with Hydra integration. Tests are organised into ma
 
 ### Essential tests
 
-Essential tests cover config validation, model asset checks, and minimum working example (MWE) pipelines. Run them on CPU first:
+Essential tests cover config validation, model asset checks, and minimum working example (MWE) pipelines. GPU is the preferred way to run the full essential suite:
+
+```bash
+PYTEST_TRAINER=gpu uv run pytest -m essential -v
+```
+
+CPU can be used as a rapid sanity check or where a GPU is not available. ECNF++ SNIS MWE experiments are too slow on CPU and are automatically skipped.
 
 ```bash
 PYTEST_TRAINER=cpu uv run pytest -m essential -v
 ```
 
-A subset of these tests can be checked on GPU or DDP:
+DDP runs only the MWE tests (config and asset tests are skipped). This is useful for catching bugs specific to distributed execution.
 
 ```bash
-PYTEST_TRAINER=gpu uv run pytest -m essential -v
 PYTEST_TRAINER=ddp uv run pytest -m essential -v
 ```
 
-> Only the MWE tests are considered essential on GPU / DDP; config and asset tests are skipped.
-
 ### Benchmark tests
 
-Benchmark tests run full experiment configs and validate metrics against published results:
+Benchmark tests run full experiment configs and validate metrics against reference values from stable codebase versions, as well as published paper results.
 
 ```bash
 PYTEST_TRAINER=gpu uv run pytest -m benchmark -v
+```
+
+To check for performance degradation from incorrect distributed implementation:
+
+```bash
 PYTEST_TRAINER=ddp uv run pytest -m benchmark -v
 ```
 
