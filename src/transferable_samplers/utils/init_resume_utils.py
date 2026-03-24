@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from pathlib import Path
 
+import filelock
 import torch
 
 from transferable_samplers.utils.huggingface import download_weights
@@ -49,6 +50,10 @@ def load_state_dict_from_file(path: str) -> dict[str, torch.Tensor]:
 def load_state_dict_from_hf(hf_filepath: str, scratch_dir: str) -> dict[str, torch.Tensor]:
     """Download a state dict from HuggingFace Hub and return it.
 
+    Uses a file lock so concurrent DDP processes don't race on the download.
+    ``dist`` is not yet initialized when this is called (it's called before
+    ``trainer.test/fit``), so we use a filesystem lock instead of a barrier.
+
     Args:
         hf_filepath: The filepath within the HuggingFace repo.
         scratch_dir: Local scratch directory used to cache downloaded weights.
@@ -57,7 +62,9 @@ def load_state_dict_from_hf(hf_filepath: str, scratch_dir: str) -> dict[str, tor
         The loaded state dict.
     """
     dst_dir = str(Path(scratch_dir) / "model-weights")
-    local_path = download_weights(hf_filepath=hf_filepath, destination_dir=dst_dir)
+    lock_path = str(Path(scratch_dir) / ".hf_download.lock")
+    with filelock.FileLock(lock_path):
+        local_path = download_weights(hf_filepath=hf_filepath, destination_dir=dst_dir)
     return load_state_dict_from_file(local_path)
 
 
