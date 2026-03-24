@@ -21,7 +21,7 @@ Path(report_dir).mkdir(parents=True, exist_ok=True)
 # Used to inject trainer name parameter into tests
 @pytest.fixture(
     scope="session",
-    params=[os.environ.get("PYTEST_TRAINER", "gpu" if torch.cuda.is_available() else "cpu")],
+    params=[os.environ.get("PYTEST_TRAINER", "cpu")],  # default to "cpu" if not set
     ids=lambda x: x,
 )
 def trainer_name_param(request):

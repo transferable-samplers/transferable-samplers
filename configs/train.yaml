@@ -14,7 +14,7 @@ defaults:
   - launcher:
   # experiment configs allow for version control of specific hyperparameters
   # e.g. best hyperparameters for given model and datamodule
-  - experiment:
+  - experiment: single_system/train/ecnf++_Ace-A-Nme
   # config for hyperparameter optimization
   - hparams_search:
   # optional local config for machine/user specific settings

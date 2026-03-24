@@ -204,14 +204,18 @@ class SMCSampler(BaseSampler):
             # Collect particle snapshot at log_traj_freq intervals
             if not (j + 1) % self.log_traj_freq:
                 temp_particles = all_gather_particles(loc_particles)
+                if get_rank() == 0:
+                    logger.info("Gathered particles from workers for trajectory logging.")
                 trajectory.append(temp_particles)
 
             # Resampling when ESS drops below threshold, or always on the final step
             is_final = j + 1 == self.num_annealing_steps
             if ess < self.ess_threshold or is_final:
-                particles = all_gather_particles(loc_particles)  # global
+                particles = all_gather_particles(loc_particles)
                 if get_rank() == 0:
+                    logger.info("Gathered particles from workers for resampling.")
                     indices = resampling_idx(particles.logw, self.resampling_method)
+                    logger.info(f"Resampled particles at t={t:.3f} with ESS={ess:.2f}")
                 else:
                     indices = torch.zeros(len(particles), dtype=torch.long, device=loc_particles.x.device)
                 indices = broadcast_tensor(indices, src=0)
@@ -220,8 +224,9 @@ class SMCSampler(BaseSampler):
                 trajectory.append(resampled)  # global
                 if not is_final:
                     resampled = shard_tensor(resampled)
+                    if get_rank() == 0:
+                        logger.info("Sharded particles to workers.")
                 loc_particles = resampled
-                logger.info(f"Resampled particles at t={t:.3f} with ESS={ess:.2f}")
 
             t_previous = t
 

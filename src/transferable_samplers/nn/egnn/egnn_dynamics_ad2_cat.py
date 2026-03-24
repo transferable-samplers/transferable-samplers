@@ -71,20 +71,20 @@ class EGNN_dynamics_AD2_cat(nn.Module):
             atom_types[[1, 2, 3]] = 2
             atom_types[[11, 12, 13]] = 12
             atom_types[[19, 20, 21]] = 20
-        if self._n_particles == 33:
+        elif self._n_particles == 33:
             atom_types = np.arange(33)
             atom_types[[1, 2, 3]] = 2
             atom_types[[9, 10, 11]] = 10
             atom_types[[19, 20, 21]] = 20
             atom_types[[29, 30, 31]] = 30
-        if self._n_particles == 42:
+        elif self._n_particles == 42:
             atom_types = np.arange(42)
             atom_types[[1, 2, 3]] = 2
             atom_types[[11, 12, 13]] = 12
             atom_types[[21, 22, 23]] = 22
             atom_types[[31, 32, 33]] = 32
             atom_types[[39, 40, 41]] = 40
-        if self._n_particles == 63:
+        elif self._n_particles == 63:
             atom_types = np.arange(63)
             atom_types[[1, 2, 3]] = 2
             atom_types[[7, 8, 9]] = 8
@@ -93,6 +93,8 @@ class EGNN_dynamics_AD2_cat(nn.Module):
             atom_types[[37, 38, 39]] = 38
             atom_types[[47, 48, 49]] = 48
             atom_types[[57, 58, 59]] = 58
+        else:
+            raise ValueError(f"Unsupported num_atoms: {self._n_particles}. Supported values: 22, 33, 42, 63.")
         h_initial = torch.nn.functional.one_hot(torch.tensor(atom_types))
         return h_initial
 

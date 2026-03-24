@@ -10,7 +10,10 @@ import scipy.special
 import torch
 import torch.utils._pytree as pytree
 
+from transferable_samplers.utils.pylogger import RankedLogger
 from transferable_samplers.utils.standardization import destandardize_coords
+
+logger = RankedLogger(__name__, rank_zero_only=False)
 
 
 @dataclass
@@ -131,8 +134,8 @@ class SourceEnergy:
         using std = 1/sqrt(num_atoms), as per Prop. 1 of https://arxiv.org/pdf/2502.18462.
         """
         num_batches = math.ceil(num_samples / self.sample_batch_size)
-        print(
-            f"sampling {num_batches} batches of {self.sample_batch_size} samples per device, "
+        logger.info(
+            f"Sampling {num_batches} batches of {self.sample_batch_size} samples per device, "
             f"total {num_samples} samples per device {num_samples * self.world_size} samples."
         )
 
@@ -146,7 +149,7 @@ class SourceEnergy:
             elapsed = time.perf_counter() - t0
             throughput = n / elapsed if elapsed > 0 else float("inf")
             batch_idx += 1
-            print(f"sample batch {batch_idx}/{num_batches}. {throughput:.1f} samples / s")
+            logger.info(f"Proposal sampling batch {batch_idx}/{num_batches} @ {throughput:.1f} samples/s")
             all_samples.append(s)
             all_E.append(e)
             remaining -= n

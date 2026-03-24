@@ -156,6 +156,18 @@ class ManyPeptidesDataModule(BaseDataModule):
         download_and_extract_pdb_tarfiles(self.data_dir)
         download_evaluation_data(self.data_dir)
 
+        if all(
+            p.is_file()
+            for p in [
+                self.pdb_dict_pkl_path,
+                self.topology_dict_pkl_path,
+                self.encodings_dict_pkl_path if "encodings" in self.system_cond_ids else None,
+                self.permutations_dict_pkl_path if "permutations" in self.system_cond_ids else None,
+            ]
+        ):
+            logger.info("All preprocessing cache files found, skipping preprocessing.")
+            return
+
         # Build or load cached preprocessing dicts (each function handles caching internally)
         pdb_paths = [str(p) for p in self.pdb_dir.glob("*/*.pdb")]
         # pyrefly: ignore [bad-argument-type]
