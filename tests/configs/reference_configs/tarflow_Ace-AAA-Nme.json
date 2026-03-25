@@ -1,0 +1,201 @@
+{
+  "callbacks": {
+    "ema": {
+      "_target_": "transferable_samplers.callbacks.ema_weight_averaging.EMAWeightAveraging",
+      "decay": 0.999
+    },
+    "loss_evaluation": {
+      "_target_": "transferable_samplers.callbacks.loss_evaluation_callback.LossEvaluationCallback",
+      "batch_size": 256
+    },
+    "lr_monitor": {
+      "_target_": "lightning.pytorch.callbacks.LearningRateMonitor",
+      "logging_interval": "step"
+    },
+    "model_checkpoint_last": {
+      "_target_": "lightning.pytorch.callbacks.ModelCheckpoint",
+      "dirpath": "${paths.output_dir}/checkpoints",
+      "every_n_epochs": 1,
+      "monitor": null,
+      "save_last": true,
+      "save_on_train_epoch_end": true,
+      "save_top_k": 1,
+      "verbose": true
+    },
+    "model_checkpoint_loss": {
+      "_target_": "lightning.pytorch.callbacks.ModelCheckpoint",
+      "auto_insert_metric_name": false,
+      "dirpath": "${paths.output_dir}/checkpoints",
+      "every_n_epochs": null,
+      "every_n_train_steps": null,
+      "filename": "epoch_{epoch:03d}_loss",
+      "mode": "min",
+      "monitor": "train/loss",
+      "save_last": false,
+      "save_on_train_epoch_end": null,
+      "save_top_k": 1,
+      "save_weights_only": false,
+      "train_time_interval": null,
+      "verbose": false
+    },
+    "model_checkpoint_resampled_energy_w2": {
+      "_target_": "lightning.pytorch.callbacks.ModelCheckpoint",
+      "auto_insert_metric_name": false,
+      "dirpath": "${paths.output_dir}/checkpoints",
+      "every_n_epochs": null,
+      "every_n_train_steps": null,
+      "filename": "epoch_{epoch:03d}_resampled_energy_w2",
+      "mode": "min",
+      "monitor": "val/mean/resampled/energy-w2",
+      "save_last": false,
+      "save_on_train_epoch_end": null,
+      "save_top_k": 1,
+      "save_weights_only": false,
+      "train_time_interval": null,
+      "verbose": false
+    },
+    "model_summary": {
+      "_target_": "lightning.pytorch.callbacks.RichModelSummary",
+      "max_depth": 2
+    },
+    "sampling_evaluation": {
+      "_target_": "transferable_samplers.callbacks.sampling_evaluation_callback.SamplingEvaluationCallback",
+      "evaluator": {
+        "_target_": "transferable_samplers.evaluation.evaluator.PeptideEnsembleEvaluator"
+      },
+      "sampler": {
+        "_target_": "transferable_samplers.samplers.snis_sampler.SNISSampler",
+        "logw_quantile_filter": 0.002,
+        "num_samples": 10000
+      }
+    }
+  },
+  "check_val_every_n_epoch": 100000,
+  "data": {
+    "_target_": "transferable_samplers.data.single_peptide_datamodule.SinglePeptideDataModule",
+    "batch_size": 512,
+    "com_augmentation": true,
+    "data_dir": "${paths.scratch_dir}/sequential-boltzmann-generators-data",
+    "num_atoms": 42,
+    "num_dimensions": 3,
+    "num_workers": 1,
+    "persistent_workers": false,
+    "pin_memory": false,
+    "sequence": "Ace-AAA-Nme",
+    "temperature": 300
+  },
+  "extras": {
+    "enforce_tags": true,
+    "ignore_warnings": false,
+    "print_config": true
+  },
+  "init_ckpt_path": null,
+  "init_hf_state_dict_path": null,
+  "logger": {
+    "csv": {
+      "_target_": "lightning.pytorch.loggers.csv_logs.CSVLogger",
+      "name": "csv/",
+      "prefix": "",
+      "save_dir": "${paths.output_dir}"
+    },
+    "wandb": {
+      "_target_": "lightning.pytorch.loggers.wandb.WandbLogger",
+      "anonymous": null,
+      "entity": "openproblems-comp",
+      "group": "",
+      "id": null,
+      "job_type": "",
+      "log_model": false,
+      "offline": false,
+      "prefix": "",
+      "project": "self-consume-bg",
+      "save_dir": "${paths.output_dir}",
+      "tags": "${tags}"
+    }
+  },
+  "model": {
+    "_target_": "transferable_samplers.models.normalizing_flow_module.NormalizingFlowModule",
+    "compile_net": false,
+    "mean_free_prior": false,
+    "net": {
+      "_target_": "transferable_samplers.nn.tarflow.tarflow_single_system.TarFlow",
+      "channels": 256,
+      "img_size": 126,
+      "in_channels": 3,
+      "layers_per_block": 6,
+      "num_blocks": 6,
+      "patch_size": 1
+    },
+    "optimizer": {
+      "_partial_": true,
+      "_target_": "torch.optim.AdamW",
+      "betas": [
+        0.9,
+        0.95
+      ],
+      "lr": 0.0001,
+      "weight_decay": 0.0004
+    },
+    "prior": {
+      "_target_": "transferable_samplers.models.priors.normal_distribution.NormalDistribution",
+      "mean_free": false,
+      "num_dimensions": "${data.num_dimensions}"
+    },
+    "scheduler": {
+      "_partial_": true,
+      "_target_": "torch.optim.lr_scheduler.OneCycleLR",
+      "anneal_strategy": "cos",
+      "cycle_momentum": false,
+      "div_factor": 500.0,
+      "final_div_factor": 1.0,
+      "max_lr": "${model.optimizer.lr}",
+      "pct_start": 0.05,
+      "total_steps": "${trainer.max_epochs}"
+    },
+    "source_energy_config": {
+      "_target_": "transferable_samplers.utils.dataclasses.SourceEnergyConfig",
+      "energy_batch_size": 10000,
+      "grad_batch_size": 10000,
+      "sample_batch_size": 10000,
+      "use_com_adjustment": true
+    },
+    "train_from_buffer": false
+  },
+  "num_sanity_val_steps": 0,
+  "paths": {
+    "data_dir": "${paths.scratch_dir}/many-peptides-md",
+    "log_dir": "${paths.scratch_dir}/logs",
+    "output_dir": "${hydra:runtime.output_dir}",
+    "scratch_dir": "${oc.env:SCRATCH_DIR}/transferable-samplers",
+    "work_dir": "${hydra:runtime.cwd}"
+  },
+  "resume_ckpt_path": null,
+  "seed": null,
+  "tags": [
+    "dev"
+  ],
+  "task_name": "train",
+  "torch_num_threads": 2,
+  "trainer": {
+    "_target_": "lightning.pytorch.trainer.Trainer",
+    "accelerator": "gpu",
+    "check_val_every_n_epoch": 50,
+    "default_root_dir": "${paths.output_dir}",
+    "deterministic": false,
+    "devices": 1,
+    "enable_progress_bar": false,
+    "gradient_clip_val": 1.0,
+    "inference_mode": false,
+    "limit_test_batches": 1,
+    "limit_val_batches": 1,
+    "max_epochs": 1000,
+    "min_epochs": 1,
+    "num_sanity_val_steps": 0,
+    "plugins": [
+      {
+        "_target_": "lightning.pytorch.plugins.environments.SLURMEnvironment",
+        "auto_requeue": false
+      }
+    ]
+  }
+}

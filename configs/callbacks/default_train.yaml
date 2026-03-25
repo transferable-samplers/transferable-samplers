@@ -1,0 +1,12 @@
+defaults:
+  - model_summary
+  - lr_monitor
+  - model_checkpoint_resampled_energy_w2
+  - model_checkpoint_loss
+  - sampling_evaluation
+  - loss_evaluation
+  - model_checkpoint_last
+  - ema_weight_averaging
+  - _self_
+model_summary:
+  max_depth: 2

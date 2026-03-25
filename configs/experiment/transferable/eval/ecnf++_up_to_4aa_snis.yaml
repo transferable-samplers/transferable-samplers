@@ -1,0 +1,33 @@
+# @package _global_
+# ──────────────────────────────────────────────────────────────
+# Description: Evaluate transferable ECNF++ on ManyPeptidesMD (<= 4aa) with SNIS
+# Reference:   Table 2, Amortized Sampling with Transferable Normalizing Flows
+#              https://arxiv.org/abs/2508.18175
+# Notes:       Run as:
+#                python src/transferable_samplers/eval.py \
+#                experiment=transferable/eval/ecnf++_up_to_4aa_snis.yaml
+#              Defaults to the model:
+#                https://huggingface.co/transferable-samplers/model-weights/tree/main/transferable/ecnf++_up_to_4aa.pth
+# ──────────────────────────────────────────────────────────────
+defaults:
+  - override /model: flow_matching
+  - override /model/net: egnn_dynamics_transferable_md
+  - override /data: transferable/up_to_4aa
+  - override /trainer: gpu
+hf_state_dict_path: transferable/ecnf++_up_to_4aa.pth
+data:
+  system_cond_ids: [encodings]
+model:
+  net:
+    channels: 256
+    num_layers: 9
+    num_aa_max: ${data.num_aa_max}
+    num_aa_min: ${data.num_aa_min}
+  source_energy_config:
+    sample_batch_size: 6
+callbacks:
+  sampling_evaluation:
+    sampler:
+      _target_: transferable_samplers.samplers.snis_sampler.SNISSampler
+      num_samples: 10_000
+      logw_quantile_filter: 0.002

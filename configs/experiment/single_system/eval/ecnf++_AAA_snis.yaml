@@ -1,0 +1,31 @@
+# @package _global_
+# ──────────────────────────────────────────────────────────────
+# Description: Evaluate ECNF++ on AAA with SNIS
+# Reference:   Table 2, Scalable Equilibrium Sampling with Sequential Boltzmann Generators
+#              https://arxiv.org/abs/2502.18462
+# Notes:       ECNF++ is a retraining of Transferable Boltzmann Generator
+#              https://arxiv.org/abs/2406.1442
+#              Run as:
+#                python src/transferable_samplers/eval.py \
+#                experiment=single_system/eval/ecnf++_AAA_snis.yaml
+#              Defaults to the model:
+#                https://huggingface.co/transferable-samplers/model-weights/tree/main/single_system/ecnf++_AAA_0.pth
+#              Change the seed with _0 -> _1, _2 to load models with different training seeds
+# ──────────────────────────────────────────────────────────────
+defaults:
+  - override /model: flow_matching
+  - override /model/net: egnn_dynamics_ad2_cat
+  - override /data: single_system/AAA
+  - override /trainer: gpu
+hf_state_dict_path: single_system/ecnf++_AAA_0.pth
+model:
+  net:
+    channels: 256
+    num_layers: 5
+  source_energy_config:
+    sample_batch_size: 48
+callbacks:
+  sampling_evaluation:
+    sampler:
+      _target_: transferable_samplers.samplers.snis_sampler.SNISSampler
+      num_samples: 10_000

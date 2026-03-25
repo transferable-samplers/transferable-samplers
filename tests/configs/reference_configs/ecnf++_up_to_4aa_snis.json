@@ -1,0 +1,229 @@
+{
+  "callbacks": {
+    "loss_evaluation": {
+      "_target_": "transferable_samplers.callbacks.loss_evaluation_callback.LossEvaluationCallback",
+      "batch_size": 256
+    },
+    "model_summary": {
+      "_target_": "lightning.pytorch.callbacks.RichModelSummary",
+      "max_depth": 2
+    },
+    "sampling_evaluation": {
+      "_target_": "transferable_samplers.callbacks.sampling_evaluation_callback.SamplingEvaluationCallback",
+      "evaluator": {
+        "_target_": "transferable_samplers.evaluation.evaluator.PeptideEnsembleEvaluator"
+      },
+      "sampler": {
+        "_target_": "transferable_samplers.samplers.snis_sampler.SNISSampler",
+        "logw_quantile_filter": 0.002,
+        "num_samples": 10000
+      }
+    }
+  },
+  "ckpt_path": null,
+  "data": {
+    "_target_": "transferable_samplers.data.many_peptides_datamodule.ManyPeptidesDataModule",
+    "batch_size": 512,
+    "data_dir": "${paths.data_dir}",
+    "num_aa_max": 4,
+    "num_aa_min": 2,
+    "num_atoms": 97,
+    "num_dimensions": 3,
+    "num_workers": 2,
+    "persistent_workers": false,
+    "pin_memory": false,
+    "precomputed_std": 0.28,
+    "system_cond_ids": [
+      "encodings"
+    ],
+    "test_sequences": [
+      "AA",
+      "CE",
+      "CL",
+      "DG",
+      "DI",
+      "FK",
+      "HL",
+      "HM",
+      "IK",
+      "IM",
+      "KG",
+      "LE",
+      "MQ",
+      "NA",
+      "NC",
+      "PG",
+      "PY",
+      "QR",
+      "RL",
+      "RT",
+      "SS",
+      "TD",
+      "VF",
+      "VS",
+      "WA",
+      "WH",
+      "WQ",
+      "WS",
+      "YC",
+      "YQ",
+      "ARIP",
+      "CCVH",
+      "CIPQ",
+      "DEMT",
+      "DMTL",
+      "EHQW",
+      "FESD",
+      "FYYY",
+      "GCDE",
+      "GDTI",
+      "GGRS",
+      "HEAV",
+      "HQVS",
+      "HYGW",
+      "ITYL",
+      "KKAP",
+      "KLLR",
+      "KRWN",
+      "NCFG",
+      "NEVI",
+      "PQIF",
+      "QAKR",
+      "QWNL",
+      "RLMM",
+      "SHKS",
+      "SVND",
+      "TAPF",
+      "TMWC",
+      "VPFY",
+      "WNMA"
+    ],
+    "val_sequences": [
+      "AL",
+      "EC",
+      "FT",
+      "GQ",
+      "HV",
+      "ND",
+      "PF",
+      "RS",
+      "WI",
+      "WY",
+      "CAVQ",
+      "CVNR",
+      "EDWY",
+      "GNFL",
+      "ISDT",
+      "KHAP",
+      "KHGM",
+      "LFTE",
+      "PMWS",
+      "YRIQ"
+    ]
+  },
+  "extras": {
+    "enforce_tags": true,
+    "ignore_warnings": false,
+    "print_config": true
+  },
+  "hf_state_dict_path": "transferable/ecnf++_up_to_4aa.pth",
+  "logger": {
+    "csv": {
+      "_target_": "lightning.pytorch.loggers.csv_logs.CSVLogger",
+      "name": "csv/",
+      "prefix": "",
+      "save_dir": "${paths.output_dir}"
+    },
+    "wandb": {
+      "_target_": "lightning.pytorch.loggers.wandb.WandbLogger",
+      "anonymous": null,
+      "entity": "openproblems-comp",
+      "group": "",
+      "id": null,
+      "job_type": "",
+      "log_model": false,
+      "offline": false,
+      "prefix": "",
+      "project": "self-consume-bg",
+      "save_dir": "${paths.output_dir}",
+      "tags": "${tags}"
+    }
+  },
+  "model": {
+    "_target_": "transferable_samplers.models.flow_matching_module.FlowMatchingModule",
+    "atol": 0.0001,
+    "compile_net": false,
+    "dlogp_tol_scale": 1.0,
+    "mean_free_prior": true,
+    "net": {
+      "_target_": "transferable_samplers.nn.egnn.egnn_dynamics_transferable_md.EGNNDynamicsTransferableMD",
+      "channels": 256,
+      "num_aa_max": "${data.num_aa_max}",
+      "num_aa_min": "${data.num_aa_min}",
+      "num_atoms": "${data.num_atoms}",
+      "num_dimensions": "${data.num_dimensions}",
+      "num_layers": 9
+    },
+    "optimizer": {
+      "_partial_": true,
+      "_target_": "torch.optim.AdamW",
+      "betas": [
+        0.9,
+        0.999
+      ],
+      "lr": 0.0005,
+      "weight_decay": 0.0
+    },
+    "prior": {
+      "_target_": "transferable_samplers.models.priors.normal_distribution.NormalDistribution",
+      "mean_free": true,
+      "num_dimensions": "${data.num_dimensions}"
+    },
+    "rtol": 0.0001,
+    "sigma": 0.0,
+    "source_energy_config": {
+      "_target_": "transferable_samplers.utils.dataclasses.SourceEnergyConfig",
+      "energy_batch_size": 8,
+      "grad_batch_size": 8,
+      "sample_batch_size": 6
+    },
+    "train_from_buffer": false
+  },
+  "paths": {
+    "data_dir": "${paths.scratch_dir}/many-peptides-md",
+    "log_dir": "${paths.scratch_dir}/logs",
+    "output_dir": "${hydra:runtime.output_dir}",
+    "scratch_dir": "${oc.env:SCRATCH_DIR}/transferable-samplers",
+    "work_dir": "${hydra:runtime.cwd}"
+  },
+  "seed": null,
+  "tags": [
+    "dev"
+  ],
+  "task_name": "eval",
+  "test": true,
+  "torch_num_threads": 2,
+  "trainer": {
+    "_target_": "lightning.pytorch.trainer.Trainer",
+    "accelerator": "gpu",
+    "check_val_every_n_epoch": 10000,
+    "default_root_dir": "${paths.output_dir}",
+    "deterministic": false,
+    "devices": 1,
+    "enable_progress_bar": false,
+    "gradient_clip_val": 1.0,
+    "inference_mode": false,
+    "limit_test_batches": 1,
+    "limit_val_batches": 1,
+    "max_epochs": 40,
+    "min_epochs": 1,
+    "num_sanity_val_steps": 0,
+    "plugins": [
+      {
+        "_target_": "lightning.pytorch.plugins.environments.SLURMEnvironment",
+        "auto_requeue": false
+      }
+    ]
+  },
+  "val": false
+}

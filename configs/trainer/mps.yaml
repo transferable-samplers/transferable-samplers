@@ -1,5 +1,3 @@
-defaults:
-  - default
-
+defaults: [default]
 accelerator: mps
 devices: 1

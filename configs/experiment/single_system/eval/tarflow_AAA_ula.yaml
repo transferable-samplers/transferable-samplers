@@ -1,0 +1,42 @@
+# @package _global_
+# ──────────────────────────────────────────────────────────────
+# Description: Evaluate TarFlow on AAA with SMC (SBG)
+# Reference:   Table 2, Scalable Equilibrium Sampling with Sequential Boltzmann Generators
+#              https://arxiv.org/abs/2502.18462
+# Notes:       Run as:
+#                python src/transferable_samplers/eval.py \
+#                experiment=single_system/eval/tarflow_AAA_ula.yaml
+#              Defaults to the model:
+#                https://huggingface.co/transferable-samplers/model-weights/tree/main/single_system/tarflow_AAA_0.pth
+#              Change the seed with _0 -> _1, _2 to load models with different training seeds
+#              As in the paper we use the continuous-time formulation of SMC
+# ──────────────────────────────────────────────────────────────
+defaults:
+  - override /model: normalizing_flow
+  - override /model/net: tarflow_single_system
+  - override /data: single_system/AAA
+  - override /trainer: gpu
+hf_state_dict_path: single_system/tarflow_AAA_0.pth
+model:
+  net:
+    channels: 256
+    img_size: 99
+    num_blocks: 6
+    layers_per_block: 6
+  source_energy_config:
+    sample_batch_size: 2048
+    energy_batch_size: 512
+    grad_batch_size: 512
+    use_com_adjustment: true
+callbacks:
+  sampling_evaluation:
+    sampler:
+      _target_: transferable_samplers.samplers.smc_sampler.SMCSampler
+      num_samples: 10_000
+      init_eps: 1e-5
+      num_annealing_steps: 100
+      ess_threshold: 0.5
+      resampling_method: multinomial
+      energy_cutoff_filter: -120.0
+      logw_quantile_filter: 0.002
+      log_traj_freq: 1

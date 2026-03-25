@@ -1,0 +1,3 @@
+loss_evaluation:
+  _target_: transferable_samplers.callbacks.loss_evaluation_callback.LossEvaluationCallback
+  batch_size: 256

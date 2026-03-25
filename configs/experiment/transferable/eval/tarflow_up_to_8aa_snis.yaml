@@ -1,0 +1,29 @@
+# @package _global_
+# ──────────────────────────────────────────────────────────────
+# Description: Evaluate TarFlow on ManyPeptidesMD with SNIS
+# Reference:   Table 2, Amortized Sampling with Transferable Normalizing Flows
+#              https://arxiv.org/abs/2508.18175
+# Notes:       Run as:
+#                python src/transferable_samplers/eval.py \
+#                experiment=transferable/eval/tarflow_up_to_8aa_snis.yaml
+#              Defaults to the model:
+#                https://huggingface.co/transferable-samplers/model-weights/tree/main/transferable/tarflow_up_to_8aa.pth
+# ──────────────────────────────────────────────────────────────
+defaults:
+  - override /model: normalizing_flow
+  - override /model/net: tarflow
+  - override /data: transferable/up_to_8aa
+  - override /trainer: gpu
+hf_state_dict_path: transferable/tarflow_up_to_8aa.pth
+model:
+  source_energy_config:
+    sample_batch_size: 5_000
+    energy_batch_size: 5_000
+    grad_batch_size: 5_000
+    use_com_adjustment: true
+callbacks:
+  sampling_evaluation:
+    sampler:
+      _target_: transferable_samplers.samplers.snis_sampler.SNISSampler
+      num_samples: 1_000_000
+      logw_quantile_filter: 0.002

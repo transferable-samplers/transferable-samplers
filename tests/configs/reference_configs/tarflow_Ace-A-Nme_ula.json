@@ -1,0 +1,144 @@
+{
+  "callbacks": {
+    "loss_evaluation": {
+      "_target_": "transferable_samplers.callbacks.loss_evaluation_callback.LossEvaluationCallback",
+      "batch_size": 256
+    },
+    "model_summary": {
+      "_target_": "lightning.pytorch.callbacks.RichModelSummary",
+      "max_depth": 2
+    },
+    "sampling_evaluation": {
+      "_target_": "transferable_samplers.callbacks.sampling_evaluation_callback.SamplingEvaluationCallback",
+      "evaluator": {
+        "_target_": "transferable_samplers.evaluation.evaluator.PeptideEnsembleEvaluator"
+      },
+      "sampler": {
+        "_target_": "transferable_samplers.samplers.smc_sampler.SMCSampler",
+        "energy_cutoff_filter": 10.0,
+        "ess_threshold": 0.5,
+        "init_eps": 1e-05,
+        "log_traj_freq": 1,
+        "logw_quantile_filter": 0.002,
+        "num_annealing_steps": 100,
+        "num_samples": 10000,
+        "resampling_method": "multinomial"
+      }
+    }
+  },
+  "ckpt_path": null,
+  "data": {
+    "_target_": "transferable_samplers.data.single_peptide_datamodule.SinglePeptideDataModule",
+    "batch_size": 512,
+    "data_dir": "${paths.scratch_dir}/sequential-boltzmann-generators-data",
+    "num_atoms": 22,
+    "num_dimensions": 3,
+    "num_workers": 1,
+    "persistent_workers": false,
+    "pin_memory": false,
+    "sequence": "Ace-A-Nme",
+    "temperature": 300
+  },
+  "extras": {
+    "enforce_tags": true,
+    "ignore_warnings": false,
+    "print_config": true
+  },
+  "hf_state_dict_path": "single_system/tarflow_Ace-A-Nme_0.pth",
+  "logger": {
+    "csv": {
+      "_target_": "lightning.pytorch.loggers.csv_logs.CSVLogger",
+      "name": "csv/",
+      "prefix": "",
+      "save_dir": "${paths.output_dir}"
+    },
+    "wandb": {
+      "_target_": "lightning.pytorch.loggers.wandb.WandbLogger",
+      "anonymous": null,
+      "entity": "openproblems-comp",
+      "group": "",
+      "id": null,
+      "job_type": "",
+      "log_model": false,
+      "offline": false,
+      "prefix": "",
+      "project": "self-consume-bg",
+      "save_dir": "${paths.output_dir}",
+      "tags": "${tags}"
+    }
+  },
+  "model": {
+    "_target_": "transferable_samplers.models.normalizing_flow_module.NormalizingFlowModule",
+    "compile_net": false,
+    "mean_free_prior": false,
+    "net": {
+      "_target_": "transferable_samplers.nn.tarflow.tarflow_single_system.TarFlow",
+      "channels": 256,
+      "img_size": 66,
+      "in_channels": 1,
+      "layers_per_block": 4,
+      "num_blocks": 4,
+      "patch_size": 1
+    },
+    "optimizer": {
+      "_partial_": true,
+      "_target_": "torch.optim.AdamW",
+      "betas": [
+        0.9,
+        0.95
+      ],
+      "lr": 0.0001,
+      "weight_decay": 0.0004
+    },
+    "prior": {
+      "_target_": "transferable_samplers.models.priors.normal_distribution.NormalDistribution",
+      "mean_free": false,
+      "num_dimensions": "${data.num_dimensions}"
+    },
+    "source_energy_config": {
+      "_target_": "transferable_samplers.utils.dataclasses.SourceEnergyConfig",
+      "energy_batch_size": 512,
+      "grad_batch_size": 512,
+      "sample_batch_size": 2048,
+      "use_com_adjustment": true
+    },
+    "train_from_buffer": false
+  },
+  "paths": {
+    "data_dir": "${paths.scratch_dir}/many-peptides-md",
+    "log_dir": "${paths.scratch_dir}/logs",
+    "output_dir": "${hydra:runtime.output_dir}",
+    "scratch_dir": "${oc.env:SCRATCH_DIR}/transferable-samplers",
+    "work_dir": "${hydra:runtime.cwd}"
+  },
+  "seed": null,
+  "tags": [
+    "dev"
+  ],
+  "task_name": "eval",
+  "test": true,
+  "torch_num_threads": 2,
+  "trainer": {
+    "_target_": "lightning.pytorch.trainer.Trainer",
+    "accelerator": "gpu",
+    "check_val_every_n_epoch": 10000,
+    "default_root_dir": "${paths.output_dir}",
+    "deterministic": false,
+    "devices": 1,
+    "enable_progress_bar": false,
+    "gradient_clip_val": 1.0,
+    "inference_mode": false,
+    "limit_test_batches": 1,
+    "limit_val_batches": 1,
+    "max_epochs": 40,
+    "min_epochs": 1,
+    "num_sanity_val_steps": 0,
+    "plugins": [
+      {
+        "_target_": "lightning.pytorch.plugins.environments.SLURMEnvironment",
+        "auto_requeue": false
+      }
+    ]
+  },
+  "val": false
+}

@@ -1,0 +1,47 @@
+# @package _global_
+# ──────────────────────────────────────────────────────────────
+# Description: Train TarFlow on ManyPeptidesMD
+# Reference:   Table 2, Amortized Sampling with Transferable Normalizing Flows
+#              https://arxiv.org/abs/2508.18175
+# Notes:       Run as:
+#                python src/transferable_samplers/train.py \
+#                experiment=transferable/train/tarflow_up_to_8aa.yaml
+# ──────────────────────────────────────────────────────────────
+defaults:
+  - override /model: normalizing_flow
+  - override /model/net: tarflow
+  - override /data: transferable/up_to_8aa
+  - override /trainer: gpu
+model:
+  optimizer:
+    _target_: torch.optim.AdamW
+    lr: 1e-4
+    betas: [0.9, 0.95]
+    weight_decay: 4e-4
+  scheduler:
+    _target_: torch.optim.lr_scheduler.OneCycleLR
+    _partial_: true
+    max_lr: ${model.optimizer.lr}
+    total_steps: ${trainer.max_epochs}
+    pct_start: 0.05
+    anneal_strategy: cos
+    cycle_momentum: false
+    div_factor: 5e2
+    final_div_factor: 1.0
+  source_energy_config:
+    sample_batch_size: 5_000
+    energy_batch_size: 5_000
+    grad_batch_size: 5_000
+    use_com_adjustment: true
+data:
+  batch_size: 512
+  com_augmentation: true
+callbacks:
+  sampling_evaluation:
+    sampler:
+      _target_: transferable_samplers.samplers.snis_sampler.SNISSampler
+      num_samples: 5_000
+trainer:
+  limit_train_batches: 1000 # need to set an "epoch" length
+  max_epochs: 500
+  check_val_every_n_epoch: 50

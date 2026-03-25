@@ -1,13 +1,8 @@
-defaults:
-  - default
-
-strategy: ddp
-
+defaults: [default]
+strategy:
+  _target_: lightning.pytorch.strategies.DDPStrategy
+  find_unused_parameters: false
 accelerator: gpu
-devices: "auto"
+devices: auto
 num_nodes: 1
 sync_batchnorm: true
-
-plugins:
-  - _target_: lightning.pytorch.plugins.environments.SLURMEnvironment
-    auto_requeue: false

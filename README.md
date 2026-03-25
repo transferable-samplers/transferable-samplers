@@ -1,81 +1,80 @@
-> [!IMPORTANT]
-> **Critical Dataset Update**
-> 
-> The original 8AA TICA models within `https://huggingface.co/datasets/transferable-samplers/many-peptides-md/subsampled_trajectories/*/8AA/*.npz` employed a CA-only atom selection. **These models are not valid for comparison to results in our paper.**
-> 
-> **Updated files (uploaded 15/12/2025)** now contain corrected models. If you previously downloaded this dataset, please re-download to ensure accurate results.
->
-> Note: Codebase references to `tica_features_ca` must now be replaced with `tica_features`. **This was resolved in our codebase by [PR #26](https://github.com/transferable-samplers/transferable-samplers/pull/26).**
->
-> Note: Unguarded `snapshot_download` calls will automatically redownload the relevant files when it detects a change in the repo.
-> 
-> We sincerely apologize for any inconvenience this may have caused.
-
 # Transferable Samplers
 
-Welcome to the official codebase for the following works:
+A codebase for **sampling the Boltzmann density of molecular systems**, with a focus on transferable methods that generalise to unseen systems at inference time.
 
-**Amortized Sampling with Transferable Normalizing Flows** [*NeurIPS 2025*](https://arxiv.org/abs/2508.18175)
+For further documentation, see the docs!
 
-**Scalable Equilibrium Sampling with Sequential Boltzmann Generators** [*ICML 2025*](https://icml.cc/virtual/2025/poster/45137)
+## Quickstart
 
-## Installation
+```bash
+# Clone repo
+git clone https://github.com/transferable-samplers/transferable-samplers.git
+cd transferable-samplers
 
-```
-conda create -n transferable-samplers python=3.11
-conda activate transferable-samplers
-pip install -r requirements.txt
-```
+# Create and activate a virtual environment
+uv venv .venv --python=3.11
+source .venv/bin/activate
 
-You must also populate `.env.example` and save as `.env`
+# Install in editable mode
+uv pip install -e .
 
-## Usage
-
-### Datasets
-
-Both ManyPeptidesMD and the single-system datasets are hosted on Hugging Face.
-- [ManyPeptidesMD](https://huggingface.co/datasets/transferable-samplers/many-peptides-md)
-- [Single systems](https://huggingface.co/datasets/transferable-samplers/sequential-boltzmann-generators-data)
-
-In both cases, the codebase is set up to automatically download the necessary data for training and evaluation. In the case of ManyPeptidesMD the training webdataset will by default be streamed and cached.
-
-### Model weights
-
-The pretrained model weights used in our works are provided [here](https://huggingface.co/transferable-samplers/model-weights).
-
-### Training
-
-The codebase builds on the [Lightning-Hydra-Template](https://github.com/ashleve/lightning-hydra-template). Accordingly, the experiments are organized into experiment configuration files.
-
-To train a TarFlow on the single system Ace-A-Nme dataset run:
-
-```
-python src/train.py experiment=training/single_system/tarflow_Ace-A-Nme
+# Install runtime dependencies
+uv pip install -r requirements.txt
 ```
 
-To train Prose on the ManyPeptidesMD dataset
-
-```
-python src/train.py experiment=training/transferable/prose_up_to_8aa
-```
-
-## Sampling
-
-The sampling experiment configs will default to downloading and using the pretrained model weights provided [here](https://huggingface.co/transferable-samplers/model-weights).
-
-```
-python src/eval_only.py experiment=evaluation/transferable/prose_up_to_8aa
+Then run your first experiment!
+```bash
+uv run python -m transferable_samplers.eval experiment=transferable/eval/prose_up_to_8aa_snis
 ```
 
-To use a locally generated checkpoint, you may pass in the argument `ckpt_path` to override the remote weights usage.
+> You must also populate `.env.example` and save as `.env` (sets `SCRATCH_DIR`).
+> **Optional:** Flash Attention (for TarFlow methods) must be installed separately, see the note at the bottom of `requirements.txt`.
+
+## Implemented Papers
+
+This codebase is the official implementation of:
+
+**Amortized Sampling with Transferable Normalizing Flows**
+[![NeurIPS 2025](https://img.shields.io/badge/NeurIPS-2025-68448c)](https://neurips.cc/virtual/2025/loc/san-diego/poster/118702)
+[![arXiv](https://img.shields.io/badge/arXiv-2508.18175-b31b1b)](https://arxiv.org/abs/2508.18175v4)
+
+**Scalable Equilibrium Sampling with Sequential Boltzmann Generators**
+[![ICML 2025](https://img.shields.io/badge/ICML-2025-0077b6)](https://icml.cc/virtual/2025/poster/45137)
+[![arXiv](https://img.shields.io/badge/arXiv-2502.18462-b31b1b)](https://arxiv.org/abs/2502.18462)
+
+For details on reproducing paper results see [Paper Reproduction](paper-reproduction.md).
+
+---
+
+We additionally provide baseline implementations of:
+
+**Transferable Boltzmann Generators**
+[![NeurIPS 2024](https://img.shields.io/badge/NeurIPS-2024-68448c)](https://proceedings.neurips.cc/paper_files/paper/2024/hash/5035a409f5798e188079e236f437e522-Abstract-Conference.html)
+[![arXiv](https://img.shields.io/badge/arXiv-2406.14426-b31b1b)](https://arxiv.org/abs/2406.14426)
+
+More to come soon! 🚀
+
+## Citation
+
+If you use this codebase, please cite:
+```bibtex
+@inproceedings{
+tan2025amortized,
+title={Amortized Sampling with Transferable Normalizing Flows},
+author={Charlie B. Tan and Majdi Hassan and Leon Klein and Saifuddin Syed and Dominique Beaini and Michael M. Bronstein and Alexander Tong and Kirill Neklyudov},
+booktitle={The Thirty-ninth Annual Conference on Neural Information Processing Systems},
+year={2025},
+url={https://openreview.net/forum?id=JenfC3ovzU}
+}
+```
 
 ## Acknowledgements
 
-We would like to thank Hugging Face for hosting our large ManyPeptidesMD dataset!
+We thank HuggingFace for hosting the [ManyPeptidesMD](https://huggingface.co/datasets/transferable-samplers/many-peptides-md) dataset!
 
 ## License
 
-The core of this repository is licensed under the MIT License (see [LICENSE](./LICENSE)).  
-Some files include adaptation of third-party code under other licenses (Apple, Meta, NVIDIA, Klein & Noé).  
-In some cases, these thrid-party licenses are **non-commerical**.
-See [NOTICE](./NOTICE) for details.
+The core of this repository is licensed under the MIT License (see [LICENSE](https://github.com/transferable-samplers/transferable-samplers/blob/main/LICENSE)).
+Some files include adaptations of third-party code under other licenses (Apple, NVIDIA, Klein & Noé).
+In some cases, these third-party licenses are **non-commercial**.
+See [NOTICE](https://github.com/transferable-samplers/transferable-samplers/blob/main/NOTICE) for details.

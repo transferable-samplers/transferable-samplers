@@ -1,0 +1,7 @@
+# Only for use in pytests!
+defaults: [default]
+strategy: ddp_fork
+accelerator: gpu
+devices: auto
+num_nodes: 1
+sync_batchnorm: true

@@ -1,4 +1,4 @@
-_target_: src.models.neural_networks.egnn.egnn_dynamics_transferable_md.EGNNDynamicsTransferableMD
+_target_: transferable_samplers.nn.egnn.egnn_dynamics_transferable_md.EGNNDynamicsTransferableMD
 num_atoms: ${data.num_atoms}
 num_dimensions: ${data.num_dimensions}
 channels: 256

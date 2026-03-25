@@ -1,0 +1,4 @@
+sampling_evaluation:
+  _target_: transferable_samplers.callbacks.sampling_evaluation_callback.SamplingEvaluationCallback
+  evaluator:
+    _target_: transferable_samplers.evaluation.evaluator.PeptideEnsembleEvaluator

@@ -175,3 +175,7 @@ ___*.py
 # Pytest outputs
 *.xml
 *.html
+CLAUDE.md
+
+df_cache/*
+NOTES/*
