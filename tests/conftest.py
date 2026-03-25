@@ -1,5 +1,5 @@
 """
-Fixtures for configuring tests based on available hardware (GPU/DDP).
+Fixtures for configuring tests based on available hardware (GPU).
 Tests are run with the appropriate trainer based on available devices.
 Unique ids for each trainer are provided for clarity in test reports.
 """
@@ -27,15 +27,9 @@ Path(report_dir).mkdir(parents=True, exist_ok=True)
 def trainer_name_param(request):
     trainer = request.param
 
-    if trainer in ("ddp", "ddp_fork") and torch.cuda.device_count() < 2:
-        pytest.skip("DDP requires >=2 GPUs")
     if trainer == "gpu" and torch.cuda.device_count() < 1:
         pytest.skip("No GPU available")
 
-    # ddp strategy requires torchrun/SLURM launcher; use ddp_fork in tests so
-    # Lightning forks worker processes itself without an external launcher.
-    if trainer == "ddp":
-        return "ddp_fork"
     return trainer
 
 
@@ -55,12 +49,4 @@ def pytest_configure(config):
 def _enforce_hardware_constraints(request, trainer_name_param: str):
     if request.node.get_closest_marker("benchmark"):
         if trainer_name_param == "cpu":
-            pytest.skip("Benchmark tests require GPU or DDP")
-    if (
-        trainer_name_param == "ddp_fork"
-        and request.node.get_closest_marker("essential")
-        and "tests/mwe" not in str(request.fspath)
-    ):
-        pytest.skip("DDP essential tests only run MWE tests")
-    if "tests/configs" in str(request.fspath) and trainer_name_param == "ddp_fork":
-        pytest.skip("Config tests do not run with DDP")
+            pytest.skip("Benchmark tests require GPU")

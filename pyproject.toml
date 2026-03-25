@@ -15,7 +15,6 @@ pythonpath = ["src"]
 markers = [
     "essential: must-pass tests (config, assets, algorithms)",
     "benchmark: long-running runs that validate metrics against a paper",
-    "benchmark_ddp: benchmark runs under DDP to verify parity with single-GPU",
     "optional: architectural/design tests",
 ]
 

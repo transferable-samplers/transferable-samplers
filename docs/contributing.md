@@ -77,12 +77,6 @@ CPU can be used as a rapid sanity check or where a GPU is not available. ECNF++ 
 PYTEST_TRAINER=cpu uv run pytest -m essential -v
 ```
 
-DDP runs only the MWE tests (config and asset tests are skipped). This is useful for catching bugs specific to distributed execution.
-
-```bash
-PYTEST_TRAINER=ddp uv run pytest -m essential -v
-```
-
 ### Benchmark tests
 
 Benchmark tests run full experiment configs and validate metrics against reference values from stable codebase versions, as well as published paper results.
@@ -91,10 +85,43 @@ Benchmark tests run full experiment configs and validate metrics against referen
 PYTEST_TRAINER=gpu uv run pytest -m benchmark -v
 ```
 
-To check for performance degradation from incorrect distributed implementation:
+### DDP Benchmarks
+
+Pytest was not found to work nicely with DDP, hence DDP tests must be run manually. The following commands validate distributed execution; batch sizes are tuned for 4×48 GB GPUs:
 
 ```bash
-PYTEST_TRAINER=ddp uv run pytest -m benchmark -v
+# tests/benchmark/test_snis_prose_up_to_8aa.py::test_snis_prose_up_to_8aa
+python -m transferable_samplers.eval \
+  experiment=transferable/eval/prose_up_to_8aa_snis.yaml \
+  trainer=ddp \
+  data.test_sequences=ARIP \
+  callbacks.sampling_evaluation.sampler.num_samples=10_000 \
+  model.source_energy_config.sample_batch_size=4_096
+
+# tests/benchmark/test_self_improve_prose_up_to_8aa.py::test_self_improve_prose_up_to_8aa
+python -m transferable_samplers.train \
+  experiment=transferable/finetune/prose_up_to_8aa_self_improve.yaml \
+  trainer=ddp \
+  data.test_sequences=ARIP \
+  model.source_energy_config.sample_batch_size=4_096
+
+# tests/benchmark/test_snis_ecnf_up_to_4aa.py::test_snis_ecnf_up_to_4aa
+python -m transferable_samplers.eval \
+  experiment=transferable/eval/ecnf++_up_to_4aa_snis.yaml \
+  trainer=ddp \
+  data.test_sequences=AA \
+  callbacks.sampling_evaluation.sampler.num_samples=10_000 \
+  model.source_energy_config.sample_batch_size=512
+
+# tests/benchmark/test_smc_prose_up_to_8aa.py::test_smc_prose_up_to_8aa
+python -m transferable_samplers.eval \
+  experiment=transferable/eval/prose_up_to_8aa_mala.yaml \
+  trainer=ddp \
+  data.test_sequences=ARIP \
+  callbacks.sampling_evaluation.sampler.num_samples=10_000 \
+  model.source_energy_config.sample_batch_size=4_096 \
+  model.source_energy_config.energy_batch_size=384 \
+  model.source_energy_config.grad_batch_size=384
 ```
 
 ### Optional tests
