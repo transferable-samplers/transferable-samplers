@@ -195,7 +195,6 @@ def download_and_extract_pdb_tarfiles(data_dir: str) -> None:
             repo_type="dataset",
             local_dir=data_dir,
             allow_patterns=["pdb_tarfiles/*"],
-            token=True,
         )
         logger.info(f"Extracting PDB tarfiles to {data_dir}")
         for subset in ["train", "val", "test"]:
@@ -231,7 +230,6 @@ def download_evaluation_data(data_dir: str) -> None:
             repo_type="dataset",
             local_dir=data_dir,
             allow_patterns=["trajectories_subsampled/*"],
-            token=True,
         )
     else:
         logger.info(f"Evaluation data already present in {data_dir}")
