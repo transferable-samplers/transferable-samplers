@@ -2,7 +2,7 @@
 
 A codebase for **sampling the Boltzmann density of molecular systems**, with a focus on transferable methods that generalise to unseen systems at inference time.
 
-For further documentation, see the docs!
+For further documentation, see the [docs](https://transferable-samplers.github.io/transferable-samplers/#/)!
 
 ## Quickstart
 
@@ -30,6 +30,8 @@ uv run python -m transferable_samplers.eval experiment=transferable/eval/prose_u
 > You must also populate `.env.example` and save as `.env` (sets `SCRATCH_DIR`).
 > **Optional:** Flash Attention (for TarFlow methods) must be installed separately, see the note at the bottom of `requirements.txt`.
 
+For full usage including datasets, model weights, training, and fine-tuning, see [Usage](https://transferable-samplers.github.io/transferable-samplers/#/usage). For development setup, tooling, and tests, see [Contributing](https://transferable-samplers.github.io/transferable-samplers/#/contributing).
+
 ## Implemented Papers
 
 This codebase is the official implementation of:
@@ -42,7 +44,7 @@ This codebase is the official implementation of:
 [![ICML 2025](https://img.shields.io/badge/ICML-2025-0077b6)](https://icml.cc/virtual/2025/poster/45137)
 [![arXiv](https://img.shields.io/badge/arXiv-2502.18462-b31b1b)](https://arxiv.org/abs/2502.18462)
 
-For details on reproducing paper results see [Paper Reproduction](paper-reproduction.md).
+For details on reproducing paper results see [Paper Reproduction](https://transferable-samplers.github.io/transferable-samplers/#/paper-reproduction).
 
 ---
 
