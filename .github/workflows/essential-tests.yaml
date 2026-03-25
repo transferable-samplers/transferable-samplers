@@ -27,8 +27,6 @@ jobs:
         with:
           path: .venv
           key: venv-${{ runner.os }}-py3.11-${{ hashFiles('requirements.txt', 'requirements-dev.txt', 'pyproject.toml') }}
-          restore-keys: |
-            venv-${{ runner.os }}-py3.11-
       - name: Install dependencies
         run: |
           uv venv .venv --python=3.11
