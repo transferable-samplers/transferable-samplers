@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing!
 
-We welcome bug reports, pull requests, and improvements of all kinds.
+We welcome bug reports, pull requests, and improvements of any kind.
 
 ## Contributing a Dataset or Method
 
