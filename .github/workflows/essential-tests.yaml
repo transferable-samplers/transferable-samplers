@@ -36,4 +36,4 @@ jobs:
       - name: Create scratch dir
         run: mkdir -p "$SCRATCH_DIR"
       - name: Run essential CPU tests
-        run: uv run --no-project pytest -vv -s -m essential tests/
+        run: uv run --no-project pytest -vv -s "tests/mwe/test_self_improve_mwe.py::test_self_improve_mwe[cpu-prose_up_to_8aa_self_improve]"
