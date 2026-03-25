@@ -7,3 +7,6 @@ junitparser>=3.2
 
 # --- Coverage ---
 pytest-cov>=7.0
+
+# --- Test utilities ---
+python-dotenv>=1.0
