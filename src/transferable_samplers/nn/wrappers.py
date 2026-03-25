@@ -27,9 +27,7 @@ class TorchDynWrapper(torch.nn.Module):
         x = x[..., :-1]  # remove the divergence estimate
 
         dx = self.model(t, x)
-        dlogp = -torch.vmap(self._divergence, in_dims=(None, 0), randomness="different")(
-            t.to(x.device).reshape(1), x
-        )
+        dlogp = -torch.vmap(self._divergence, in_dims=(None, 0), randomness="different")(t.to(x.device).reshape(1), x)
 
         self.nfe += 1
         return torch.cat([dx, dlogp[:, None] / self.dlogp_tol_scale], dim=-1).detach()

@@ -27,18 +27,18 @@ Then run your first experiment!
 uv run python -m transferable_samplers.eval experiment=transferable/eval/prose_up_to_8aa_snis
 ```
 
-> You must also populate `.env.example` and save as `.env` (sets `SCRATCH_DIR`).  
+> You must also populate `.env.example` and save as `.env` (sets `SCRATCH_DIR`).
 > **Optional:** Flash Attention (for TarFlow methods) must be installed separately, see the note at the bottom of `requirements.txt`.
 
 ## Implemented Papers
 
 This codebase is the official implementation of:
 
-**Amortized Sampling with Transferable Normalizing Flows**  
+**Amortized Sampling with Transferable Normalizing Flows**
 [![NeurIPS 2025](https://img.shields.io/badge/NeurIPS-2025-68448c)](https://neurips.cc/virtual/2025/loc/san-diego/poster/118702)
 [![arXiv](https://img.shields.io/badge/arXiv-2508.18175-b31b1b)](https://arxiv.org/abs/2508.18175v4)
 
-**Scalable Equilibrium Sampling with Sequential Boltzmann Generators**  
+**Scalable Equilibrium Sampling with Sequential Boltzmann Generators**
 [![ICML 2025](https://img.shields.io/badge/ICML-2025-0077b6)](https://icml.cc/virtual/2025/poster/45137)
 [![arXiv](https://img.shields.io/badge/arXiv-2502.18462-b31b1b)](https://arxiv.org/abs/2502.18462)
 
@@ -48,7 +48,7 @@ For details on reproducing paper results see [Paper Reproduction](paper-reproduc
 
 We additionally provide baseline implementations of:
 
-**Transferable Boltzmann Generators**  
+**Transferable Boltzmann Generators**
 [![NeurIPS 2024](https://img.shields.io/badge/NeurIPS-2024-68448c)](https://proceedings.neurips.cc/paper_files/paper/2024/hash/5035a409f5798e188079e236f437e522-Abstract-Conference.html)
 [![arXiv](https://img.shields.io/badge/arXiv-2406.14426-b31b1b)](https://arxiv.org/abs/2406.14426)
 
