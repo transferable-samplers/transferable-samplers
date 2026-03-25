@@ -65,7 +65,6 @@ def cfg_test_self_improve_mwe(request: pytest.FixtureRequest, trainer_name_param
     GlobalHydra.instance().clear()
 
 
-@pytest.mark.essential
 def test_self_improve_mwe(cfg_test_self_improve_mwe: DictConfig) -> None:
     """
     Run the self-improvement pipeline for a single iteration and check basic metrics.
