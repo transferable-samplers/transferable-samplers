@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, "release/*"]
+    branches: [main]
 jobs:
   code-quality:
     runs-on: ubuntu-latest
