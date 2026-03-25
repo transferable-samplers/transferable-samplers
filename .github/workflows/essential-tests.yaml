@@ -20,9 +20,9 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
       - name: Cache uv virtualenv
-        uses: actions/cache@v4
-        with:
-          path: .venv
+          key: venv-${{ runner.os }}-py3.11-${{ hashFiles('requirements.txt', 'requirements-dev.txt', 'pyproject.toml') }}
+          restore-keys: |
+            venv-${{ runner.os }}-py3.11-
           key: venv-${{ runner.os }}-${{ hashFiles('requirements.txt', 'pyproject.toml') }}
           restore-keys: |
             venv-${{ runner.os }}-
