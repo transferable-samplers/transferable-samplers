@@ -21,9 +21,9 @@ defaults:
 hf_state_dict_path: transferable/prose_up_to_8aa.pth
 model:
   source_energy_config:
-    sample_batch_size: 5_000
-    energy_batch_size: 5_000
-    grad_batch_size: 5_000
+    sample_batch_size: 512
+    energy_batch_size: 512
+    grad_batch_size: 512
     use_com_adjustment: true
 callbacks:
   sampling_evaluation:
