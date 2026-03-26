@@ -49,6 +49,12 @@ def broadcast_tensor(tensor: torch.Tensor, src: int = 0) -> torch.Tensor:
     return tensor
 
 
+def barrier() -> None:
+    """Synchronize all ranks. No-op if not distributed."""
+    if is_distributed():
+        dist.barrier()
+
+
 def shard_tensor(x: T) -> T:
     """Shard x across DDP ranks, asserts number of particles exactly divisible by world size.
 

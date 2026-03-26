@@ -25,6 +25,7 @@
 # Appendix D.2 of https://arxiv.org/pdf/2508.18175
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import torch
@@ -38,6 +39,7 @@ from transferable_samplers.samplers.smc.smc_particles import SMCParticles, all_g
 from transferable_samplers.utils.dataclasses import SamplesData, SourceEnergy, TargetEnergy
 from transferable_samplers.utils.dist_utils import (
     all_gather_cat,
+    barrier,
     broadcast_tensor,
     get_rank,
     get_world_size,
@@ -46,6 +48,36 @@ from transferable_samplers.utils.dist_utils import (
 from transferable_samplers.utils.pylogger import RankedLogger
 
 logger = RankedLogger(__name__, rank_zero_only=False)
+
+
+def _check_cross_rank_duplicates(
+    gathered: torch.Tensor,
+    world_size: int,
+    chunk_size: int,
+    label: str,
+    tol: float = 1e-4,
+) -> None:
+    """Log whether per-rank chunks in a gathered tensor contain near-duplicates.
+
+    Splits ``gathered`` into ``world_size`` chunks and uses ``torch.cdist`` to
+    find nearest-neighbour distances across every pair of ranks.
+    """
+    for i in range(world_size):
+        for j in range(i + 1, world_size):
+            flat_i = gathered[i * chunk_size : (i + 1) * chunk_size].reshape(chunk_size, -1).float()
+            flat_j = gathered[j * chunk_size : (j + 1) * chunk_size].reshape(chunk_size, -1).float()
+            dists = torch.cdist(flat_i, flat_j)
+            min_dists = dists.min(dim=1).values
+            n_dup = (min_dists < tol).sum().item()
+            if n_dup > 0:
+                logger.warning(
+                    f"DDP RNG CHECK [{label}]: ranks {i},{j} share {n_dup}/{chunk_size} "
+                    f"near-duplicates (min dist {min_dists.min():.2e}, tol={tol})"
+                )
+            else:
+                logger.info(
+                    f"DDP RNG CHECK [{label}]: ranks {i},{j} OK — min dist {min_dists.min():.2e}, no duplicates"
+                )
 
 
 class SMCSampler(BaseSampler):
@@ -123,6 +155,14 @@ class SMCSampler(BaseSampler):
         E_source = all_gather_cat(loc_E_source)
         E_target = all_gather_cat(loc_E_target)
 
+        # ── DDP RNG diversity check ──────────────────────────────────────
+        if world_size > 1:
+            _check_cross_rank_duplicates(samples, world_size, loc_num_samples, "source_energy.sample()")
+            loc_noise = torch.randn_like(loc_samples)
+            all_noise = all_gather_cat(loc_noise)
+            _check_cross_rank_duplicates(all_noise, world_size, loc_num_samples, "torch.randn_like() [Langevin proxy]")
+        # ─────────────────────────────────────────────────────────────────
+
         # Store for evaluation / plotting
         proposal_data = SamplesData(samples, E_target)
 
@@ -131,7 +171,7 @@ class SMCSampler(BaseSampler):
             samples, E_source, E_target = filter_by_energy_cutoff(
                 samples, E_source, E_target, self.energy_cutoff_filter
             )
-            logger.info("Clipping energies")
+            logger.info("Clipped proposal energy for SMC")
 
         # Clip by logit quantile (all ranks do same filtering to maintain same shape)
         if self.logw_quantile_filter is not None:
@@ -171,8 +211,13 @@ class SMCSampler(BaseSampler):
 
         # Main loop
         t_previous = 0.0
-        for j, t in enumerate(timesteps[:-1]):
-            logger.info(f"SMC step {j + 1}/{self.num_annealing_steps}, t={t:.3f}, eps={eps:.2e}")
+        t0_step = time.perf_counter()
+        for j, t in enumerate(timesteps[1:]):
+            barrier()  # makes log ordering more clear, shouldn't slow down much since have a sync in the loop anyway.
+            elapsed = time.perf_counter() - t0_step
+            rate = 1.0 / elapsed if elapsed > 0 else float("inf")
+            logger.info(f"SMC step {j + 1}/{self.num_annealing_steps}, t={t:.3f}, eps={eps:.2e} @ {rate:.2f} steps/s")
+            t0_step = time.perf_counter()
 
             dt = t - t_previous
             loc_particles, acceptance_rate = mcmc_kernel(
@@ -190,10 +235,38 @@ class SMCSampler(BaseSampler):
             elif loc_particles.logw.isnan().any():
                 raise ValueError("logw has NaNs")
 
+            # ── DDP diagnostics: per-rank stats BEFORE sync ──────────────
+            rank = get_rank()
+            loc_ar = acceptance_rate.item() if isinstance(acceptance_rate, torch.Tensor) else acceptance_rate
+            loc_logw = loc_particles.logw
+            loc_E = loc_particles.E_target
+            logger.info(
+                f"DDP DIAG step {j + 1} rank {rank}: "
+                f"loc_accept={loc_ar:.4f}  "
+                f"loc_logw mean={loc_logw.mean():.4f} std={loc_logw.std():.4f} "
+                f"min={loc_logw.min():.4f} max={loc_logw.max():.4f}  "
+                f"loc_E_target mean={loc_E.mean():.2f} std={loc_E.std():.2f} "
+                f"median={loc_E.median():.2f}"
+            )
+            # ──────────────────────────────────────────────────────────────
+
             if self.adaptive_step_size:
+                # Sync acceptance rate across ranks and adapt eps
+                acceptance_rate = all_gather_cat(acceptance_rate.unsqueeze(0)).mean()
                 eps = self._adapt_eps(eps, acceptance_rate)
 
-            ess = normalized_ess(all_gather_cat(loc_particles.logw))
+            global_logw = all_gather_cat(loc_particles.logw)
+            ess = normalized_ess(global_logw)
+
+            # ── DDP diagnostics: global stats AFTER sync ─────────────────
+            logger.info(
+                f"DDP DIAG step {j + 1} GLOBAL: "
+                f"accept={acceptance_rate:.4f}  eps={eps:.2e}  ess={ess:.4f}  "
+                f"logw mean={global_logw.mean():.4f} std={global_logw.std():.4f} "
+                f"min={global_logw.min():.4f} max={global_logw.max():.4f}  "
+                f"logw_range={global_logw.max() - global_logw.min():.4f}"
+            )
+            # ──────────────────────────────────────────────────────────────
 
             # Track diagnostics at every step
             diagnostics["t"].append(t)
@@ -204,8 +277,6 @@ class SMCSampler(BaseSampler):
             # Collect particle snapshot at log_traj_freq intervals
             if not (j + 1) % self.log_traj_freq:
                 temp_particles = all_gather_particles(loc_particles)
-                if get_rank() == 0:
-                    logger.info("Gathered particles from workers for trajectory logging.")
                 trajectory.append(temp_particles)
 
             # Resampling when ESS drops below threshold, or always on the final step
@@ -213,7 +284,6 @@ class SMCSampler(BaseSampler):
             if ess < self.ess_threshold or is_final:
                 particles = all_gather_particles(loc_particles)
                 if get_rank() == 0:
-                    logger.info("Gathered particles from workers for resampling.")
                     indices = resampling_idx(particles.logw, self.resampling_method)
                     logger.info(f"Resampled particles at t={t:.3f} with ESS={ess:.2f}")
                 else:
@@ -222,10 +292,20 @@ class SMCSampler(BaseSampler):
                 resampled = particles[indices]
                 resampled.logw = torch.zeros(len(resampled), device=resampled.x.device)
                 trajectory.append(resampled)  # global
+
+                # ── DDP diagnostics: post-resampling diversity ────────────
+                n_unique = resampled.lineage.unique().numel()
+                logger.info(
+                    f"DDP DIAG step {j + 1} RESAMPLE: "
+                    f"n_unique={n_unique}/{len(resampled)}  "
+                    f"E_target mean={resampled.E_target.mean():.2f} "
+                    f"median={resampled.E_target.median():.2f} "
+                    f"std={resampled.E_target.std():.2f}"
+                )
+                # ──────────────────────────────────────────────────────────
+
                 if not is_final:
                     resampled = shard_tensor(resampled)
-                    if get_rank() == 0:
-                        logger.info("Sharded particles to workers.")
                 loc_particles = resampled
 
             t_previous = t
