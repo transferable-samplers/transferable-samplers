@@ -55,8 +55,12 @@ def _make_train_cfg(trainer_name: str, tmp_path: Path, **extra) -> DictConfig:
         cfg.trainer.max_epochs = 1
         cfg.trainer.limit_train_batches = 1
         cfg.data.num_workers = 0
-        cfg.data.batch_size = 4
+        cfg.data.batch_size = 2
         cfg.seed = 42
+        # Shrink network for faster CI runs
+        cfg.model.net.channels = 64
+        cfg.model.net.num_blocks = 2
+        cfg.model.net.layers_per_block = 2
         cfg.tags = ["pytest"]
         # Disable sampling evaluation callback (not needed for training-only tests).
         cfg.callbacks.sampling_evaluation = None
