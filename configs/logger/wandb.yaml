@@ -6,7 +6,7 @@ wandb:
   offline: false
   id: # pass correct id to resume experiment!
   anonymous: # enable anonymous logging
-  project: self-consume-bg
+  project: ${oc.env:WANDB_PROJECT}
   log_model: false # upload lightning ckpts
   entity: openproblems-comp
   prefix: '' # a string to put at the beginning of metric keys

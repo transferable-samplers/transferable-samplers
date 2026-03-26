@@ -28,7 +28,7 @@ Then run your first experiment!
 uv run python -m transferable_samplers.eval experiment=transferable/eval/prose_up_to_8aa_snis
 ```
 
-> You must also populate `.env.example` and save as `.env` (sets `SCRATCH_DIR`).
+> You must also populate `.env.example` and save as `.env` (sets `SCRATCH_DIR` and `WANDB_PROJECT`).
 > **Optional:** Flash Attention (for TarFlow methods) must be installed separately, see the note at the bottom of `requirements.txt`.
 
 For full usage including datasets, model weights, training, and fine-tuning, see [Usage](usage.md). For development setup, tooling, and tests, see [Contributing](contributing.md).
