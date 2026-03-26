@@ -97,7 +97,7 @@
       "log_model": false,
       "offline": false,
       "prefix": "",
-      "project": "self-consume-bg",
+      "project": "${oc.env:WANDB_PROJECT}",
       "save_dir": "${paths.output_dir}",
       "tags": "${tags}"
     }
