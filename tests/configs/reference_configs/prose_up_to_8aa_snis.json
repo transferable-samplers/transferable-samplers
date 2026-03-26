@@ -185,7 +185,7 @@
       "log_model": false,
       "offline": false,
       "prefix": "",
-      "project": "self-consume-bg",
+      "project": "${oc.env:WANDB_PROJECT}",
       "save_dir": "${paths.output_dir}",
       "tags": "${tags}"
     }
@@ -240,9 +240,9 @@
     },
     "source_energy_config": {
       "_target_": "transferable_samplers.utils.dataclasses.SourceEnergyConfig",
-      "energy_batch_size": 5000,
-      "grad_batch_size": 5000,
-      "sample_batch_size": 5000,
+      "energy_batch_size": 512,
+      "grad_batch_size": 512,
+      "sample_batch_size": 512,
       "use_com_adjustment": true
     },
     "train_from_buffer": false

@@ -61,6 +61,11 @@ def test_snis_prose_up_to_8aa(trainer_name_param: str, tmp_path: Path) -> None:
     metrics, _ = eval(cfg)
     GlobalHydra.instance().clear()
 
+    print("\n--- Benchmark metrics ---")
+    for suffix in REFERENCE:
+        key = f"test/ARIP/{suffix}"
+        print(f"  {key}: {metrics.get(key, 'MISSING')}")
+
     for suffix, (ref_mean, ref_std) in REFERENCE.items():
         key = f"test/ARIP/{suffix}"
         assert key in metrics, f"{key} missing from metrics"

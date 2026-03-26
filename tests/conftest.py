@@ -4,6 +4,7 @@ Tests are run with the appropriate trainer based on available devices.
 Unique ids for each trainer are provided for clarity in test reports.
 """
 
+import gc
 import os
 from pathlib import Path
 
@@ -50,3 +51,10 @@ def _enforce_hardware_constraints(request, trainer_name_param: str):
     if request.node.get_closest_marker("benchmark"):
         if trainer_name_param == "cpu":
             pytest.skip("Benchmark tests require GPU")
+
+
+@pytest.fixture(autouse=True)
+def _free_memory_after_test():
+    yield
+    gc.collect()
+    torch.cuda.empty_cache()

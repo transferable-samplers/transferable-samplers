@@ -164,6 +164,7 @@ class ManyPeptidesDataModule(BaseDataModule):
                 self.encodings_dict_pkl_path if "encodings" in self.system_cond_ids else None,
                 self.permutations_dict_pkl_path if "permutations" in self.system_cond_ids else None,
             ]
+            if p is not None
         ):
             logger.info("All preprocessing cache files found, skipping preprocessing.")
             return

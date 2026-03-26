@@ -106,7 +106,6 @@ class SinglePeptideDataModule(BaseDataModule):
             repo_type="dataset",
             local_dir=f"{self.data_dir}/{self.repo_name}",
             allow_patterns=[f"{self.trajectory_name}/*"],
-            token=True,
         )
         logger.info(f"Downloaded dataset to {local_dir}")
 

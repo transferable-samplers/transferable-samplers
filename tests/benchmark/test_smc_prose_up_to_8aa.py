@@ -59,6 +59,11 @@ def test_smc_prose_up_to_8aa(trainer_name_param: str, tmp_path: Path) -> None:
     test_sequence = extract_test_sequence(cfg)
     assert f"test/{test_sequence}/smc/median-energy" in metrics
 
+    print("\n--- Benchmark metrics ---")
+    for suffix in REFERENCE:
+        key = f"test/{test_sequence}/{suffix}"
+        print(f"  {key}: {metrics.get(key, 'MISSING')}")
+
     for suffix, (ref_mean, ref_std) in REFERENCE.items():
         key = f"test/{test_sequence}/{suffix}"
         assert key in metrics, f"{key} missing from metrics"
@@ -67,7 +72,3 @@ def test_smc_prose_up_to_8aa(trainer_name_param: str, tmp_path: Path) -> None:
         assert lo <= val <= hi, (
             f"{key}={val:.4f} outside 2.5σ range [{lo:.4f}, {hi:.4f}] (ref {ref_mean:.4f}±{ref_std:.4f})"
         )
-
-    print("\n--- Benchmark metrics ---")
-    for key in sorted(metrics):
-        print(f"  {key}: {metrics[key]}")

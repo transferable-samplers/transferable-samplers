@@ -55,7 +55,15 @@ def cfg_test_train_mwe(request: pytest.FixtureRequest, trainer_name_param: str, 
         cfg.trainer.max_epochs = 1
         cfg.trainer.limit_train_batches = 1
         cfg.data.num_workers = 0  # avoid multiprocessing issues in tests
-        cfg.data.batch_size = 4
+        cfg.data.batch_size = 2
+        # Shrink network for faster CI runs
+        if "ecnf" in experiment_name:
+            cfg.model.net.channels = 64
+            cfg.model.net.num_layers = 2
+        else:  # tarflow / prose
+            cfg.model.net.channels = 64
+            cfg.model.net.num_blocks = 2
+            cfg.model.net.layers_per_block = 2
         if trainer_name_param == "cpu" and cfg.callbacks.sampling_evaluation is not None:
             cfg.callbacks.sampling_evaluation.run_diagnostics_kwargs = {
                 "num_samples_invert": 8,

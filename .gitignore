@@ -180,3 +180,5 @@ CLAUDE.md
 
 df_cache/*
 NOTES/*
+
+uv.lock

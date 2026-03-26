@@ -1,0 +1,39 @@
+name: Essential Tests (CPU)
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [ready_for_review]
+    branches: [main]
+jobs:
+  essential-tests:
+    runs-on: ubuntu-latest
+    env:
+      PYTEST_TRAINER: cpu
+      SCRATCH_DIR: /tmp/scratch
+      WANDB_MODE: offline
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Cache uv virtualenv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-py3.11-${{ hashFiles('requirements.txt', 'requirements-dev.txt', 'pyproject.toml') }}
+      - name: Install dependencies
+        run: |
+          uv venv .venv --python=3.11
+          uv pip install -r requirements.txt
+          uv pip install -r requirements-dev.txt
+      - name: Create scratch dir
+        run: mkdir -p "$SCRATCH_DIR"
+      - name: Run essential CPU tests
+        run: uv run --no-project pytest -vv -s -m essential tests/
