@@ -82,10 +82,16 @@ class LossEvaluationCallback(Callback):
                 torch.distributed.all_reduce(local_mean, op=torch.distributed.ReduceOp.AVG)
 
             if trainer.is_global_zero:
-                key = f"{prefix}/{sequence}/eval-loss"
+                key = f"{prefix}/{sequence}/loss"
                 value = local_mean.item()
-                all_metrics[key] = value
-                pl_module.log_dict({key: value})
+                dim = x.shape[1] * x.shape[2]
+                loss_per_dim = value / dim
+                metrics = {
+                    key: value,
+                    f"{prefix}/{sequence}/loss-per-dim": loss_per_dim,
+                }
+                all_metrics.update(metrics)
+                pl_module.log_dict(metrics)
                 logger.info(f"{key}: {value:.6f}")
 
             # Logging only runs on rank 0 — barrier so all ranks are aligned before next sequence
