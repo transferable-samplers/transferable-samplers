@@ -23,6 +23,32 @@ def get_rank() -> int:
     return dist.get_rank() if dist.is_initialized() else 0
 
 
+def drift_rng_state(stride: int = 10_000) -> None:
+    """Desync the per-rank RNG by consuming `rank * stride` random draws.
+
+    Lightning's ``seed_everything`` sets the same seed on every rank, which
+    causes rank-local sampling ops (e.g. ``source_energy.sample`` drawing
+    from a normalising-flow base distribution) to produce identical outputs
+    across ranks. Calling this once after DDP is initialised consumes a
+    rank-dependent number of random draws so subsequent draws decorrelate.
+    No-op on rank 0 / non-distributed.
+
+    Drifts CPU and (if available) every CUDA device's RNG. PyTorch's CPU
+    and CUDA RNGs are independent generators, and code paths that look
+    GPU-only often sample on CPU then move to GPU (e.g.
+    ``torch.distributions.Normal`` with scalar params), so we have to
+    advance both to be safe.
+    """
+    rank = get_rank()
+    if rank == 0:
+        return
+    n = rank * stride
+    torch.randn(n)
+    if torch.cuda.is_available():
+        for i in range(torch.cuda.device_count()):
+            torch.randn(n, device=torch.device("cuda", i))
+
+
 def all_gather_cat(tensor: torch.Tensor) -> torch.Tensor:
     """All-gather a tensor across ranks and concatenate along dim 0.
 
