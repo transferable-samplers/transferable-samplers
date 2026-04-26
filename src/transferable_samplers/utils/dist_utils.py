@@ -33,8 +33,8 @@ def drift_rng_state(stride: int = 10_000) -> None:
     rank-dependent number of random draws so subsequent draws decorrelate.
     No-op on rank 0 / non-distributed.
 
-    Drifts CPU and (if available) every CUDA device's RNG. PyTorch's CPU
-    and CUDA RNGs are independent generators, and code paths that look
+    Drifts CPU and (if available) the current CUDA device's RNG. PyTorch's
+    CPU and CUDA RNGs are independent generators, and code paths that look
     GPU-only often sample on CPU then move to GPU (e.g.
     ``torch.distributions.Normal`` with scalar params), so we have to
     advance both to be safe.
@@ -45,8 +45,7 @@ def drift_rng_state(stride: int = 10_000) -> None:
     n = rank * stride
     torch.randn(n)
     if torch.cuda.is_available():
-        for i in range(torch.cuda.device_count()):
-            torch.randn(n, device=torch.device("cuda", i))
+        torch.randn(n, device=torch.cuda.current_device())
 
 
 def all_gather_cat(tensor: torch.Tensor) -> torch.Tensor:
