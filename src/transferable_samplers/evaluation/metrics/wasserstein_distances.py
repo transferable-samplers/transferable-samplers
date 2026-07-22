@@ -87,7 +87,14 @@ def energy_wasserstein(pred_energy: torch.Tensor, true_energy: torch.Tensor, pre
 def torus_wasserstein(
     true_samples: torch.Tensor, pred_samples: torch.Tensor, topology: md.Topology, prefix: str = ""
 ) -> dict[str, float]:
-    """Compute torus Wasserstein W2 on phi/psi dihedral angles."""
+    """Compute torus Wasserstein W2 on phi/psi dihedral angles.
+
+    All phi and psi angles are concatenated into a single feature vector and compared
+    via a per-dimension torus distance. Which residue each column "belongs to" doesn't
+    matter here (unlike for a Ramachandran plot, see plot_ramachandran.py) since the same
+    column ordering is used consistently for both true and predicted samples. The
+    N-terminal residue's psi and the C-terminal residue's phi are included.
+    """
     phis_true, psis_true = _get_phi_psi_vectors(true_samples, topology)
     x_true = torch.cat([torch.from_numpy(phis_true), torch.from_numpy(psis_true)], dim=1)
 

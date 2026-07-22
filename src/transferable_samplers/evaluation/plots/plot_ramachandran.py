@@ -5,17 +5,45 @@ from typing import Any
 
 import matplotlib
 import matplotlib.pyplot as plt
+import mdtraj as md
 import numpy as np
 import torch
 from matplotlib.colors import LogNorm
 
-from transferable_samplers.evaluation.metrics.wasserstein_distances import _get_phi_psi_vectors as get_phi_psi_vectors
 from transferable_samplers.utils.pylogger import RankedLogger
 
 logger = RankedLogger(__name__, rank_zero_only=True)
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
+
+
+def _get_paired_phi_psi_vectors(samples: torch.Tensor, topology: md.Topology) -> tuple[np.ndarray, np.ndarray]:
+    """Extract per-residue phi/psi dihedral angles, paired by the residue they belong to.
+
+    ``md.compute_phi`` omits the first residue when there is no preceding atom (e.g. no
+    ACE cap) to form the angle with, and ``md.compute_psi`` omits the last residue when
+    there is no following atom (e.g. no NME cap). Without capping groups, the returned
+    phi/psi columns are therefore offset by one residue relative to each other, so a
+    Ramachandran plot needs residues matched explicitly via the atom indices mdtraj
+    returns rather than zipped by column position. This holds regardless of whether
+    capping groups are present.
+    """
+    samples = samples.cpu()
+    traj = md.Trajectory(samples, topology=topology)
+    phi_indices, phis = md.compute_phi(traj)
+    psi_indices, psis = md.compute_psi(traj)
+
+    # phi is C(i-1)-N(i)-CA(i)-C(i): the N atom (column 1) belongs to residue i.
+    phi_residues = [topology.atom(idx).residue.index for idx in phi_indices[:, 1]]
+    # psi is N(i)-CA(i)-C(i)-N(i+1): the N atom (column 0) belongs to residue i.
+    psi_residues = [topology.atom(idx).residue.index for idx in psi_indices[:, 0]]
+
+    common_residues = [r for r in phi_residues if r in psi_residues]
+    phi_cols = [phi_residues.index(r) for r in common_residues]
+    psi_cols = [psi_residues.index(r) for r in common_residues]
+
+    return phis[:, phi_cols], psis[:, psi_cols]
 
 
 def plot_ramachandran(
@@ -35,7 +63,7 @@ def plot_ramachandran(
     logger.info(f"Plotting Ramachandran for {prefix}")
     prefix += "/rama"
 
-    phis, psis = get_phi_psi_vectors(samples, topology)
+    phis, psis = _get_paired_phi_psi_vectors(samples, topology)
 
     for i in range(phis.shape[1]):
         phi_tmp = phis[:, i]
