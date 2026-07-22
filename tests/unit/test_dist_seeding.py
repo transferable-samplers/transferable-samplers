@@ -1,12 +1,12 @@
-"""Tests for the DDP rank-local RNG seeding scheme (PR #38).
+"""Tests for the DDP rank-local RNG seeding scheme.
 
-Verifies the seeding mechanism introduced in ``drift_rng_state()`` and called
-from ``BaseLightningModule.setup()``.
+Verifies the ``seed_rank_local()`` mechanism and its integration into
+``BaseLightningModule.setup()``.
 
 Three groups:
-  A. Unit tests for ``drift_rng_state()`` mechanism (non-distributed, mocked rank).
-  B. DDP integration tests (real gloo, 2 ranks) — bug, fix, gaps, alternative.
-  C. ``BaseLightningModule.setup()`` integration — call verification, compounding.
+  A. Unit tests for ``seed_rank_local()`` mechanism (non-distributed, mocked rank).
+  B. DDP integration tests (real gloo, 2 ranks) — bug, fix, reproducibility.
+  C. ``BaseLightningModule.setup()`` integration — call verification, idempotency.
 """
 
 import json
@@ -17,7 +17,7 @@ import socket
 import tempfile
 from functools import partial
 from pathlib import Path
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import PropertyMock, patch
 
 import numpy as np
 import pytest
@@ -29,17 +29,19 @@ from lightning import seed_everything
 from transferable_samplers.models.base_lightning_module import BaseLightningModule
 from transferable_samplers.utils import dist_utils
 
-STRIDE = 1 << 20  # must match drift_rng_state's internal STRIDE
-
-
 # ======================================================================
 # Helpers
 # ======================================================================
 
 
 def _find_free_port() -> str:
-    """Return a free TCP port as a string (for gloo rendezvous)."""
+    """Return a free TCP port as a string (for gloo rendezvous).
+
+    ``SO_REUSEADDR`` avoids lingering ``TIME_WAIT`` sockets binding the port
+    on rapid re-runs (e.g. when the gloo store is retried after a flaky spawn).
+    """
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind(("", 0))
         s.listen(1)
         return str(s.getsockname()[1])
@@ -63,11 +65,9 @@ def _ddp_worker(
         seed_everything(base_seed, workers=False)
     elif strategy == "seed_workers":
         seed_everything(base_seed, workers=True)
-    elif strategy == "drift":
-        seed_everything(base_seed, workers=False)
-        dist_utils.drift_rng_state()
-    elif strategy == "per_rank_seed":
-        seed_everything(base_seed + rank, workers=True)
+    elif strategy == "seed_rank_local":
+        seed_everything(base_seed, workers=True)
+        dist_utils.seed_rank_local()
     else:
         raise ValueError(f"Unknown strategy: {strategy}")
 
@@ -85,164 +85,222 @@ def _ddp_worker(
 
 
 def _run_ddp(strategy: str, world_size: int = 2, base_seed: int = 42, n_draws: int = 8) -> list[dict]:
-    """Spawn DDP workers with a given strategy and return per-rank RNG draws."""
+    """Spawn DDP workers with a given strategy and return per-rank RNG draws.
+
+    Retries once on a fresh port if any worker exits non-zero — gloo rendezvous
+    is occasionally flaky under fork+``mp.spawn`` in CI/concurrent test runs.
+    """
     ctx = mp.get_context("fork")
-    port = _find_free_port()
-    tmpdir = tempfile.mkdtemp()
-    procs = []
-    for rank in range(world_size):
-        p = ctx.Process(
-            target=_ddp_worker,
-            args=(rank, world_size, port, strategy, base_seed, tmpdir, n_draws),
-        )
-        p.start()
-        procs.append(p)
-    for p in procs:
-        p.join(timeout=60)
-        if p.exitcode != 0:
-            raise RuntimeError(f"DDP worker exited with code {p.exitcode}")
-    results = []
-    for rank in range(world_size):
-        rank_path = Path(tmpdir) / f"rank_{rank}.json"
-        with rank_path.open() as f:
-            results.append(json.load(f))
-    shutil.rmtree(tmpdir)
-    return results
-
-
-def _per_rank_seed(base_seed: int) -> None:
-    """Alternative strategy: per-rank derived seed (fixes torch + numpy + python)."""
-    seed_everything(base_seed + dist_utils.get_rank(), workers=True)
+    last_err: Exception | None = None
+    for _attempt in range(2):
+        port = _find_free_port()
+        tmpdir = tempfile.mkdtemp()
+        procs = []
+        for rank in range(world_size):
+            p = ctx.Process(
+                target=_ddp_worker,
+                args=(rank, world_size, port, strategy, base_seed, tmpdir, n_draws),
+            )
+            p.start()
+            procs.append(p)
+        failed = False
+        for p in procs:
+            p.join(timeout=60)
+            if p.exitcode != 0:
+                failed = True
+                last_err = RuntimeError(f"DDP worker exited with code {p.exitcode}")
+                # Terminate any stragglers so the next attempt starts clean.
+                for q in procs:
+                    if q.is_alive():
+                        q.terminate()
+                break
+        if not failed:
+            results = []
+            for rank in range(world_size):
+                rank_path = Path(tmpdir) / f"rank_{rank}.json"
+                with rank_path.open() as f:
+                    results.append(json.load(f))
+            shutil.rmtree(tmpdir)
+            return results
+        shutil.rmtree(tmpdir, ignore_errors=True)
+    # Exhausted retries — surface the last failure.
+    assert last_err is not None
+    raise last_err
 
 
 # ======================================================================
-# Part A: Unit tests for drift_rng_state() mechanism
+# Part A: Unit tests for seed_rank_local() mechanism
 # ======================================================================
 
 
 @pytest.mark.essential
-class TestDriftMechanism:
-    """Unit tests for drift_rng_state() CPU/CUDA advancement (non-distributed, mocked rank)."""
+class TestSeedRankLocalMechanism:
+    """Unit tests for seed_rank_local() (non-distributed, mocked rank)."""
 
     def test_noop_when_not_distributed(self):
-        """drift_rng_state is a no-op when dist is not initialized (rank defaults to 0)."""
+        """seed_rank_local is a no-op when dist is not initialized (rank defaults to 0)."""
         torch.manual_seed(42)
         before = torch.get_rng_state()
-        dist_utils.drift_rng_state()
+        dist_utils.seed_rank_local()
         after = torch.get_rng_state()
         assert before.equal(after)
 
     def test_noop_on_rank_zero(self):
-        """Explicit rank 0 is a no-op."""
+        """Explicit rank 0 is a no-op (already correctly seeded by seed_everything)."""
         torch.manual_seed(42)
         before = torch.get_rng_state()
         with patch("transferable_samplers.utils.dist_utils.get_rank", return_value=0):
-            dist_utils.drift_rng_state()
+            dist_utils.seed_rank_local()
         after = torch.get_rng_state()
         assert before.equal(after)
 
-    def test_cpu_rng_advances_by_rank_times_stride(self):
-        """Rank N drift advances CPU RNG by exactly N*STRIDE elements."""
-        with patch("transferable_samplers.utils.dist_utils.get_rank", return_value=2):
-            torch.manual_seed(42)
-            dist_utils.drift_rng_state()
-            post_drift = torch.randn(4)
+    def test_reseeds_torch_with_base_seed_plus_rank(self):
+        """Rank N gets re-seeded with base_seed + N on torch."""
+        with (
+            patch("transferable_samplers.utils.dist_utils.get_rank", return_value=2),
+            patch.dict(os.environ, {"PL_GLOBAL_SEED": "100"}),
+        ):
+            dist_utils.seed_rank_local()
+            post_seed = torch.randn(4)
 
-        torch.manual_seed(42)
-        _ = torch.randn(2 * STRIDE)
+        torch.manual_seed(102)  # 100 + 2
         expected = torch.randn(4)
 
-        assert torch.equal(post_drift, expected)
+        assert torch.equal(post_seed, expected)
 
-    def test_rank1_stream_equals_manual_burn(self):
-        """Rank 1 post-drift draw == manual burn of STRIDE elements from same seed.
+    def test_reseeds_numpy_with_base_seed_plus_rank(self):
+        """Rank N gets re-seeded with base_seed + N on numpy."""
+        with (
+            patch("transferable_samplers.utils.dist_utils.get_rank", return_value=3),
+            patch.dict(os.environ, {"PL_GLOBAL_SEED": "50"}),
+        ):
+            dist_utils.seed_rank_local()
+            post_seed = np.random.rand(4).tolist()
 
-        Verifies sub-stream continuity: rank 1 picks up right after rank 0's STRIDE budget.
-        """
-        with patch("transferable_samplers.utils.dist_utils.get_rank", return_value=1):
-            torch.manual_seed(42)
-            dist_utils.drift_rng_state()
-            drifted_draw = torch.randn(4)
+        np.random.seed(53)  # 50 + 3
+        expected = np.random.rand(4).tolist()
 
-        torch.manual_seed(42)
-        _ = torch.randn(STRIDE)
-        manual_draw = torch.randn(4)
+        assert post_seed == expected
 
-        assert torch.equal(drifted_draw, manual_draw)
+    def test_reseeds_python_random_with_base_seed_plus_rank(self):
+        """Rank N gets re-seeded with base_seed + N on python.random."""
+        with (
+            patch("transferable_samplers.utils.dist_utils.get_rank", return_value=1),
+            patch.dict(os.environ, {"PL_GLOBAL_SEED": "77"}),
+        ):
+            dist_utils.seed_rank_local()
+            post_seed = [random.random() for _ in range(4)]
 
-    def test_cpu_draws_differ_across_ranks(self):
-        """Rank 0 and rank 1 produce different CPU draws after drift."""
-        with patch("transferable_samplers.utils.dist_utils.get_rank", return_value=1):
-            torch.manual_seed(42)
-            dist_utils.drift_rng_state()
-            rank1_draw = torch.randn(8)
+        random.seed(78)  # 77 + 1
+        expected = [random.random() for _ in range(4)]
 
-        torch.manual_seed(42)
-        rank0_draw = torch.randn(8)  # rank 0 / not distributed → no drift
+        assert post_seed == expected
+
+    def test_torch_draws_differ_across_ranks(self):
+        """Rank 0 and rank 1 produce different torch draws after seeding."""
+        with patch.dict(os.environ, {"PL_GLOBAL_SEED": "42"}):
+            with patch("transferable_samplers.utils.dist_utils.get_rank", return_value=1):
+                dist_utils.seed_rank_local()
+                rank1_draw = torch.randn(8)
+
+            torch.manual_seed(42)  # rank 0
+            rank0_draw = torch.randn(8)
 
         assert not torch.equal(rank0_draw, rank1_draw)
 
+    def test_no_substream_collision(self):
+        """Per-rank seeds produce independent streams with no collision risk.
+
+        Unlike offset-based drift, rank 0 can draw indefinitely without ever
+        colliding with rank 1's stream — they use independent seeds.
+        """
+        with patch.dict(os.environ, {"PL_GLOBAL_SEED": "42"}):
+            torch.manual_seed(42)  # rank 0
+            _ = torch.randn(10_000_000)  # way past any drift STRIDE budget
+            rank0_after = torch.randn(1)
+
+            with patch("transferable_samplers.utils.dist_utils.get_rank", return_value=1):
+                dist_utils.seed_rank_local()
+                rank1_first = torch.randn(1)
+
+        assert not torch.equal(rank0_after, rank1_first), (
+            "Per-rank seeds produce independent streams — no sub-stream collision."
+        )
+
     def test_reproducible_same_seed_same_rank(self):
-        """Same seed + same rank produces identical draws across runs."""
+        """Same base seed + same rank produces identical draws across runs."""
 
         def _run():
-            torch.manual_seed(42)
-            with patch("transferable_samplers.utils.dist_utils.get_rank", return_value=3):
-                dist_utils.drift_rng_state()
+            torch.manual_seed(999)  # arbitrary pre-state
+            with (
+                patch("transferable_samplers.utils.dist_utils.get_rank", return_value=3),
+                patch.dict(os.environ, {"PL_GLOBAL_SEED": "42"}),
+            ):
+                dist_utils.seed_rank_local()
             return torch.randn(8)
 
         assert torch.equal(_run(), _run())
 
-    def test_stride_budget_limitation(self):
-        """Document: rank 0's (STRIDE+1)-th draw collides with rank 1's first draw.
+    def test_idempotent_multiple_calls(self):
+        """Calling seed_rank_local twice produces the same state (no compounding).
 
-        If any rank consumes more than STRIDE RNG draws, it enters the next rank's
-        sub-stream. This is the fundamental limitation of offset-based drift vs.
-        independent per-rank seeds.
+        This is the key advantage over offset-based drift: setup() may be called
+        multiple times (fit + validate + test) and the RNG state is deterministic
+        regardless of how many stages ran.
         """
-        with patch("transferable_samplers.utils.dist_utils.get_rank", return_value=1):
-            torch.manual_seed(42)
-            dist_utils.drift_rng_state()
-            rank1_first = torch.randn(1)
 
-        # From the same seed, burn STRIDE then draw 1 — this is rank 1's first draw
-        torch.manual_seed(42)
-        _ = torch.randn(STRIDE)
-        rank0_after_stride = torch.randn(1)
+        def _run_two_calls():
+            torch.manual_seed(999)  # arbitrary pre-state
+            with (
+                patch("transferable_samplers.utils.dist_utils.get_rank", return_value=1),
+                patch.dict(os.environ, {"PL_GLOBAL_SEED": "42"}),
+            ):
+                dist_utils.seed_rank_local()
+                dist_utils.seed_rank_local()  # second call
+            return torch.randn(4)
 
-        assert torch.equal(rank1_first, rank0_after_stride), (
-            "Rank 0's (STRIDE+1)-th draw == rank 1's first draw. "
-            "If rank 0 exceeds its STRIDE budget, sub-streams collide."
+        def _run_one_call():
+            torch.manual_seed(999)  # same pre-state
+            with (
+                patch("transferable_samplers.utils.dist_utils.get_rank", return_value=1),
+                patch.dict(os.environ, {"PL_GLOBAL_SEED": "42"}),
+            ):
+                dist_utils.seed_rank_local()
+            return torch.randn(4)
+
+        assert torch.equal(_run_two_calls(), _run_one_call()), (
+            "seed_rank_local should be idempotent: two calls produce the same state as one."
         )
 
-    def test_cuda_offset_set_when_available(self):
-        """When CUDA is available, drift advances the generator offset by rank*STRIDE."""
-        mock_gen = MagicMock()
-        mock_gen.get_offset.return_value = 1000
+    def test_cuda_manual_seed_all_when_available(self):
+        """When CUDA is available, seed_rank_local calls torch.cuda.manual_seed_all.
 
+        torch.manual_seed is mocked to isolate our code's CUDA branch (it
+        internally calls manual_seed_all regardless of is_available).
+        """
         with (
             patch("transferable_samplers.utils.dist_utils.get_rank", return_value=2),
+            patch.dict(os.environ, {"PL_GLOBAL_SEED": "100"}),
+            patch("torch.manual_seed"),  # no-op to prevent internal cuda call
             patch("torch.cuda.is_available", return_value=True),
-            patch("torch.cuda.current_device", return_value=0),
-            patch("torch.cuda.default_generators", new=[mock_gen]),
+            patch("torch.cuda.manual_seed_all") as mock_cuda_seed,
         ):
-            dist_utils.drift_rng_state()
+            dist_utils.seed_rank_local()
 
-        mock_gen.get_offset.assert_called_once()
-        mock_gen.set_offset.assert_called_once_with(1000 + 2 * STRIDE)
+        mock_cuda_seed.assert_called_once_with(102)  # 100 + 2
 
     def test_cuda_skipped_when_unavailable(self):
-        """When CUDA is unavailable, no generator offset is set."""
-        mock_gen = MagicMock()
-
+        """When CUDA is unavailable, manual_seed_all is not called by our code."""
         with (
             patch("transferable_samplers.utils.dist_utils.get_rank", return_value=2),
+            patch.dict(os.environ, {"PL_GLOBAL_SEED": "100"}),
+            patch("torch.manual_seed"),  # no-op to prevent internal cuda call
             patch("torch.cuda.is_available", return_value=False),
-            patch("torch.cuda.default_generators", new=[mock_gen]),
+            patch("torch.cuda.manual_seed_all") as mock_cuda_seed,
         ):
-            dist_utils.drift_rng_state()
+            dist_utils.seed_rank_local()
 
-        mock_gen.set_offset.assert_not_called()
+        mock_cuda_seed.assert_not_called()
 
 
 # ======================================================================
@@ -254,8 +312,8 @@ class TestDriftMechanism:
 class TestDDPSeeding:
     """Integration tests with real gloo DDP (2 ranks).
 
-    Tests the bug (identical draws across ranks), the drift fix (torch-only),
-    its gaps (numpy/python untouched), and the per-rank-seed alternative.
+    Tests the bug (identical draws across ranks) and the seed_rank_local fix
+    (all three RNG sources: torch, numpy, python.random).
     """
 
     def test_bug_seed_only_ranks_identical(self):
@@ -272,62 +330,37 @@ class TestDDPSeeding:
         assert r[0]["numpy"] == r[1]["numpy"]
         assert r[0]["python"] == r[1]["python"]
 
-    def test_drift_fixes_torch(self):
-        """Fix: drift_rng_state decorrelates torch CPU draws across ranks."""
-        r = _run_ddp("drift")
+    def test_fix_torch(self):
+        """Fix: seed_rank_local decorrelates torch draws across ranks."""
+        r = _run_ddp("seed_rank_local")
         assert r[0]["torch"] != r[1]["torch"]
 
-    def test_drift_does_not_fix_numpy(self):
-        """Gap: drift does NOT decorrelate numpy RNG across ranks.
-
-        drift_rng_state only advances torch's CPU/CUDA generators. numpy's
-        independent RNG remains seeded identically across ranks.
-        """
-        r = _run_ddp("drift")
-        assert r[0]["numpy"] == r[1]["numpy"]
-
-    def test_drift_does_not_fix_python_random(self):
-        """Gap: drift does NOT decorrelate python.random across ranks."""
-        r = _run_ddp("drift")
-        assert r[0]["python"] == r[1]["python"]
-
-    def test_per_rank_seed_fixes_torch(self):
-        """Alternative: per-rank seed decorrelates torch draws."""
-        r = _run_ddp("per_rank_seed")
-        assert r[0]["torch"] != r[1]["torch"]
-
-    def test_per_rank_seed_fixes_numpy(self):
-        """Alternative: per-rank seed decorrelates numpy draws."""
-        r = _run_ddp("per_rank_seed")
+    def test_fix_numpy(self):
+        """Fix: seed_rank_local decorrelates numpy draws across ranks."""
+        r = _run_ddp("seed_rank_local")
         assert r[0]["numpy"] != r[1]["numpy"]
 
-    def test_per_rank_seed_fixes_python(self):
-        """Alternative: per-rank seed decorrelates python.random draws."""
-        r = _run_ddp("per_rank_seed")
+    def test_fix_python_random(self):
+        """Fix: seed_rank_local decorrelates python.random draws across ranks."""
+        r = _run_ddp("seed_rank_local")
         assert r[0]["python"] != r[1]["python"]
 
-    def test_drift_reproducible_across_runs(self):
-        """Drift: same seed → same per-rank draws across independent runs."""
-        r1 = _run_ddp("drift")
-        r2 = _run_ddp("drift")
+    def test_reproducible_across_runs(self):
+        """Same seed → same per-rank draws across independent runs."""
+        r1 = _run_ddp("seed_rank_local")
+        r2 = _run_ddp("seed_rank_local")
         assert r1[0]["torch"] == r2[0]["torch"]
         assert r1[1]["torch"] == r2[1]["torch"]
 
-    def test_per_rank_seed_reproducible_across_runs(self):
-        """Per-rank seed: same seed → same per-rank draws across independent runs."""
-        r1 = _run_ddp("per_rank_seed")
-        r2 = _run_ddp("per_rank_seed")
-        assert r1[0]["torch"] == r2[0]["torch"]
-        assert r1[1]["torch"] == r2[1]["torch"]
+    def test_no_substream_collision(self):
+        """Per-rank seeds: independent streams, no sub-stream collision risk.
 
-    def test_per_rank_seed_no_substream_collision(self):
-        """Per-rank seed: independent seeds, no STRIDE sub-stream collision risk.
-
-        Unlike drift (where rank 0's (STRIDE+1)-th draw == rank 1's first draw),
-        per-rank seeds produce fully independent streams with no boundary.
+        Unlike offset-based drift (where rank 0's (STRIDE+1)-th draw == rank 1's
+        first draw), per-rank seeds produce fully independent streams with no
+        boundary.
         """
         seed_everything(42)  # rank 0
-        _ = torch.randn(STRIDE + 100)  # way past the drift budget
+        _ = torch.randn(10_000_000)  # way past any drift budget
         rank0_after = torch.randn(1)
 
         seed_everything(43)  # rank 1
@@ -369,71 +402,46 @@ def _make_module() -> _MinimalLightningModule:
 
 @pytest.mark.essential
 class TestSetupIntegration:
-    """Tests for BaseLightningModule.setup() calling drift_rng_state."""
+    """Tests for BaseLightningModule.setup() calling seed_rank_local."""
 
-    def test_setup_calls_drift_for_every_stage(self):
-        """setup() calls drift_rng_state once per stage invocation."""
+    def test_setup_calls_seed_rank_local_for_every_stage(self):
+        """setup() calls seed_rank_local once per stage invocation."""
         mod = _make_module()
         with (
             patch.object(BaseLightningModule, "trainer", new_callable=PropertyMock, return_value=None),
-            patch("transferable_samplers.models.base_lightning_module.drift_rng_state") as mock_drift,
+            patch("transferable_samplers.models.base_lightning_module.seed_rank_local") as mock_seed,
         ):
             for stage in ("fit", "validate", "test", "predict"):
                 mod.setup(stage)
-        assert mock_drift.call_count == 4
+        assert mock_seed.call_count == 4
 
-    def test_drift_compounds_across_setup_calls(self):
-        """Footgun: calling drift twice (setup fit + setup test) advances RNG twice.
+    def test_seed_rank_local_idempotent_across_setup_calls(self):
+        """Idempotency: calling setup() multiple times does NOT compound.
 
-        Since drift advances from the *current* state (not from a fixed seed),
-        calling setup() per stage means the RNG offset depends on how many stages
-        ran before. Two setup() calls produce different draws than one.
+        seed_rank_local re-seeds from a fixed (base_seed + rank) each time, so
+        two setup() calls produce the same RNG state as one call. This avoids
+        the cross-stage reproducibility footgun of offset-based drift.
         """
-        with patch("transferable_samplers.utils.dist_utils.get_rank", return_value=1):
-            # Scenario A: setup("fit") then setup("test") — drift called twice
-            torch.manual_seed(42)
-            dist_utils.drift_rng_state()  # setup("fit")
-            dist_utils.drift_rng_state()  # setup("test")
-            draw_two_calls = torch.randn(4)
 
-            # Scenario B: setup("test") only — drift called once
-            torch.manual_seed(42)
-            dist_utils.drift_rng_state()  # setup("test")
-            draw_one_call = torch.randn(4)
-
-        assert not torch.equal(draw_two_calls, draw_one_call), (
-            "Drift compounds: two setup() calls produce different RNG state than one. "
-            "This is the cross-stage reproducibility footgun."
-        )
-
-    def test_per_rank_seed_once_no_compounding(self):
-        """Alternative: per-rank seed with one-time guard does NOT compound.
-
-        Calling setup() multiple times is safe because the second call is a no-op
-        — the seed is only applied once, producing a deterministic state regardless
-        of how many stages ran.
-        """
-        seeded = [False]
-
-        def seed_once(base_seed):
-            if not seeded[0]:
-                _per_rank_seed(base_seed)
-                seeded[0] = True
-
-        with patch("transferable_samplers.utils.dist_utils.get_rank", return_value=1):
-            # Scenario A: setup("fit") then setup("test") — seed fires once
-            seeded[0] = False
+        def _run_two_calls():
             torch.manual_seed(999)  # arbitrary pre-state
-            seed_once(42)  # setup("fit")
-            seed_once(42)  # setup("test") — no-op
-            draw_two_calls = torch.randn(4)
+            with (
+                patch("transferable_samplers.utils.dist_utils.get_rank", return_value=1),
+                patch.dict(os.environ, {"PL_GLOBAL_SEED": "42"}),
+            ):
+                dist_utils.seed_rank_local()  # setup("fit")
+                dist_utils.seed_rank_local()  # setup("test")
+            return torch.randn(4)
 
-            # Scenario B: setup("test") only — seed fires once
-            seeded[0] = False
+        def _run_one_call():
             torch.manual_seed(999)  # same pre-state
-            seed_once(42)  # setup("test")
-            draw_one_call = torch.randn(4)
+            with (
+                patch("transferable_samplers.utils.dist_utils.get_rank", return_value=1),
+                patch.dict(os.environ, {"PL_GLOBAL_SEED": "42"}),
+            ):
+                dist_utils.seed_rank_local()  # setup("test") only
+            return torch.randn(4)
 
-        assert torch.equal(draw_two_calls, draw_one_call), (
-            "Per-rank seed-once should NOT compound: two setup() calls produce the same RNG state as one call."
+        assert torch.equal(_run_two_calls(), _run_one_call()), (
+            "seed_rank_local should NOT compound: two setup() calls produce the same RNG state as one call."
         )

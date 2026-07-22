@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import os
+import random
 from typing import TypeVar
 
+import numpy as np
 import torch
 import torch.distributed as dist
 
@@ -23,42 +26,39 @@ def get_rank() -> int:
     return dist.get_rank() if dist.is_initialized() else 0
 
 
-def drift_rng_state() -> None:
-    """Desync the per-rank RNG by seeking each rank's generators to a unique offset.
+def seed_rank_local() -> None:
+    """Re-seed this rank's RNG with a rank-unique seed derived from the base seed.
 
     Lightning's ``seed_everything`` sets the same seed on every rank, which
     causes rank-local sampling ops (e.g. ``source_energy.sample`` drawing
     from a normalising-flow base distribution) to produce identical outputs
-    across ranks. Calling this once after DDP is initialised advances each
-    rank's RNG by ``rank * STRIDE``, so subsequent draws decorrelate.
-    No-op on rank 0 / non-distributed.
+    across ranks. This derives a unique seed per rank by offsetting the base
+    seed (read from ``PL_GLOBAL_SEED``, set by ``seed_everything``) with the
+    rank, then re-seeds torch, numpy, and python.random.
 
-    Drifts CPU and (if available) the current CUDA device's RNG. PyTorch's
-    CPU and CUDA RNGs are independent generators, and code paths that look
-    GPU-only often sample on CPU then move to GPU (e.g.
-    ``torch.distributions.Normal`` with scalar params), so we have to
-    advance both.
+    Unlike offset-based RNG drift, per-rank seeds produce fully independent
+    streams (no collision risk), cover all three RNG sources (torch, numpy,
+    python.random), and are idempotent — calling this multiple times from
+    repeated ``setup()`` calls produces the same state (no compounding).
 
-    CUDA uses a counter-based Philox generator, so we seek directly via
-    ``Generator.set_offset`` rather than burning kernel launches — note that
-    ``torch.randn(N, device=cuda)`` advances the offset by a fixed amount
-    *per launch*, not per element, so a single big call would not decorrelate
-    ranks. CPU's Mersenne Twister has no cheap seek, but it advances per
-    element, so a single ``torch.randn(rank * STRIDE)`` is fine.
+    No-op on rank 0 (already correctly seeded by ``seed_everything``) or
+    when distributed is not initialised.
 
-    STRIDE is chosen so each rank gets a sub-stream large enough to never
-    collide in practice: ~10^6 launches/elements per rank gap, well above
-    any realistic per-rank RNG consumption in a single run, and a tiny
-    fraction of Philox's 2^64 offset space.
+    Note: ``PL_GLOBAL_SEED`` is intentionally not overwritten so that
+    subsequent calls remain idempotent and DataLoader worker seeding
+    (``pl_worker_init_function``, which derives from ``torch.initial_seed()``
+    + rank + worker_id) automatically picks up the per-rank seed.
     """
-    STRIDE = 1 << 20
     rank = get_rank()
     if rank == 0:
         return
-    torch.randn(rank * STRIDE)
+    base_seed = int(os.environ.get("PL_GLOBAL_SEED", "0"))
+    per_rank_seed = base_seed + rank
+    torch.manual_seed(per_rank_seed)
+    np.random.seed(per_rank_seed)
+    random.seed(per_rank_seed)
     if torch.cuda.is_available():
-        gen = torch.cuda.default_generators[torch.cuda.current_device()]
-        gen.set_offset(gen.get_offset() + rank * STRIDE)
+        torch.cuda.manual_seed_all(per_rank_seed)
 
 
 def all_gather_cat(tensor: torch.Tensor) -> torch.Tensor:
