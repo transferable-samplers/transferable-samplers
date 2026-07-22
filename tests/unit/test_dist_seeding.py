@@ -35,8 +35,13 @@ from transferable_samplers.utils import dist_utils
 
 
 def _find_free_port() -> str:
-    """Return a free TCP port as a string (for gloo rendezvous)."""
+    """Return a free TCP port as a string (for gloo rendezvous).
+
+    ``SO_REUSEADDR`` avoids lingering ``TIME_WAIT`` sockets binding the port
+    on rapid re-runs (e.g. when the gloo store is retried after a flaky spawn).
+    """
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind(("", 0))
         s.listen(1)
         return str(s.getsockname()[1])
@@ -80,29 +85,47 @@ def _ddp_worker(
 
 
 def _run_ddp(strategy: str, world_size: int = 2, base_seed: int = 42, n_draws: int = 8) -> list[dict]:
-    """Spawn DDP workers with a given strategy and return per-rank RNG draws."""
+    """Spawn DDP workers with a given strategy and return per-rank RNG draws.
+
+    Retries once on a fresh port if any worker exits non-zero — gloo rendezvous
+    is occasionally flaky under fork+``mp.spawn`` in CI/concurrent test runs.
+    """
     ctx = mp.get_context("fork")
-    port = _find_free_port()
-    tmpdir = tempfile.mkdtemp()
-    procs = []
-    for rank in range(world_size):
-        p = ctx.Process(
-            target=_ddp_worker,
-            args=(rank, world_size, port, strategy, base_seed, tmpdir, n_draws),
-        )
-        p.start()
-        procs.append(p)
-    for p in procs:
-        p.join(timeout=60)
-        if p.exitcode != 0:
-            raise RuntimeError(f"DDP worker exited with code {p.exitcode}")
-    results = []
-    for rank in range(world_size):
-        rank_path = Path(tmpdir) / f"rank_{rank}.json"
-        with rank_path.open() as f:
-            results.append(json.load(f))
-    shutil.rmtree(tmpdir)
-    return results
+    last_err: Exception | None = None
+    for _attempt in range(2):
+        port = _find_free_port()
+        tmpdir = tempfile.mkdtemp()
+        procs = []
+        for rank in range(world_size):
+            p = ctx.Process(
+                target=_ddp_worker,
+                args=(rank, world_size, port, strategy, base_seed, tmpdir, n_draws),
+            )
+            p.start()
+            procs.append(p)
+        failed = False
+        for p in procs:
+            p.join(timeout=60)
+            if p.exitcode != 0:
+                failed = True
+                last_err = RuntimeError(f"DDP worker exited with code {p.exitcode}")
+                # Terminate any stragglers so the next attempt starts clean.
+                for q in procs:
+                    if q.is_alive():
+                        q.terminate()
+                break
+        if not failed:
+            results = []
+            for rank in range(world_size):
+                rank_path = Path(tmpdir) / f"rank_{rank}.json"
+                with rank_path.open() as f:
+                    results.append(json.load(f))
+            shutil.rmtree(tmpdir)
+            return results
+        shutil.rmtree(tmpdir, ignore_errors=True)
+    # Exhausted retries — surface the last failure.
+    assert last_err is not None
+    raise last_err
 
 
 # ======================================================================
