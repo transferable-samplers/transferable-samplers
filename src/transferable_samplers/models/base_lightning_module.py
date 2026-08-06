@@ -15,6 +15,7 @@ from transferable_samplers.callbacks.ema_weight_averaging import EMAWeightAverag
 from transferable_samplers.models.buffer import Buffer
 from transferable_samplers.models.priors.prior import Prior
 from transferable_samplers.utils.dataclasses import SourceEnergy, SourceEnergyConfig, SystemCond
+from transferable_samplers.utils.dist_utils import drift_rng_state
 from transferable_samplers.utils.pylogger import RankedLogger
 
 logger = RankedLogger(__name__, rank_zero_only=False)
@@ -136,6 +137,11 @@ class BaseLightningModule(LightningModule):
 
         Optionally compiles the network and validates trainer batch limits.
         """
+        # Desync per-rank RNG once DDP is up. seed_everything seeds every rank
+        # identically, which makes rank-local draws (e.g. source_energy.sample)
+        # produce duplicate proposals across ranks.
+        drift_rng_state()
+
         if self.compile_net and stage == "fit":
             # pyrefly: ignore [bad-assignment]
             self.net = torch.compile(self.net)
